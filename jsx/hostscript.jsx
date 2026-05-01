@@ -1562,4 +1562,125 @@ $._editflow.exportCustom = function(presetPath, fileName, folderPath) {
     } catch(e) { return '{"status":"error","message":"' + e.message + '"}'; }
 };
 
+// =========================================================
+// AUTO-CUT SILENCE — FFmpeg analysis + QE razor + ripple
+// Reads silence ranges from a JSON file produced by
+// bin/silence_detector.py, razors every silence boundary on
+// the active sequence, then removes the silent middle
+// segments (with ripple) on every track.
+// =========================================================
+
+$._editflow.applySilenceCuts = function(jsonPath, offsetSecs, rippleFlag) {
+    var seq = this.getSeq();
+    if (!seq) return '{"status":"error","message":"Open a sequence."}';
+
+    // Read silence JSON
+    var data;
+    try {
+        var f = new File(jsonPath);
+        if (!f.exists) return '{"status":"error","message":"Silence JSON not found: ' + jsonPath + '"}';
+        f.encoding = "UTF-8";
+        f.open("r");
+        var raw = f.read();
+        f.close();
+        data = eval("(" + raw + ")");
+    } catch(e) {
+        return '{"status":"error","message":"Bad silence JSON: ' + e.message + '"}';
+    }
+
+    var silences = data.silences || [];
+    if (silences.length === 0) {
+        return '{"status":"success","message":"No silences detected — nothing to cut.","silences":0,"deleted":0}';
+    }
+
+    var offset = parseFloat(offsetSecs) || 0;
+    var ripple = (rippleFlag === "false" || rippleFlag === false) ? false : true;
+
+    // Enable QE DOM
+    try { app.enableQE(); } catch(e) {
+        return '{"status":"error","message":"QE DOM unavailable."}';
+    }
+    var qeSeq;
+    try { qeSeq = qe.project.getActiveSequence(); } catch(e) {
+        return '{"status":"error","message":"Cannot access QE sequence."}';
+    }
+    if (!qeSeq) return '{"status":"error","message":"No active QE sequence."}';
+
+    // Frame rate (qe returns string like "29.97")
+    var fps = 30;
+    try {
+        var fr = qeSeq.getFrameRate();
+        var p = parseFloat(fr);
+        if (p && p > 0) fps = p;
+    } catch(e) {}
+    var fpsRound = Math.round(fps);
+
+    function pad2(n) { return (n < 10) ? "0" + n : "" + n; }
+    function secToTC(sec) {
+        if (sec < 0) sec = 0;
+        var totalFrames = Math.round(sec * fps);
+        var ff = totalFrames % fpsRound;
+        var totalSec = Math.floor(totalFrames / fpsRound);
+        var ss = totalSec % 60;
+        var mm = Math.floor(totalSec / 60) % 60;
+        var hh = Math.floor(totalSec / 3600);
+        return pad2(hh) + ":" + pad2(mm) + ":" + pad2(ss) + ":" + pad2(ff);
+    }
+
+    // 1) Razor every boundary. Process in DESCENDING order so cuts
+    //    don't shift later targets when ripple is off.
+    var sorted = silences.slice().sort(function(a, b) { return b.start - a.start; });
+    var razorCount = 0;
+    for (var i = 0; i < sorted.length; i++) {
+        var s = sorted[i].start + offset;
+        var e = sorted[i].end + offset;
+        try { qeSeq.razor(secToTC(s)); razorCount++; } catch(err) {}
+        try { qeSeq.razor(secToTC(e)); razorCount++; } catch(err) {}
+    }
+
+    // 2) Walk every track, remove items that fall inside any silence
+    var deletedCount = 0;
+    var tol = 0.02; // seconds tolerance for boundary match
+    var tracks = [];
+    try {
+        for (var v = 0; v < qeSeq.numVideoTracks; v++) tracks.push(qeSeq.getVideoTrackAt(v));
+    } catch(e) {}
+    try {
+        for (var a = 0; a < qeSeq.numAudioTracks; a++) tracks.push(qeSeq.getAudioTrackAt(a));
+    } catch(e) {}
+
+    function clipInsideSilence(startSec, endSec) {
+        for (var si = 0; si < silences.length; si++) {
+            var ss = silences[si].start + offset;
+            var es = silences[si].end + offset;
+            if (startSec >= ss - tol && endSec <= es + tol) return true;
+        }
+        return false;
+    }
+
+    for (var t = 0; t < tracks.length; t++) {
+        var track = tracks[t];
+        var n = 0;
+        try { n = track.numItems; } catch(e) { continue; }
+        // iterate in REVERSE so removal does not shift earlier indices
+        for (var idx = n - 1; idx >= 0; idx--) {
+            try {
+                var item = track.getItemAt(idx);
+                if (!item || item.type !== "Clip") continue;
+                var sSec = (item.start && item.start.secs !== undefined) ? item.start.secs : 0;
+                var eSec = (item.end && item.end.secs !== undefined) ? item.end.secs : 0;
+                if (!clipInsideSilence(sSec, eSec)) continue;
+                // Try every removal signature Premiere has shipped
+                var removed = false;
+                try { item.remove(ripple, true); removed = true; } catch(e1) {}
+                if (!removed) { try { item.remove(true, ripple); removed = true; } catch(e2) {} }
+                if (!removed) { try { track.removeItem(item, ripple, true); removed = true; } catch(e3) {} }
+                if (removed) deletedCount++;
+            } catch(err) {}
+        }
+    }
+
+    return '{"status":"success","message":"Cut ' + silences.length + ' silences (' + deletedCount + ' segments removed, ' + razorCount + ' razors).","silences":' + silences.length + ',"razors":' + razorCount + ',"deleted":' + deletedCount + ',"ripple":' + ripple + '}';
+};
+
 $._editflow_loaded = true;

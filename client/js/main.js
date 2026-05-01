@@ -377,6 +377,70 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     });
 
+    // ============================================================
+    // AUTO-CUT SILENCE — FFmpeg analysis + JSX QE razor
+    // ============================================================
+    safeBind("btn-autocut-silence", function() {
+        if (!fsModule || !execModule || !osModule) {
+            showStatus("Node modules unavailable.", "red"); return;
+        }
+        if (operationRunning) return;
+
+        var noiseDb = parseFloat(document.getElementById("silence-noise-db").value) || -30;
+        var minSec  = parseFloat(document.getElementById("silence-min-sec").value)  || 0.5;
+        var padSec  = parseFloat(document.getElementById("silence-pad-sec").value);
+        if (isNaN(padSec)) padSec = 0.05;
+
+        showProgress("Finding audio...", 5);
+        csInterface.evalScript('$._editflow.getAudioMedia()', function(raw) {
+            var info = safeParse(raw);
+            if (!info || !info.mediaPath) {
+                hideProgress(); showStatus("No audio on timeline.", "red"); return;
+            }
+            var mediaPath  = info.mediaPath;
+            var timelineStart = info.timelineStart || 0;
+
+            var detector = extensionPath + "/bin/silence_detector.py";
+            if (!fsModule.existsSync(detector)) {
+                hideProgress(); showStatus("silence_detector.py missing.", "red"); return;
+            }
+            var jsonOut = osModule.tmpdir() + "/efp_silence_" + Date.now() + ".json";
+
+            // Quote args for shell
+            function shq(s) { return '"' + String(s).replace(/(["\\$`])/g, "\\$1") + '"'; }
+            var cmd = "/usr/bin/env python3 " + shq(detector) + " " + shq(mediaPath) + " " + shq(jsonOut) +
+                      " --noise " + noiseDb + " --min " + minSec + " --pad " + padSec;
+
+            showProgress("Detecting silences (FFmpeg)...", 30);
+            execModule(cmd, { maxBuffer: 8 * 1024 * 1024 }, function(err, stdout, stderr) {
+                if (err) {
+                    hideProgress();
+                    console.log("[AutoCut] detector err:", err.message, stderr);
+                    showStatus("Silence detection failed.", "red"); return;
+                }
+                var summary = safeParse(stdout) || {};
+                if (summary.status !== "success" || !summary.silences_count) {
+                    hideProgress();
+                    showStatus(summary.silences_count === 0 ? "No silences found." : "Detector error.", "orange");
+                    try { fsModule.unlinkSync(jsonOut); } catch(e) {}
+                    return;
+                }
+
+                showProgress("Cutting " + summary.silences_count + " silences...", 75);
+                var jsonEsc = jsonOut.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+                csInterface.evalScript(
+                    '$._editflow.applySilenceCuts("' + jsonEsc + '","' + timelineStart + '","true")',
+                    function(res) {
+                        showProgress("Done!", 100); setTimeout(hideProgress, 2000);
+                        console.log("[AutoCut] result:", res);
+                        handleJSXResult(res);
+                        try { fsModule.unlinkSync(jsonOut); } catch(e) {}
+                    }
+                );
+            });
+        });
+    });
+
     safeBind("btn-clear-markers", function() {
         showConfirm("Clear Markers", "Delete all markers?", function() {
             csInterface.evalScript('$._editflow.clearMarkers()', function(res) {

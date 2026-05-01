@@ -201,6 +201,23 @@
             </button>
         </div>
 
+        <!-- AUTO-CUT SILENCE -->
+        <div class="action-group" style="border-left: 3px solid #a855f7;">
+            <h3>✂️ Auto-Cut Silence</h3>
+            <p class="description">Select an audio clip → detect & remove silent gaps. Cmd+Z to undo.</p>
+            <div class="input-row" style="display:flex; gap:4px; margin-bottom:6px; align-items:center;">
+                <label style="font-size:9px; color:#888; width:46px;">Noise dB</label>
+                <input type="number" id="silence-noise-db" value="-30" min="-60" max="-10" step="1" style="flex:1; padding:3px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:9px;" data-tooltip="Anything below this volume is treated as silence (default -30 dB).">
+                <label style="font-size:9px; color:#888; width:46px;">Min sec</label>
+                <input type="number" id="silence-min-sec" value="0.5" min="0.1" max="5" step="0.1" style="flex:1; padding:3px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:9px;" data-tooltip="Minimum silence duration to cut (default 0.5s).">
+                <label style="font-size:9px; color:#888; width:46px;">Pad sec</label>
+                <input type="number" id="silence-pad-sec" value="0.05" min="0" max="1" step="0.01" style="flex:1; padding:3px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:9px;" data-tooltip="Speech padding kept on each side (default 50ms).">
+            </div>
+            <button id="btn-autocut-silence" style="width:100%; background:linear-gradient(135deg, #a855f7, #7c3aed); border:none; color:#fff; font-weight:bold; padding:8px; border-radius:4px; cursor:pointer;" data-tooltip="Detect silences with FFmpeg and remove them via QE razor + ripple delete.">
+                ✂️ Detect &amp; Cut Silences
+            </button>
+        </div>
+
         <!-- BEAT DETECTION (last section) -->
 
         <div class="action-group" style="border-left: 3px solid #f43f5e;">
