@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>EditFlow Pro</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/CSInterface.js"></script>
+</head>
+<body>
+
+    <!-- SETTINGS OVERLAY -->
+    <div id="settings-overlay" class="settings-overlay hidden">
+        <div class="settings-panel">
+            <h2>⚙️ Settings</h2>
+            <label>Voice Level Presets (dB)</label>
+            <div class="settings-row">
+                <input type="number" id="cfg-voice-1" value="2" min="-30" max="30">
+                <input type="number" id="cfg-voice-2" value="3" min="-30" max="30">
+                <input type="number" id="cfg-voice-3" value="5" min="-30" max="30">
+            </div>
+            <label>Music Level Presets (dB)</label>
+            <div class="settings-row">
+                <input type="number" id="cfg-music-1" value="-9" min="-60" max="0">
+                <input type="number" id="cfg-music-2" value="-16" min="-60" max="0">
+                <input type="number" id="cfg-music-3" value="-21" min="-60" max="0">
+            </div>
+            <label>Static Scale Presets (%)</label>
+            <div class="settings-row">
+                <input type="number" id="cfg-scale-1" value="115" min="100" max="500">
+                <input type="number" id="cfg-scale-2" value="130" min="100" max="500">
+                <input type="number" id="cfg-scale-3" value="150" min="100" max="500">
+                <input type="number" id="cfg-scale-4" value="175" min="100" max="500">
+                <input type="number" id="cfg-scale-5" value="200" min="100" max="500">
+            </div>
+            <hr class="settings-divider">
+            <label>Default Bitrate (Mbps)</label>
+            <div class="settings-row">
+                <input type="number" id="cfg-bitrate" value="10" min="1" max="100">
+            </div>
+            <label>Default Beat Precision</label>
+            <div class="settings-row">
+                <select id="cfg-beat-precision" style="flex:1;">
+                    <option value="normal">Normal</option>
+                    <option value="precision" selected>Precision</option>
+                </select>
+            </div>
+            <hr class="settings-divider">
+            <div style="display:flex; gap:8px;">
+                <button id="btn-settings-save" class="primary" style="flex:1;">Save</button>
+                <button id="btn-settings-cancel" class="secondary" style="flex:1;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONFIRM MODAL -->
+    <div id="confirm-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2 id="confirm-title">⚠️ Confirm</h2>
+            <p id="confirm-text">Are you sure?</p>
+            <div class="modal-actions">
+                <button id="btn-confirm-no" class="secondary">Cancel</button>
+                <button id="btn-confirm-yes" class="primary">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WELCOME MODAL -->
+    <div id="welcome-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2>🎬 EditFlow Pro v14</h2>
+            <p style="font-size:12px; line-height:1.5; color:#ccc;">
+                <strong style="color:#4ade80;">Fixed:</strong><br>
+                ✓ Speed controls now use QE DOM — real speed change on clips<br>
+                ✓ Auto-Cut Silence rebuilt with FFmpeg analysis + QE razor<br>
+                ✓ All operations support Cmd+Z / Ctrl+Z undo<br><br>
+                <strong style="color:#60a5fa;">New:</strong><br>
+                ✓ Color Match — 30+ cinematic Lumetri preset looks<br>
+                ✓ Dedicated Reset 0dB buttons for Voice & Music<br>
+                ✓ Keyboard shortcuts for common operations<br><br>
+                <strong style="color:#ef4444;">Removed:</strong><br>
+                ✗ Fake Ramp In/Out/Freeze+Burst buttons (API limitation)<br>
+                ✗ Browser-side silence analysis (replaced with FFmpeg)
+            </p>
+            <div class="modal-actions">
+                <button id="btn-welcome-close" class="primary" style="flex:1;">Get Started</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- HEADER -->
+    <div class="header">
+        <div class="header-left">
+            <h1>EditFlow Pro</h1>
+        </div>
+        <div class="header-right">
+            <div class="badge badge-pro">v15</div>
+            <button class="settings-gear" id="btn-settings" data-tooltip="Customize presets and defaults">⚙</button>
+        </div>
+    </div>
+
+    <div class="panel-content">
+
+        <!-- 1. AUDIO LEVELS -->
+        <div class="action-group">
+            <h3>🔊 Audio Level</h3>
+            <p class="description">Select audio clip → Nudge volume. Cmd+Z to undo.</p>
+
+            <!-- Current level display -->
+            <div id="audio-level-display" style="
+                text-align:center;
+                font-size:18px;
+                font-weight:bold;
+                color:#4fc3f7;
+                font-family:monospace;
+                padding:8px;
+                background:rgba(255,255,255,0.05);
+                border:1px solid rgba(255,255,255,0.1);
+                border-radius:6px;
+                margin-bottom:8px;
+            ">0 dB</div>
+
+            <!-- Nudge controls -->
+            <div style="display:flex; gap:4px; margin-bottom:6px;">
+                <button id="btn-audio-down" style="flex:1; padding:10px; background:#1e293b; color:#f87171; border:1px solid #334155; border-radius:4px; cursor:pointer; font-size:16px; font-weight:bold;" title="Decrease 1 dB">▼ −1 dB</button>
+                <button id="btn-audio-up" style="flex:1; padding:10px; background:#1e293b; color:#81c784; border:1px solid #334155; border-radius:4px; cursor:pointer; font-size:16px; font-weight:bold;" title="Increase 1 dB">▲ +1 dB</button>
+            </div>
+        </div>
+
+
+        <!-- 3. STATIC SCALE -->
+        <div class="action-group" style="border-left: 3px solid #14b8a6;">
+            <h3>🖼️ Static Scale (Cut-in)</h3>
+            <p class="description">Select clips. Instantly resizes base scale (no keyframes).</p>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:4px;" id="scale-grid">
+                <button id="btn-scale-115" class="scale-btn">115</button>
+                <button id="btn-scale-130" class="scale-btn">130</button>
+                <button id="btn-scale-150" class="scale-btn">150</button>
+                <button id="btn-scale-175" class="scale-btn">175</button>
+                <button id="btn-scale-200" class="scale-btn">200</button>
+                <button id="btn-scale-reset" class="scale-btn" style="background:#444; color:#ef4444;">↺ 100</button>
+            </div>
+        </div>
+
+        <!-- TRANSFORM & CLIPBOARD (merged, right after Scale) -->
+        <div class="action-group" style="border-left: 3px solid #06b6d4;">
+            <h3>📐 Transform & Tools</h3>
+
+            <!-- NUDGE ARROWS -->
+            <div style="display:flex; gap:4px; margin-bottom:6px; align-items:center;">
+                <button id="refresh-clip-info" style="padding:4px 6px; font-size:10px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15); color:#aaa; border-radius:3px; cursor:pointer;" title="Refresh">🔄</button>
+                <button id="nudge-left" style="padding:4px 8px; background:#1e293b; color:#4fc3f7; border:1px solid #334155; border-radius:3px; cursor:pointer; font-size:12px; font-weight:bold;" title="Move Left">◀</button>
+                <button id="nudge-up" style="padding:4px 8px; background:#1e293b; color:#4fc3f7; border:1px solid #334155; border-radius:3px; cursor:pointer; font-size:12px; font-weight:bold;" title="Move Up">▲</button>
+                <button id="nudge-down" style="padding:4px 8px; background:#1e293b; color:#4fc3f7; border:1px solid #334155; border-radius:3px; cursor:pointer; font-size:12px; font-weight:bold;" title="Move Down">▼</button>
+                <button id="nudge-right" style="padding:4px 8px; background:#1e293b; color:#4fc3f7; border:1px solid #334155; border-radius:3px; cursor:pointer; font-size:12px; font-weight:bold;" title="Move Right">▶</button>
+                <input type="number" id="nudge-step" value="10" min="1" max="500" style="width:36px; padding:3px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:9px; text-align:center;" title="Step size">
+                <span style="font-size:8px; color:#666;">px</span>
+            </div>
+
+            <!-- Position & Scale (compact) -->
+            <div style="display:flex; gap:3px; margin-bottom:4px; align-items:center;">
+                <label style="font-size:9px; color:#888; width:32px;">Pos</label>
+                <input type="number" id="pos-x" placeholder="X" step="0.1" style="flex:1; padding:3px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:9px;">
+                <input type="number" id="pos-y" placeholder="Y" step="0.1" style="flex:1; padding:3px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:9px;">
+                <button id="apply-position" style="padding:2px 6px; background:#334155; color:#06b6d4; border:1px solid #06b6d4; border-radius:2px; cursor:pointer; font-size:8px; font-weight:600;">Set</button>
+            </div>
+            <div style="display:flex; gap:3px; margin-bottom:6px; align-items:center;">
+                <label style="font-size:9px; color:#888; width:32px;">Scl%</label>
+                <input type="number" id="scale-value" placeholder="100" style="flex:1; padding:3px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:9px;">
+                <button id="apply-scale" style="padding:2px 6px; background:#334155; color:#06b6d4; border:1px solid #06b6d4; border-radius:2px; cursor:pointer; font-size:8px; font-weight:600;">Set</button>
+            </div>
+
+            <!-- Clipboard (merged) -->
+            <button id="btn-paste-clipboard" style="width:100%; padding:5px; background:linear-gradient(135deg, #3b82f6, #1d4ed8); border:none; color:#fff; font-weight:600; font-size:10px; border-radius:4px; cursor:pointer;" data-tooltip="Paste any image copied from the internet directly onto your timeline.">
+                📋 Paste Image from Internet
+            </button>
+            <p id="paste-status" style="font-size:9px; color:#666; margin-top:2px;"></p>
+        </div>
+
+        <!-- EXPORT ENGINE -->
+        <div class="action-group" style="border-left: 3px solid #f59e0b;">
+            <h3>📤 Export Engine</h3>
+            <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap;">
+                <label style="color:#999; font-size:10px; white-space:nowrap;">File:</label>
+                <input type="text" id="export-filename" placeholder="sequence name" style="flex:1; min-width:80px; padding:3px 6px; background:#2a2a2a; border:1px solid #444; border-radius:3px; color:#eee; font-size:10px;">
+                <label style="color:#999; font-size:10px;">Mbps:</label>
+                <input type="number" id="batch-bitrate-input" value="10" min="1" max="100" style="width:40px; padding:3px; background:#2a2a2a; border:1px solid #444; border-radius:3px; color:#eee; font-size:10px;">
+            </div>
+            <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+                <label style="color:#999; font-size:10px; white-space:nowrap;">Save to:</label>
+                <input type="text" id="export-path" placeholder="Desktop/EditFlowPro_Exports" style="flex:1; padding:3px 6px; background:#2a2a2a; border:1px solid #444; border-radius:3px; color:#eee; font-size:10px;">
+                <button id="btn-export-browse" style="padding:3px 8px; font-size:10px; background:#444; color:#eee; border:1px solid #555; border-radius:3px; cursor:pointer; white-space:nowrap;">📁</button>
+            </div>
+            <button id="btn-export-selected" style="background:linear-gradient(135deg, #f59e0b, #d97706); border:none; color:#000; font-weight:bold; margin-bottom:6px;" data-tooltip="Export only the currently selected clip respecting its in/out range markers.">
+                📤 Export Selected Clip In-Out Only
+            </button>
+            <button id="btn-export-all" class="secondary" data-tooltip="Export the entire timeline as one continuous video file.">
+                📦 Export All Timeline Clips
+            </button>
+        </div>
+
+        <!-- BEAT DETECTION (last section) -->
+
+        <div class="action-group" style="border-left: 3px solid #f43f5e;">
+            <h3>🎵 AI Beat Detection</h3>
+            <div class="input-row" style="margin-bottom:6px;">
+                <select id="beat-band-select" style="flex:1;" data-tooltip="Filter which percussion hits to detect.">
+                    <option value="all">🎶 All Percussion</option>
+                    <option value="kicks">🥁 Kicks</option>
+                    <option value="snares">🪘 Snares</option>
+                    <option value="hihats">🔔 Hi-Hats</option>
+                </select>
+                <select id="beat-precision-select" style="flex:1;" data-tooltip="Higher precision = slower processing but more accurate markers.">
+                    <option value="normal">Normal</option>
+                    <option value="precision" selected>Precision</option>
+                </select>
+            </div>
+            <button id="btn-beat-markers" class="secondary" style="margin-bottom:4px;" data-tooltip="Analyze audio and place sequence markers on every detected beat. Supports Cmd+Z undo.">Place Musical Markers</button>
+            <button id="btn-clear-markers" style="font-size:10px; color:#ff6b6b; padding:2px; border:none; background:none; cursor:pointer; width:auto;" data-tooltip="Remove all sequence markers. Requires confirmation.">Clear All Markers</button>
+        </div>
+
+        <!-- PROGRESS -->
+        <div class="progress-box hidden" id="progress-container">
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progress-fill"></div>
+            </div>
+            <p id="progress-text">Working...</p>
+        </div>
+
+        <!-- STATUS BAR -->
+        <div class="status-box status-info" id="status-box">
+            <div class="pulsing-orb"></div>
+            <span id="status-text">EditFlow Pro v14.0 ready.</span>
+        </div>
+    </div>
+
+    <div id="ai-insights-panel" class="ai-insights hidden">
+        <h4>💡 Task Report</h4><p id="ai-insight-text"></p>
+    </div>
+
+    <script src="js/dspTools.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
