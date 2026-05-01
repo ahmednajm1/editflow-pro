@@ -78,6 +78,37 @@ def detect_silences(ffmpeg, path, noise_db, min_silence):
     return pairs
 
 
+def probe_volume(ffmpeg, path):
+    """Run ffmpeg volumedetect to learn mean/peak dB. Returns (mean_db, max_db)
+    or (None, None) on failure."""
+    cmd = [ffmpeg, "-hide_banner", "-nostats", "-i", path,
+           "-af", "volumedetect", "-f", "null", "-"]
+    proc = subprocess.run(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    mean_db, max_db = None, None
+    for line in proc.stderr.splitlines():
+        m = re.search(r"mean_volume:\s*(-?\d+(?:\.\d+)?)\s*dB", line)
+        if m:
+            mean_db = float(m.group(1))
+        m = re.search(r"max_volume:\s*(-?\d+(?:\.\d+)?)\s*dB", line)
+        if m:
+            max_db = float(m.group(1))
+    return mean_db, max_db
+
+
+def suggest_threshold(mean_db, max_db):
+    """Pick a sensible silencedetect threshold from observed levels.
+    Mean + 6dB tends to catch genuine pauses without eating speech."""
+    if mean_db is None:
+        return None
+    candidate = round(mean_db + 6.0)
+    # Clamp into a reasonable speech range
+    if candidate > -15:
+        candidate = -15
+    if candidate < -55:
+        candidate = -55
+    return candidate
+
+
 def apply_padding(silences, padding, duration):
     """Shrink each silence by `padding` seconds on each side so we don't
     cut into the speech that immediately neighbors it."""
@@ -129,12 +160,19 @@ def main():
     silences = apply_padding(raw, args.pad, duration)
     keep = build_keep_segments(silences, duration)
 
+    # Always probe volume so the panel can give actionable feedback
+    mean_db, max_db = probe_volume(ffmpeg, args.input)
+    suggested = suggest_threshold(mean_db, max_db)
+
     payload = {
         "status": "success",
         "duration": round(duration, 3),
         "noise_db": args.noise,
         "min_silence": args.min_silence,
         "padding": args.pad,
+        "mean_volume_db": mean_db,
+        "max_volume_db": max_db,
+        "suggested_noise_db": suggested,
         "silences": [{"start": s, "end": e} for s, e in silences],
         "keep": [{"start": s, "end": e} for s, e in keep],
     }
@@ -147,6 +185,9 @@ def main():
         "silences_count": len(silences),
         "keep_count": len(keep),
         "duration": payload["duration"],
+        "mean_volume_db": mean_db,
+        "max_volume_db": max_db,
+        "suggested_noise_db": suggested,
         "output": args.output,
     }
     json.dump(summary, sys.stdout)

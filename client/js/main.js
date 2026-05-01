@@ -419,10 +419,25 @@ document.addEventListener("DOMContentLoaded", function() {
                     showStatus("Silence detection failed.", "red"); return;
                 }
                 var summary = safeParse(stdout) || {};
-                if (summary.status !== "success" || !summary.silences_count) {
+                console.log("[AutoCut] detector summary:", summary);
+                if (summary.status !== "success") {
                     hideProgress();
-                    showStatus(summary.silences_count === 0 ? "No silences found." : "Detector error.", "orange");
+                    showStatus("Detector error.", "red");
                     try { fsModule.unlinkSync(jsonOut); } catch(e) {}
+                    return;
+                }
+                if (!summary.silences_count) {
+                    hideProgress();
+                    var msg = "No silences at " + noiseDb + " dB.";
+                    if (summary.mean_volume_db !== undefined && summary.mean_volume_db !== null) {
+                        msg += " Mean: " + summary.mean_volume_db + " dB, Peak: " + summary.max_volume_db + " dB.";
+                    }
+                    if (summary.suggested_noise_db !== undefined && summary.suggested_noise_db !== null) {
+                        msg += " Try Noise=" + summary.suggested_noise_db + ".";
+                        document.getElementById("silence-noise-db").value = summary.suggested_noise_db;
+                    }
+                    showStatus(msg, "orange");
+                    console.log("[AutoCut] keeping JSON for inspection:", jsonOut);
                     return;
                 }
 
