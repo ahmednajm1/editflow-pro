@@ -262,11 +262,21 @@
             <div style="display:flex; gap:4px; margin-bottom:8px; align-items:center;">
                 <label style="font-size:9px; color:#888; width:42px;">Font</label>
                 <select id="cap-font" style="flex:1; padding:4px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:10px;">
-                    <option value="Arial" selected>Arial Bold</option>
-                    <option value="Helvetica">Helvetica Bold</option>
-                    <option value="Impact">Impact</option>
-                    <option value="Montserrat">Montserrat Black</option>
-                    <option value="Poppins">Poppins Black</option>
+                    <optgroup label="🌐 Latin">
+                        <option value="Arial" selected>Arial Bold</option>
+                        <option value="Helvetica">Helvetica Bold</option>
+                        <option value="Impact">Impact</option>
+                        <option value="Montserrat">Montserrat Black</option>
+                        <option value="Poppins">Poppins Black</option>
+                    </optgroup>
+                    <optgroup label="🇸🇦 Arabic">
+                        <option value="Makeen">مكين — Makeen</option>
+                        <option value="VIP Hala Bold">VIP Hala Bold</option>
+                        <option value="Digi Madasi Bold">Digi Madasi Bold</option>
+                        <option value="MadaniArabic-Bold">Madani Arabic Bold</option>
+                        <option value="MadaniArabic-Light">Madani Arabic Light</option>
+                        <option value="MadaniArabic-Thin">Madani Arabic Thin</option>
+                    </optgroup>
                 </select>
                 <label style="font-size:9px; color:#888; width:30px;">Size</label>
                 <input type="number" id="cap-size" value="72" min="20" max="200" step="2" style="width:46px; padding:4px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:10px;">

@@ -1647,16 +1647,21 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
         var ms = Math.round((t - Math.floor(t)) * 1000);
         return pad(h, 2) + ":" + pad(m, 2) + ":" + pad(s, 2) + "," + pad(ms, 3);
     }
+    // ExtendScript's writeln() emits a lone CR on macOS, which Premiere's
+    // SRT importer rejects with "generic error". We write CRLF + UTF-8 BOM
+    // explicitly so the file matches the SRT spec on every platform.
     var srtPath = efpJsonPath.replace(/\.efp\.json$/, "") + ".efp." + groupStyle + ".srt";
     var sf = new File(srtPath);
     sf.encoding = "UTF-8";
+    sf.lineFeed = "Windows";   // ensures \r\n on writeln
     sf.open("w");
+    sf.write("﻿");        // UTF-8 BOM — required for Arabic/RTL captions
     for (var i = 0; i < groups.length; i++) {
         var g = groups[i];
-        sf.writeln(i + 1);
-        sf.writeln(secToSRT(g.start + offsetSecs) + " --> " + secToSRT(g.end + offsetSecs));
-        sf.writeln(g.text);
-        sf.writeln("");
+        sf.write((i + 1) + "\r\n");
+        sf.write(secToSRT(g.start + offsetSecs) + " --> " + secToSRT(g.end + offsetSecs) + "\r\n");
+        sf.write(g.text + "\r\n");
+        sf.write("\r\n");
     }
     sf.close();
 
