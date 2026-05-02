@@ -114,7 +114,7 @@ def run_whisper(whisper_cli, model_path, wav_path, lang, output_basename):
         "-of", output_basename,
         "--output-json-full",   # includes word-level timestamps + confidence
         "--output-srt",
-        "--max-len", "42",      # ~42 chars per subtitle line (readable)
+        "--max-len", "0",       # disable char limit — natural sentence segmentation
         "--print-progress",
     ]
     if lang and lang != "auto":

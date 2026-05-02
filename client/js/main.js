@@ -368,12 +368,32 @@ document.addEventListener("DOMContentLoaded", function() {
     // ============================================================
     // AI CAPTIONS — Whisper transcription + animated captions
     // ============================================================
-    // ── COLOR SWATCH SYNC ────────────────────────────────────
+    // ── COLOR PALETTE ──────────────────────────────────────────
     (function() {
-        function linkSwatch(inputId, swatchId) {
-            var input  = document.getElementById(inputId);
-            var swatch = document.getElementById(swatchId);
-            if (!input || !swatch) return;
+        var COLORS = [
+            "#FFFFFF", "#000000", "#FFD700", "#FF4444",
+            "#1F8FFF", "#51CF66", "#FF6B6B", "#FF9F43",
+            "#A855F7", "#EC4899", "#14B8A6", "#F97316",
+            "#6366F1", "#8B5CF6", "#06B6D4", "#84CC16",
+            "#FBBF24", "#F472B6", "#22D3EE", "#EF4444",
+            "#10B981", "#3B82F6", "#F59E0B", "#E5E7EB"
+        ];
+
+        function setupPalette(inputId, swatchId, paletteId) {
+            var input   = document.getElementById(inputId);
+            var swatch  = document.getElementById(swatchId);
+            var palette = document.getElementById(paletteId);
+            if (!input || !swatch || !palette) return;
+
+            // Build color cells
+            for (var i = 0; i < COLORS.length; i++) {
+                var cell = document.createElement("div");
+                cell.className = "cp-cell";
+                cell.style.background = COLORS[i];
+                cell.setAttribute("data-color", COLORS[i]);
+                palette.appendChild(cell);
+            }
+
             function sync() {
                 var v = input.value;
                 if (/^#[0-9a-fA-F]{6}$/.test(v)) swatch.style.background = v;
@@ -381,10 +401,33 @@ document.addEventListener("DOMContentLoaded", function() {
             sync();
             input.addEventListener("input",  sync);
             input.addEventListener("change", sync);
-            swatch.addEventListener("click", function() { input.focus(); input.select(); });
+
+            swatch.addEventListener("click", function(e) {
+                e.stopPropagation();
+                var isOpen = !palette.classList.contains("hidden");
+                // Close all palettes first
+                var all = document.querySelectorAll(".color-palette");
+                for (var j = 0; j < all.length; j++) all[j].classList.add("hidden");
+                if (!isOpen) palette.classList.remove("hidden");
+            });
+
+            palette.addEventListener("click", function(e) {
+                var c = e.target.getAttribute("data-color");
+                if (c) {
+                    input.value = c;
+                    swatch.style.background = c;
+                    palette.classList.add("hidden");
+                }
+            });
         }
-        linkSwatch("cap-color",     "cap-color-swatch");
-        linkSwatch("cap-highlight", "cap-hl-swatch");
+        setupPalette("cap-color",     "cap-color-swatch",  "cap-color-palette");
+        setupPalette("cap-highlight", "cap-hl-swatch",     "cap-hl-palette");
+
+        // Close palette on outside click
+        document.addEventListener("click", function() {
+            var all = document.querySelectorAll(".color-palette");
+            for (var j = 0; j < all.length; j++) all[j].classList.add("hidden");
+        });
     })();
 
     safeBind("btn-generate-captions", function() {
@@ -404,9 +447,12 @@ document.addEventListener("DOMContentLoaded", function() {
 
         var statusLine = document.getElementById("cap-status");
         function setStatus(t) { if (statusLine) statusLine.textContent = t; }
+        function shq(s) { return '"' + String(s).replace(/(["\\$`])/g, "\\$1") + '"'; }
+        var opts = { maxBuffer: 16 * 1024 * 1024, timeout: 30 * 60 * 1000 };
 
         showProgress("Finding audio...", 3);
         setStatus("Reading selection…");
+
         csInterface.evalScript('$._editflow.getAudioMedia()', function(raw) {
             var info = safeParse(raw);
             if (!info || !info.mediaPath) {
@@ -424,23 +470,18 @@ document.addEventListener("DOMContentLoaded", function() {
             }
             var outBase = osModule.tmpdir() + "/efp_caps_" + Date.now();
 
-            function shq(s) { return '"' + String(s).replace(/(["\\$`])/g, "\\$1") + '"'; }
             var cmd = "/usr/bin/env python3 " + shq(transcriber) + " " + shq(mediaPath) + " " + shq(outBase) +
                       " --lang " + shq(lang) + " --model " + shq(model);
-            // Trim to the actual selection so we don't transcribe the whole source file
             if (clipDur > 0.1 && clipOut > clipIn) {
                 cmd += " --start " + clipIn.toFixed(3) + " --end " + clipOut.toFixed(3);
             }
 
             var modelSize = ({tiny:75, base:140, small:460, medium:1500, large:3000})[model] || 460;
-            var trimNote = (clipDur > 0.1) ? (" · " + clipDur.toFixed(1) + "s of " + (info.clipName || "clip")) : "";
+            var trimNote = (clipDur > 0.1) ? (" · " + clipDur.toFixed(1) + "s") : "";
             showProgress("Transcribing with Whisper (" + model + ")…", 15);
             setStatus("Whisper " + model + trimNote + " · model = " + modelSize + " MB on first run");
             console.log("[Captions] running:", cmd);
-            console.log("[Captions] clip in/out:", clipIn, clipOut, "duration:", clipDur);
 
-            // Whisper jobs can be slow; allow up to 30 min and a big stdout buffer
-            var opts = { maxBuffer: 16 * 1024 * 1024, timeout: 30 * 60 * 1000 };
             execModule(cmd, opts, function(err, stdout, stderr) {
                 if (err) {
                     hideProgress(); setStatus("");
@@ -456,35 +497,111 @@ document.addEventListener("DOMContentLoaded", function() {
                     return;
                 }
 
-                showProgress("Placing " + summary.segments + " captions…", 80);
                 setStatus("Detected " + summary.language + " · " + summary.words + " words · " + summary.segments + " segments");
 
-                // Build the JSX config object as JSON-ish text safe to paste into evalScript
-                var cfg = {
-                    style: style, animation: anim, font: font,
-                    size: size, color: color, highlight: hl,
-                    offsetSecs: timelineStart
-                };
-                var cfgStr = JSON.stringify(cfg).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-                var jsonEsc = summary.json.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+                // ── Phase 2: Get sequence resolution, then render clips ──
+                csInterface.evalScript('$._editflow.getSequenceInfo()', function(seqRaw) {
+                    var seqInfo = safeParse(seqRaw) || {};
+                    var seqW = seqInfo.width  || 1920;
+                    var seqH = seqInfo.height || 1080;
 
-                csInterface.evalScript(
-                    '$._editflow.placeAnimatedCaptions("' + jsonEsc + '","' + cfgStr + '")',
-                    function(res) {
-                        showProgress("Done!", 100); setTimeout(hideProgress, 2500);
-                        console.log("[Captions] place result:", res);
-                        handleJSXResult(res);
-                        var r = safeParse(res);
-                        if (r && r.placed) {
-                            setStatus("✅ " + summary.words + " words placed (" + style + " · " + anim + ")");
-                        } else if (r) {
-                            setStatus("⚠️ SRT imported to project — drag it onto a captions track.");
-                        }
+                    var renderer = extensionPath + "/bin/caption_renderer.py";
+                    var hasRenderer = false;
+                    try { hasRenderer = fsModule.existsSync(renderer); } catch(e) {}
+
+                    if (!hasRenderer) {
+                        console.log("[Captions] caption_renderer.py not found — falling back to SRT");
+                        fallbackSRT(summary, style, anim, font, size, color, hl, timelineStart, setStatus);
+                        return;
                     }
-                );
+
+                    var renderCfg = JSON.stringify({
+                        font: font, size: size, color: color, highlight: hl,
+                        style: style, animation: anim,
+                        width: seqW, height: seqH
+                    });
+                    var clipsDir = outBase + "_clips";
+                    var renderCmd = "/usr/bin/env python3 " + shq(renderer) + " " + shq(summary.json) +
+                                    " " + shq(clipsDir) + " --config " + shq(renderCfg);
+
+                    showProgress("Rendering " + summary.words + " words (" + font + " / " + anim + ")…", 50);
+                    setStatus("Rendering captions with " + font + " font and " + anim + " animation…");
+                    console.log("[Captions] render cmd:", renderCmd);
+
+                    execModule(renderCmd, opts, function(err2, stdout2, stderr2) {
+                        if (err2) {
+                            console.log("[Captions] renderer failed:", err2.message, stderr2);
+                            fallbackSRT(summary, style, anim, font, size, color, hl, timelineStart, setStatus);
+                            return;
+                        }
+                        var renderResult = safeParse(stdout2) || {};
+                        console.log("[Captions] render result:", renderResult);
+                        if (renderResult.status !== "success" || !renderResult.clips || renderResult.clips.length === 0) {
+                            console.log("[Captions] renderer produced no clips — falling back to SRT");
+                            fallbackSRT(summary, style, anim, font, size, color, hl, timelineStart, setStatus);
+                            return;
+                        }
+
+                        // Write manifest for JSX to read
+                        var manifestPath = outBase + "_manifest.json";
+                        try {
+                            fsModule.writeFileSync(manifestPath, JSON.stringify(renderResult), "utf8");
+                        } catch(e) {
+                            console.log("[Captions] manifest write failed:", e);
+                            fallbackSRT(summary, style, anim, font, size, color, hl, timelineStart, setStatus);
+                            return;
+                        }
+
+                        showProgress("Placing " + renderResult.rendered + " clips on timeline…", 85);
+                        setStatus("Placing " + renderResult.rendered + " animated caption clips…");
+
+                        var jsxCfg = JSON.stringify({ offsetSecs: timelineStart });
+                        var mEsc = manifestPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+                        var cEsc = jsxCfg.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
+                        csInterface.evalScript(
+                            '$._editflow.placeRenderedCaptions("' + mEsc + '","' + cEsc + '")',
+                            function(res) {
+                                showProgress("Done!", 100); setTimeout(hideProgress, 2500);
+                                console.log("[Captions] place result:", res);
+                                handleJSXResult(res);
+                                var r = safeParse(res);
+                                if (r && r.placed) {
+                                    setStatus(r.placed + " captions placed (" + font + " · " + anim + ")");
+                                }
+                            }
+                        );
+                    });
+                });
             });
         });
     });
+
+    // SRT fallback — used when caption_renderer.py is missing or fails
+    function fallbackSRT(summary, style, anim, font, size, color, hl, timelineStart, setStatus) {
+        showProgress("Falling back to SRT import…", 80);
+        setStatus("Using SRT fallback (font/animation limited)…");
+        var cfg = {
+            style: style, animation: anim, font: font,
+            size: size, color: color, highlight: hl,
+            offsetSecs: timelineStart
+        };
+        var cfgStr = JSON.stringify(cfg).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+        var jsonEsc = summary.json.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+        csInterface.evalScript(
+            '$._editflow.placeAnimatedCaptions("' + jsonEsc + '","' + cfgStr + '")',
+            function(res) {
+                showProgress("Done!", 100); setTimeout(hideProgress, 2500);
+                handleJSXResult(res);
+                var r = safeParse(res);
+                if (r && r.placed) {
+                    setStatus(summary.words + " words placed (SRT fallback — " + style + ")");
+                } else if (r) {
+                    setStatus("SRT imported — drag onto a captions track.");
+                }
+            }
+        );
+    }
 
     safeBind("btn-clear-markers", function() {
         showConfirm("Clear Markers", "Delete all markers?", function() {

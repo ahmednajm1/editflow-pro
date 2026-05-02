@@ -1833,6 +1833,115 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
 };
 
 // =========================================================
+// ANIMATED CAPTIONS V2 — Place pre-rendered MOV clips
+// Reads a manifest JSON with clip paths + timecodes, imports
+// them into a project bin, and places each on a video track.
+// =========================================================
+
+$._editflow.placeRenderedCaptions = function(manifestPath, configJSON) {
+    var me = this;
+    var seq = this.getSeq();
+    if (!seq) return '{"status":"error","message":"Open a sequence."}';
+
+    // Read manifest file
+    var manifest;
+    try {
+        var mf = new File(manifestPath);
+        if (!mf.exists) return '{"status":"error","message":"Manifest file not found."}';
+        mf.encoding = "UTF-8";
+        mf.open("r");
+        var raw = mf.read();
+        mf.close();
+        manifest = eval("(" + raw + ")");
+    } catch(e) {
+        return '{"status":"error","message":"Bad manifest: ' + e.message + '"}';
+    }
+
+    var cfg = {};
+    try { cfg = eval("(" + (configJSON || "{}") + ")"); } catch(e) {}
+    var offsetSecs = parseFloat(cfg.offsetSecs) || 0;
+
+    var clips = manifest.clips || [];
+    if (clips.length === 0) return '{"status":"error","message":"No clips in manifest."}';
+
+    // Collect import paths
+    var paths = [];
+    for (var i = 0; i < clips.length; i++) {
+        paths.push(clips[i].path);
+    }
+
+    // Create a bin so caption clips are organized
+    var binName = "EFP_Captions";
+    var bin = null;
+    try {
+        // Reuse existing bin if present
+        for (var b = 0; b < app.project.rootItem.children.numItems; b++) {
+            var child = app.project.rootItem.children[b];
+            if (child.name === binName && child.type === 2) { bin = child; break; }
+        }
+        if (!bin) bin = app.project.rootItem.createBin(binName);
+    } catch(e) { bin = app.project.rootItem; }
+
+    // Import all clips at once
+    try {
+        app.project.importFiles(paths, false, bin, false);
+    } catch(e) {
+        return '{"status":"error","message":"Import failed: ' + e.message + '"}';
+    }
+
+    // Build a lookup: filename → project item
+    var itemMap = {};
+    try {
+        for (var i = 0; i < bin.children.numItems; i++) {
+            var item = bin.children[i];
+            if (item && item.name) itemMap[item.name] = item;
+        }
+    } catch(e) {}
+
+    // Pick the topmost video track for captions overlay
+    var trackIdx = seq.videoTracks.numTracks - 1;
+    var track = seq.videoTracks[trackIdx];
+
+    var placedCount = 0;
+    for (var i = 0; i < clips.length; i++) {
+        var c = clips[i];
+        var startSec = c.start + offsetSecs;
+
+        // Extract filename from full path
+        var fname = c.path.replace(/^.*[\/\\]/, "");
+        var pItem = itemMap[fname];
+        if (!pItem) {
+            // Try without extension
+            var noExt = fname.replace(/\.[^.]+$/, "");
+            for (var k in itemMap) {
+                if (k.indexOf(noExt) === 0) { pItem = itemMap[k]; break; }
+            }
+        }
+        if (!pItem) continue;
+
+        var startTicks = me.secToTicks(startSec);
+        try {
+            track.overwriteClip(pItem, startTicks);
+            placedCount++;
+        } catch(e) {
+            try {
+                track.insertClip(pItem, startTicks);
+                placedCount++;
+            } catch(e2) {
+                me.log("placeRenderedCaptions: failed to place clip " + i + ": " + e2.message);
+            }
+        }
+    }
+
+    var anim = manifest.animation || "none";
+    var fontName = manifest.font || "unknown";
+    var msg = "Placed " + placedCount + "/" + clips.length + " captions";
+    msg += " (" + fontName + ", " + anim + " animation).";
+
+    return '{"status":"success","message":"' + msg.replace(/"/g, '\\"') + '","placed":' + placedCount + ',"total":' + clips.length + '}';
+};
+
+// =========================================================
 // AUTO-CUT SILENCE — FFmpeg analysis + QE razor + ripple
 // Reads silence ranges from a JSON file produced by
 // bin/silence_detector.py, razors every silence boundary on

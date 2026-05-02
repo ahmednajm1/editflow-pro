@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>EditFlow Pro</title>
-    <link rel="stylesheet" href="css/style.css?v=15.2">
+    <link rel="stylesheet" href="css/style.css?v=16">
     <script src="js/CSInterface.js"></script>
 </head>
 <body>
@@ -280,11 +280,20 @@
                     <option value="96">96 px</option>
                     <option value="120">120 px</option>
                     <option value="160">160 px</option>
+                    <option value="200">200 px</option>
+                    <option value="250">250 px</option>
+                    <option value="300">300 px</option>
                 </select>
-                <span id="cap-color-swatch"     style="display:inline-block;width:20px;height:20px;background:#ffffff;border:1px solid var(--border);border-radius:var(--r);cursor:pointer;flex-shrink:0;" title="Caption color"></span>
-                <input type="text" id="cap-color"     value="#ffffff" maxlength="7" style="width:64px;" title="Caption color (hex)" placeholder="#ffffff">
-                <span id="cap-hl-swatch"     style="display:inline-block;width:20px;height:20px;background:#1F8FFF;border:1px solid var(--border);border-radius:var(--r);cursor:pointer;flex-shrink:0;" title="Highlight color"></span>
-                <input type="text" id="cap-highlight" value="#1F8FFF" maxlength="7" style="width:64px;" title="Highlight color (hex)" placeholder="#1F8FFF">
+                <div style="position:relative;display:inline-flex;align-items:center;gap:4px;">
+                    <span id="cap-color-swatch" class="color-swatch" style="background:#ffffff;" title="Caption color"></span>
+                    <input type="text" id="cap-color" value="#ffffff" maxlength="7" style="width:58px;" placeholder="#ffffff">
+                    <div id="cap-color-palette" class="color-palette hidden"></div>
+                </div>
+                <div style="position:relative;display:inline-flex;align-items:center;gap:4px;">
+                    <span id="cap-hl-swatch" class="color-swatch" style="background:#1F8FFF;" title="Highlight color"></span>
+                    <input type="text" id="cap-highlight" value="#1F8FFF" maxlength="7" style="width:58px;" placeholder="#1F8FFF">
+                    <div id="cap-hl-palette" class="color-palette hidden"></div>
+                </div>
             </div>
 
             <button id="btn-generate-captions" data-tooltip="Transcribe with Whisper and place animated captions on the timeline." style="margin-top:8px;">
