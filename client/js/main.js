@@ -378,78 +378,92 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     // ============================================================
-    // AUTO-CUT SILENCE — FFmpeg analysis + JSX QE razor
+    // AI CAPTIONS — Whisper transcription + animated captions
     // ============================================================
-    safeBind("btn-autocut-silence", function() {
+    safeBind("btn-generate-captions", function() {
         if (!fsModule || !execModule || !osModule) {
             showStatus("Node modules unavailable.", "red"); return;
         }
         if (operationRunning) return;
 
-        var noiseDb = parseFloat(document.getElementById("silence-noise-db").value) || -30;
-        var minSec  = parseFloat(document.getElementById("silence-min-sec").value)  || 0.5;
-        var padSec  = parseFloat(document.getElementById("silence-pad-sec").value);
-        if (isNaN(padSec)) padSec = 0.05;
+        var lang  = document.getElementById("cap-language").value;
+        var model = document.getElementById("cap-model").value;
+        var style = document.getElementById("cap-style").value;
+        var anim  = document.getElementById("cap-animation").value;
+        var font  = document.getElementById("cap-font").value;
+        var size  = document.getElementById("cap-size").value;
+        var color = document.getElementById("cap-color").value;
+        var hl    = document.getElementById("cap-highlight").value;
 
-        showProgress("Finding audio...", 5);
+        var statusLine = document.getElementById("cap-status");
+        function setStatus(t) { if (statusLine) statusLine.textContent = t; }
+
+        showProgress("Finding audio...", 3);
+        setStatus("Reading selection…");
         csInterface.evalScript('$._editflow.getAudioMedia()', function(raw) {
             var info = safeParse(raw);
             if (!info || !info.mediaPath) {
-                hideProgress(); showStatus("No audio on timeline.", "red"); return;
+                hideProgress(); setStatus(""); showStatus("Select an audio/video clip first.", "red"); return;
             }
-            var mediaPath  = info.mediaPath;
+            var mediaPath = info.mediaPath;
             var timelineStart = info.timelineStart || 0;
 
-            var detector = extensionPath + "/bin/silence_detector.py";
-            if (!fsModule.existsSync(detector)) {
-                hideProgress(); showStatus("silence_detector.py missing.", "red"); return;
+            var transcriber = extensionPath + "/bin/transcriber.py";
+            if (!fsModule.existsSync(transcriber)) {
+                hideProgress(); setStatus(""); showStatus("transcriber.py missing.", "red"); return;
             }
-            var jsonOut = osModule.tmpdir() + "/efp_silence_" + Date.now() + ".json";
+            var outBase = osModule.tmpdir() + "/efp_caps_" + Date.now();
 
-            // Quote args for shell
             function shq(s) { return '"' + String(s).replace(/(["\\$`])/g, "\\$1") + '"'; }
-            var cmd = "/usr/bin/env python3 " + shq(detector) + " " + shq(mediaPath) + " " + shq(jsonOut) +
-                      " --noise " + noiseDb + " --min " + minSec + " --pad " + padSec;
+            var cmd = "/usr/bin/env python3 " + shq(transcriber) + " " + shq(mediaPath) + " " + shq(outBase) +
+                      " --lang " + shq(lang) + " --model " + shq(model);
 
-            showProgress("Detecting silences (FFmpeg)...", 30);
-            execModule(cmd, { maxBuffer: 8 * 1024 * 1024 }, function(err, stdout, stderr) {
+            var modelSize = ({tiny:75, base:140, small:460, medium:1500, large:3000})[model] || 460;
+            showProgress("Transcribing with Whisper (" + model + ")…", 15);
+            setStatus("Whisper " + model + " · this can take 10–60s · model = " + modelSize + " MB on first run");
+            console.log("[Captions] running:", cmd);
+
+            // Whisper jobs can be slow; allow up to 30 min and a big stdout buffer
+            var opts = { maxBuffer: 16 * 1024 * 1024, timeout: 30 * 60 * 1000 };
+            execModule(cmd, opts, function(err, stdout, stderr) {
                 if (err) {
-                    hideProgress();
-                    console.log("[AutoCut] detector err:", err.message, stderr);
-                    showStatus("Silence detection failed.", "red"); return;
+                    hideProgress(); setStatus("");
+                    console.log("[Captions] err:", err.message, "\nstderr:", stderr);
+                    showStatus("Transcription failed: " + (err.message || "see console").slice(0, 80), "red");
+                    return;
                 }
                 var summary = safeParse(stdout) || {};
-                console.log("[AutoCut] detector summary:", summary);
+                console.log("[Captions] summary:", summary);
                 if (summary.status !== "success") {
-                    hideProgress();
-                    showStatus("Detector error.", "red");
-                    try { fsModule.unlinkSync(jsonOut); } catch(e) {}
-                    return;
-                }
-                if (!summary.silences_count) {
-                    hideProgress();
-                    var msg = "No silences at " + noiseDb + " dB.";
-                    if (summary.mean_volume_db !== undefined && summary.mean_volume_db !== null) {
-                        msg += " Mean: " + summary.mean_volume_db + " dB, Peak: " + summary.max_volume_db + " dB.";
-                    }
-                    if (summary.suggested_noise_db !== undefined && summary.suggested_noise_db !== null) {
-                        msg += " Try Noise=" + summary.suggested_noise_db + ".";
-                        document.getElementById("silence-noise-db").value = summary.suggested_noise_db;
-                    }
-                    showStatus(msg, "orange");
-                    console.log("[AutoCut] keeping JSON for inspection:", jsonOut);
+                    hideProgress(); setStatus("");
+                    showStatus("Transcriber error: " + (summary.message || "unknown"), "red");
                     return;
                 }
 
-                showProgress("Cutting " + summary.silences_count + " silences...", 75);
-                var jsonEsc = jsonOut.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+                showProgress("Placing " + summary.segments + " captions…", 80);
+                setStatus("Detected " + summary.language + " · " + summary.words + " words · " + summary.segments + " segments");
+
+                // Build the JSX config object as JSON-ish text safe to paste into evalScript
+                var cfg = {
+                    style: style, animation: anim, font: font,
+                    size: size, color: color, highlight: hl,
+                    offsetSecs: timelineStart
+                };
+                var cfgStr = JSON.stringify(cfg).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+                var jsonEsc = summary.json.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
                 csInterface.evalScript(
-                    '$._editflow.applySilenceCuts("' + jsonEsc + '","' + timelineStart + '","true")',
+                    '$._editflow.placeAnimatedCaptions("' + jsonEsc + '","' + cfgStr + '")',
                     function(res) {
-                        showProgress("Done!", 100); setTimeout(hideProgress, 2000);
-                        console.log("[AutoCut] result:", res);
+                        showProgress("Done!", 100); setTimeout(hideProgress, 2500);
+                        console.log("[Captions] place result:", res);
                         handleJSXResult(res);
-                        try { fsModule.unlinkSync(jsonOut); } catch(e) {}
+                        var r = safeParse(res);
+                        if (r && r.placed) {
+                            setStatus("✅ " + summary.words + " words placed (" + style + " · " + anim + ")");
+                        } else if (r) {
+                            setStatus("⚠️ SRT imported to project — drag it onto a captions track.");
+                        }
                     }
                 );
             });

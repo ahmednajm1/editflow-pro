@@ -201,21 +201,84 @@
             </button>
         </div>
 
-        <!-- AUTO-CUT SILENCE -->
+        <!-- AI CAPTIONS — Whisper transcription + animated captions -->
         <div class="action-group" style="border-left: 3px solid #a855f7;">
-            <h3>✂️ Auto-Cut Silence</h3>
-            <p class="description">Select an audio clip → detect & remove silent gaps. Cmd+Z to undo.</p>
-            <div class="input-row" style="display:flex; gap:4px; margin-bottom:6px; align-items:center;">
-                <label style="font-size:9px; color:#888; width:46px;">Noise dB</label>
-                <input type="number" id="silence-noise-db" value="-30" min="-60" max="-10" step="1" style="flex:1; padding:3px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:9px;" data-tooltip="Anything below this volume is treated as silence (default -30 dB).">
-                <label style="font-size:9px; color:#888; width:46px;">Min sec</label>
-                <input type="number" id="silence-min-sec" value="0.5" min="0.1" max="5" step="0.1" style="flex:1; padding:3px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:9px;" data-tooltip="Minimum silence duration to cut (default 0.5s).">
-                <label style="font-size:9px; color:#888; width:46px;">Pad sec</label>
-                <input type="number" id="silence-pad-sec" value="0.05" min="0" max="1" step="0.01" style="flex:1; padding:3px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:9px;" data-tooltip="Speech padding kept on each side (default 50ms).">
+            <h3>🎤 AI Captions</h3>
+            <p class="description">Select an audio/video clip → transcribe & place animated captions on timeline.</p>
+
+            <!-- Row 1: Language + Model -->
+            <div style="display:flex; gap:4px; margin-bottom:6px; align-items:center;">
+                <label style="font-size:9px; color:#888; width:42px;">Lang</label>
+                <select id="cap-language" style="flex:1; padding:4px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:10px;" data-tooltip="Language of the spoken audio. 'Auto' lets Whisper detect.">
+                    <option value="auto" selected>🌐 Auto-detect</option>
+                    <option value="ar">🇸🇦 Arabic</option>
+                    <option value="en">🇬🇧 English</option>
+                    <option value="es">🇪🇸 Spanish</option>
+                    <option value="fr">🇫🇷 French</option>
+                    <option value="de">🇩🇪 German</option>
+                    <option value="it">🇮🇹 Italian</option>
+                    <option value="pt">🇵🇹 Portuguese</option>
+                    <option value="tr">🇹🇷 Turkish</option>
+                    <option value="ru">🇷🇺 Russian</option>
+                    <option value="ja">🇯🇵 Japanese</option>
+                    <option value="ko">🇰🇷 Korean</option>
+                    <option value="zh">🇨🇳 Chinese</option>
+                    <option value="hi">🇮🇳 Hindi</option>
+                    <option value="ur">🇵🇰 Urdu</option>
+                </select>
+                <label style="font-size:9px; color:#888; width:42px;">Model</label>
+                <select id="cap-model" style="flex:1; padding:4px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:10px;" data-tooltip="Larger = more accurate but slower & bigger download.">
+                    <option value="tiny">tiny (75 MB · fastest)</option>
+                    <option value="base">base (140 MB · fast)</option>
+                    <option value="small" selected>small (460 MB · balanced)</option>
+                    <option value="medium">medium (1.5 GB · accurate)</option>
+                    <option value="large">large (3 GB · best)</option>
+                </select>
             </div>
-            <button id="btn-autocut-silence" style="width:100%; background:linear-gradient(135deg, #a855f7, #7c3aed); border:none; color:#fff; font-weight:bold; padding:8px; border-radius:4px; cursor:pointer;" data-tooltip="Detect silences with FFmpeg and remove them via QE razor + ripple delete.">
-                ✂️ Detect &amp; Cut Silences
+
+            <!-- Row 2: Caption style + Words per line -->
+            <div style="display:flex; gap:4px; margin-bottom:6px; align-items:center;">
+                <label style="font-size:9px; color:#888; width:42px;">Style</label>
+                <select id="cap-style" style="flex:1; padding:4px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:10px;" data-tooltip="How the words are grouped on screen.">
+                    <option value="word">Word-by-word (TikTok)</option>
+                    <option value="phrase" selected>Short phrases (3–5 words)</option>
+                    <option value="line">Full lines (subtitle)</option>
+                </select>
+                <label style="font-size:9px; color:#888; width:42px;">Anim</label>
+                <select id="cap-animation" style="flex:1; padding:4px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:10px;" data-tooltip="Entrance animation for each caption.">
+                    <option value="pop" selected>✨ Pop</option>
+                    <option value="fade">🌫️ Fade</option>
+                    <option value="slide-up">⬆️ Slide Up</option>
+                    <option value="bounce">🏀 Bounce</option>
+                    <option value="karaoke">🎤 Karaoke</option>
+                    <option value="typewriter">⌨️ Typewriter</option>
+                    <option value="shake">📳 Shake</option>
+                    <option value="glow">💡 Glow Pulse</option>
+                    <option value="none">— None</option>
+                </select>
+            </div>
+
+            <!-- Row 3: Font + Color + Size -->
+            <div style="display:flex; gap:4px; margin-bottom:8px; align-items:center;">
+                <label style="font-size:9px; color:#888; width:42px;">Font</label>
+                <select id="cap-font" style="flex:1; padding:4px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:10px;">
+                    <option value="Arial" selected>Arial Bold</option>
+                    <option value="Helvetica">Helvetica Bold</option>
+                    <option value="Impact">Impact</option>
+                    <option value="Montserrat">Montserrat Black</option>
+                    <option value="Poppins">Poppins Black</option>
+                </select>
+                <label style="font-size:9px; color:#888; width:30px;">Size</label>
+                <input type="number" id="cap-size" value="72" min="20" max="200" step="2" style="width:46px; padding:4px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:10px;">
+                <label style="font-size:9px; color:#888; width:30px;">Color</label>
+                <input type="color" id="cap-color" value="#ffffff" style="width:34px; height:24px; padding:0; background:transparent; border:1px solid #334155; border-radius:3px; cursor:pointer;">
+                <input type="color" id="cap-highlight" value="#a855f7" title="Highlight color (Karaoke / Glow)" style="width:34px; height:24px; padding:0; background:transparent; border:1px solid #334155; border-radius:3px; cursor:pointer;">
+            </div>
+
+            <button id="btn-generate-captions" style="width:100%; background:linear-gradient(135deg, #a855f7, #7c3aed); border:none; color:#fff; font-weight:bold; padding:9px; border-radius:4px; cursor:pointer; font-size:11px;" data-tooltip="Transcribe with Whisper and place animated captions on the timeline.">
+                🎤 Generate Animated Captions
             </button>
+            <p id="cap-status" style="font-size:9px; color:#666; margin-top:3px; text-align:center;"></p>
         </div>
 
         <!-- BEAT DETECTION (last section) -->

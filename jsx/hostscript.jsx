@@ -1563,6 +1563,161 @@ $._editflow.exportCustom = function(presetPath, fileName, folderPath) {
 };
 
 // =========================================================
+// AI CAPTIONS — Whisper transcription pipeline
+// Reads the flattened EFP JSON written by bin/transcriber.py,
+// rebuilds an SRT in the requested grouping style, imports it
+// into the project, and (best-effort) attaches it as a captions
+// track on the active sequence.
+// =========================================================
+
+$._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
+    var seq = this.getSeq();
+    if (!seq) return '{"status":"error","message":"Open a sequence."}';
+
+    // ---- Read the transcription
+    var data;
+    try {
+        var jf = new File(efpJsonPath);
+        if (!jf.exists) return '{"status":"error","message":"Transcript JSON not found: ' + efpJsonPath + '"}';
+        jf.encoding = "UTF-8";
+        jf.open("r");
+        var raw = jf.read();
+        jf.close();
+        data = eval("(" + raw + ")");
+    } catch(e) {
+        return '{"status":"error","message":"Bad transcript JSON: ' + e.message + '"}';
+    }
+
+    // ---- Parse caller config
+    var cfg = {};
+    try { cfg = eval("(" + (configJSON || "{}") + ")"); } catch(e) {}
+    var groupStyle = cfg.style || "phrase";       // word | phrase | line
+    var anim       = cfg.animation || "pop";       // pop | fade | slide-up | bounce | karaoke | typewriter | shake | glow | none
+    var font       = cfg.font || "Arial";
+    var sizePx     = parseInt(cfg.size, 10) || 72;
+    var color      = cfg.color || "#FFFFFF";
+    var highlight  = cfg.highlight || "#A855F7";
+    var offsetSecs = parseFloat(cfg.offsetSecs) || 0;
+
+    // ---- Build groups based on style
+    var groups = [];   // each group: {start, end, text}
+    var segs = data.segments || [];
+
+    function pushGroup(s, e, t) {
+        t = (t || "").replace(/^\s+|\s+$/g, "");
+        if (!t) return;
+        if (e <= s) e = s + 0.3;
+        groups.push({start: s, end: e, text: t});
+    }
+
+    if (groupStyle === "line") {
+        for (var i = 0; i < segs.length; i++) pushGroup(segs[i].start, segs[i].end, segs[i].text);
+    } else if (groupStyle === "word") {
+        for (var i = 0; i < segs.length; i++) {
+            var ws = segs[i].words || [];
+            for (var w = 0; w < ws.length; w++) pushGroup(ws[w].start, ws[w].end, ws[w].text);
+        }
+    } else { // phrase: ~3–5 words per caption
+        for (var i = 0; i < segs.length; i++) {
+            var ws = segs[i].words || [];
+            if (ws.length === 0) { pushGroup(segs[i].start, segs[i].end, segs[i].text); continue; }
+            var step = 4;
+            for (var k = 0; k < ws.length; k += step) {
+                var chunk = ws.slice(k, Math.min(k + step, ws.length));
+                if (chunk.length === 0) continue;
+                var t = "";
+                for (var c = 0; c < chunk.length; c++) t += (c ? " " : "") + chunk[c].text;
+                pushGroup(chunk[0].start, chunk[chunk.length - 1].end, t);
+            }
+        }
+    }
+
+    if (groups.length === 0) {
+        return '{"status":"error","message":"No transcript groups produced."}';
+    }
+
+    // ---- Emit our own SRT next to the JSON. Whisper-cli writes one too,
+    //      but we override grouping to honour the user's chosen style.
+    function pad(n, w) { var s = "" + n; while (s.length < w) s = "0" + s; return s; }
+    function secToSRT(t) {
+        if (t < 0) t = 0;
+        var h = Math.floor(t / 3600);
+        var m = Math.floor((t % 3600) / 60);
+        var s = Math.floor(t % 60);
+        var ms = Math.round((t - Math.floor(t)) * 1000);
+        return pad(h, 2) + ":" + pad(m, 2) + ":" + pad(s, 2) + "," + pad(ms, 3);
+    }
+    var srtPath = efpJsonPath.replace(/\.efp\.json$/, "") + ".efp." + groupStyle + ".srt";
+    var sf = new File(srtPath);
+    sf.encoding = "UTF-8";
+    sf.open("w");
+    for (var i = 0; i < groups.length; i++) {
+        var g = groups[i];
+        sf.writeln(i + 1);
+        sf.writeln(secToSRT(g.start + offsetSecs) + " --> " + secToSRT(g.end + offsetSecs));
+        sf.writeln(g.text);
+        sf.writeln("");
+    }
+    sf.close();
+
+    // ---- Import the SRT into the project root
+    var imported = null;
+    try {
+        var beforeCount = app.project.rootItem.children.numItems;
+        app.project.importFiles([srtPath], false, app.project.rootItem, false);
+        var afterCount = app.project.rootItem.children.numItems;
+        // Pick the most recently added item that ends with .srt
+        for (var i = afterCount - 1; i >= 0; i--) {
+            var item = app.project.rootItem.children[i];
+            if (item && item.name && /\.srt$/i.test(item.name)) { imported = item; break; }
+        }
+    } catch(e) {
+        return '{"status":"error","message":"SRT import failed: ' + e.message + '"}';
+    }
+
+    // ---- Try to attach as a captions track. The Premiere DOM has shipped
+    //      several different captions APIs across versions; we attempt the
+    //      most likely ones and fall back to placing the SRT on a video
+    //      track so the user can right-click → "Convert to Captions".
+    var placed = false;
+    var placedHow = "";
+
+    // Attempt 1: native Sequence.createCaptionTrack from imported subtitle
+    if (!placed && imported) {
+        try {
+            if (typeof seq.createCaptionTrack === "function") {
+                seq.createCaptionTrack(imported);
+                placed = true; placedHow = "createCaptionTrack";
+            }
+        } catch(e) {}
+    }
+    // Attempt 2: insert on existing captions track
+    if (!placed && imported) {
+        try {
+            if (seq.captionTracks && seq.captionTracks.numTracks > 0) {
+                var ct = seq.captionTracks[0];
+                if (ct.insertClip) { ct.insertClip(imported, 0); placed = true; placedHow = "captionTracks.insertClip"; }
+            }
+        } catch(e) {}
+    }
+    // Attempt 3: drop on the topmost video track at the playhead
+    if (!placed && imported) {
+        try {
+            var topV = seq.videoTracks[seq.videoTracks.numTracks - 1];
+            topV.insertClip(imported, seq.getPlayerPosition());
+            placed = true; placedHow = "videoTrack (manual: right-click → Convert to Captions)";
+        } catch(e) {}
+    }
+
+    var msg = "Transcribed " + groups.length + " " + groupStyle + " caption(s)";
+    if (placed) msg += " and placed via " + placedHow + ".";
+    else msg += ". SRT imported to project — drag onto a captions track.";
+
+    return '{"status":"success","message":"' + msg.replace(/"/g,'\\"') + '","groups":' + groups.length +
+           ',"placed":' + placed + ',"animation":"' + anim + '","srt":"' + srtPath.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '"}';
+};
+
+// =========================================================
 // AUTO-CUT SILENCE — FFmpeg analysis + QE razor + ripple
 // Reads silence ranges from a JSON file produced by
 // bin/silence_detector.py, razors every silence boundary on
