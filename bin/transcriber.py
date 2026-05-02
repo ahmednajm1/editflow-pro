@@ -87,14 +87,19 @@ def ensure_model(model_name):
     return target
 
 
-def extract_audio(ffmpeg, input_path, wav_path):
-    """Whisper expects 16 kHz mono PCM. ffmpeg handles any source format."""
-    cmd = [
-        ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
-        "-i", input_path,
-        "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le",
-        wav_path,
-    ]
+def extract_audio(ffmpeg, input_path, wav_path, start_sec=None, end_sec=None):
+    """Whisper expects 16 kHz mono PCM. ffmpeg handles any source format.
+    When start/end are given we trim the source so we only transcribe the
+    portion the user actually has on the timeline."""
+    cmd = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error"]
+    # -ss before -i is faster (seek by keyframe). For accuracy with the
+    # exact in-point we pass it after -i so ffmpeg decodes precisely.
+    cmd += ["-i", input_path]
+    if start_sec is not None and start_sec > 0:
+        cmd += ["-ss", "{:.3f}".format(start_sec)]
+    if end_sec is not None and end_sec > 0:
+        cmd += ["-to", "{:.3f}".format(end_sec)]
+    cmd += ["-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", wav_path]
     subprocess.run(cmd, check=True)
 
 
@@ -181,6 +186,10 @@ def main():
     ap.add_argument("--model", default="small",
                     choices=list(MODEL_URLS.keys()),
                     help="Whisper model size (default: small)")
+    ap.add_argument("--start", type=float, default=None,
+                    help="Trim source media: in-point in seconds")
+    ap.add_argument("--end", type=float, default=None,
+                    help="Trim source media: out-point in seconds")
     args = ap.parse_args()
 
     if not os.path.exists(args.input):
@@ -214,7 +223,7 @@ def main():
     srt_path = args.output + ".srt"
 
     try:
-        extract_audio(ffmpeg, args.input, wav_path)
+        extract_audio(ffmpeg, args.input, wav_path, args.start, args.end)
     except subprocess.CalledProcessError as e:
         json.dump({"status": "error", "message": "audio extraction failed"}, sys.stdout)
         sys.exit(3)

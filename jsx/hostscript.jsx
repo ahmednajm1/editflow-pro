@@ -525,13 +525,43 @@ $._editflow = {
     getAudioMedia: function() {
         var seq = this.getSeq();
         if (!seq) return '{"status":"error","message":"Open a project."}';
+
+        var me = this;
+        function buildPayload(clip) {
+            var mp = clip.projectItem.getMediaPath();
+            if (!mp) return null;
+            // inPoint/outPoint = where in the SOURCE media this clip starts/ends.
+            // start/end          = where on the TIMELINE the clip lives.
+            var clipIn = 0, clipOut = 0;
+            try { if (clip.inPoint  && clip.inPoint.seconds  !== undefined) clipIn  = clip.inPoint.seconds;  } catch(e) {}
+            try { if (clip.outPoint && clip.outPoint.seconds !== undefined) clipOut = clip.outPoint.seconds; } catch(e) {}
+            // Fallback to ticks if seconds is missing
+            if (!clipIn  && clip.inPoint  && clip.inPoint.ticks)  clipIn  = me.ticksToSec(clip.inPoint.ticks);
+            if (!clipOut && clip.outPoint && clip.outPoint.ticks) clipOut = me.ticksToSec(clip.outPoint.ticks);
+
+            var tlStart = 0;
+            try { tlStart = me.ticksToSec(clip.start.ticks) || 0; } catch(e) {}
+
+            var dur = (clipOut > clipIn) ? (clipOut - clipIn) : 0;
+            var name = "";
+            try { name = clip.projectItem.name || ""; } catch(e) {}
+
+            return '{"status":"success",' +
+                '"mediaPath":"' + mp.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '",' +
+                '"clipIn":'        + clipIn  + ',' +
+                '"clipOut":'       + clipOut + ',' +
+                '"duration":'      + dur     + ',' +
+                '"timelineStart":' + tlStart + ',' +
+                '"clipName":"'     + name.replace(/"/g, '\\"') + '"}';
+        }
+
         try {
             var sel = seq.getSelection();
             if (sel && sel.length > 0) {
                 for (var i = 0; i < sel.length; i++) {
                     if (sel[i].projectItem) {
-                        var mp = sel[i].projectItem.getMediaPath();
-                        if (mp) return '{"status":"success","mediaPath":"' + mp.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '","timelineStart":' + (this.ticksToSec(sel[i].start.ticks) || 0) + '}';
+                        var p = buildPayload(sel[i]);
+                        if (p) return p;
                     }
                 }
             }
@@ -539,9 +569,8 @@ $._editflow = {
         for (var t = 0; t < seq.audioTracks.numTracks; t++) {
             for (var c = 0; c < seq.audioTracks[t].clips.numItems; c++) {
                 try {
-                    var clip = seq.audioTracks[t].clips[c];
-                    var mp = clip.projectItem.getMediaPath();
-                    if (mp) return '{"status":"success","mediaPath":"' + mp.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '","timelineStart":' + this.ticksToSec(clip.start.ticks) + '}';
+                    var p2 = buildPayload(seq.audioTracks[t].clips[c]);
+                    if (p2) return p2;
                 } catch(e) {}
             }
         }
@@ -1714,12 +1743,43 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
         } catch(e) {}
     }
 
+    // ---- Best-effort styling: walk the captions tracks and try to set
+    //      font / size / color via every property name Premiere has used.
+    //      None of these are guaranteed to exist on every version, so we
+    //      catch and continue. Even when this fully fails, the user can
+    //      still open the Essential Graphics panel and apply the style
+    //      to all captions at once with the font we leave logged.
+    var styledCount = 0;
+    try {
+        if (seq.captionTracks && seq.captionTracks.numTracks > 0) {
+            for (var ti = 0; ti < seq.captionTracks.numTracks; ti++) {
+                var ct2 = seq.captionTracks[ti];
+                if (!ct2 || !ct2.clips) continue;
+                for (var ci = 0; ci < ct2.clips.numItems; ci++) {
+                    var cap = ct2.clips[ci];
+                    if (!cap) continue;
+                    var didOne = false;
+                    var keys = ["fontName", "font", "typeface", "fontFace"];
+                    for (var k = 0; k < keys.length; k++) {
+                        try { cap[keys[k]] = font; didOne = true; } catch(e) {}
+                    }
+                    try { cap.fontSize = sizePx;     didOne = true; } catch(e) {}
+                    try { cap.color    = color;      didOne = true; } catch(e) {}
+                    try { cap.fillColor = color;     didOne = true; } catch(e) {}
+                    if (didOne) styledCount++;
+                }
+            }
+        }
+    } catch(e) {}
+
     var msg = "Transcribed " + groups.length + " " + groupStyle + " caption(s)";
     if (placed) msg += " and placed via " + placedHow + ".";
     else msg += ". SRT imported to project — drag onto a captions track.";
+    if (styledCount > 0) msg += " Styled " + styledCount + " with " + font + ".";
+    else msg += " Manual style: open Essential Graphics, set Font='" + font + "'.";
 
     return '{"status":"success","message":"' + msg.replace(/"/g,'\\"') + '","groups":' + groups.length +
-           ',"placed":' + placed + ',"animation":"' + anim + '","srt":"' + srtPath.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '"}';
+           ',"placed":' + placed + ',"styled":' + styledCount + ',"font":"' + font.replace(/"/g,'\\"') + '","animation":"' + anim + '","srt":"' + srtPath.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '"}';
 };
 
 // =========================================================

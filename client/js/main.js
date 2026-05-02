@@ -407,6 +407,9 @@ document.addEventListener("DOMContentLoaded", function() {
             }
             var mediaPath = info.mediaPath;
             var timelineStart = info.timelineStart || 0;
+            var clipIn  = info.clipIn  || 0;
+            var clipOut = info.clipOut || 0;
+            var clipDur = info.duration || 0;
 
             var transcriber = extensionPath + "/bin/transcriber.py";
             if (!fsModule.existsSync(transcriber)) {
@@ -417,11 +420,17 @@ document.addEventListener("DOMContentLoaded", function() {
             function shq(s) { return '"' + String(s).replace(/(["\\$`])/g, "\\$1") + '"'; }
             var cmd = "/usr/bin/env python3 " + shq(transcriber) + " " + shq(mediaPath) + " " + shq(outBase) +
                       " --lang " + shq(lang) + " --model " + shq(model);
+            // Trim to the actual selection so we don't transcribe the whole source file
+            if (clipDur > 0.1 && clipOut > clipIn) {
+                cmd += " --start " + clipIn.toFixed(3) + " --end " + clipOut.toFixed(3);
+            }
 
             var modelSize = ({tiny:75, base:140, small:460, medium:1500, large:3000})[model] || 460;
+            var trimNote = (clipDur > 0.1) ? (" · " + clipDur.toFixed(1) + "s of " + (info.clipName || "clip")) : "";
             showProgress("Transcribing with Whisper (" + model + ")…", 15);
-            setStatus("Whisper " + model + " · this can take 10–60s · model = " + modelSize + " MB on first run");
+            setStatus("Whisper " + model + trimNote + " · model = " + modelSize + " MB on first run");
             console.log("[Captions] running:", cmd);
+            console.log("[Captions] clip in/out:", clipIn, clipOut, "duration:", clipDur);
 
             // Whisper jobs can be slow; allow up to 30 min and a big stdout buffer
             var opts = { maxBuffer: 16 * 1024 * 1024, timeout: 30 * 60 * 1000 };
