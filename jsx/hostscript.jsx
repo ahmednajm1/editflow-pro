@@ -1743,34 +1743,63 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
         } catch(e) {}
     }
 
-    // ---- Best-effort styling: walk the captions tracks and try to set
-    //      font / size / color via every property name Premiere has used.
-    //      None of these are guaranteed to exist on every version, so we
-    //      catch and continue. Even when this fully fails, the user can
-    //      still open the Essential Graphics panel and apply the style
-    //      to all captions at once with the font we leave logged.
+    // ---- Best-effort styling. Premiere parks the imported subtitle
+    //      differently across versions: as a real Caption on
+    //      captionTracks, as a "Caption" item dropped onto a videoTrack,
+    //      or as a graphic. We scan every track type and probe every
+    //      property name the API has shipped over the years.
     var styledCount = 0;
-    try {
-        if (seq.captionTracks && seq.captionTracks.numTracks > 0) {
-            for (var ti = 0; ti < seq.captionTracks.numTracks; ti++) {
-                var ct2 = seq.captionTracks[ti];
-                if (!ct2 || !ct2.clips) continue;
-                for (var ci = 0; ci < ct2.clips.numItems; ci++) {
-                    var cap = ct2.clips[ci];
-                    if (!cap) continue;
-                    var didOne = false;
-                    var keys = ["fontName", "font", "typeface", "fontFace"];
-                    for (var k = 0; k < keys.length; k++) {
-                        try { cap[keys[k]] = font; didOne = true; } catch(e) {}
+    var fontKeys  = ["fontName", "font", "typeface", "fontFace", "captionFontName"];
+    var sizeKeys  = ["fontSize", "captionFontSize", "size"];
+    var colorKeys = ["color", "fillColor", "captionColor", "fontColor"];
+
+    function tryStyle(item) {
+        if (!item) return false;
+        var did = false;
+        for (var k = 0; k < fontKeys.length; k++) {
+            try { item[fontKeys[k]] = font; did = true; } catch(e) {}
+        }
+        for (var k = 0; k < sizeKeys.length; k++) {
+            try { item[sizeKeys[k]] = sizePx; did = true; } catch(e) {}
+        }
+        for (var k = 0; k < colorKeys.length; k++) {
+            try { item[colorKeys[k]] = color; did = true; } catch(e) {}
+        }
+        try { if (item.style) { item.style.fontName = font; item.style.fontSize = sizePx; did = true; } } catch(e) {}
+        try {
+            if (item.properties && item.properties.numItems !== undefined) {
+                for (var p = 0; p < item.properties.numItems; p++) {
+                    var prop = item.properties[p];
+                    var nm = ""; try { nm = prop.displayName || prop.name || ""; } catch(e) {}
+                    if (/font/i.test(nm) && /name|family/i.test(nm)) {
+                        try { prop.setValue(font, true); did = true; } catch(e) {}
                     }
-                    try { cap.fontSize = sizePx;     didOne = true; } catch(e) {}
-                    try { cap.color    = color;      didOne = true; } catch(e) {}
-                    try { cap.fillColor = color;     didOne = true; } catch(e) {}
-                    if (didOne) styledCount++;
                 }
             }
+        } catch(e) {}
+        return did;
+    }
+
+    function scanTracks(coll, restrictToCaptionLooking) {
+        if (!coll || coll.numTracks === undefined) return;
+        for (var ti = 0; ti < coll.numTracks; ti++) {
+            var tk = coll[ti];
+            if (!tk || !tk.clips) continue;
+            for (var ci = 0; ci < tk.clips.numItems; ci++) {
+                var item = tk.clips[ci];
+                if (!item) continue;
+                if (restrictToCaptionLooking) {
+                    var nm = ""; try { nm = item.name || ""; } catch(e) {}
+                    var isCap = /\.srt$/i.test(nm) || /caption/i.test(nm) || /subtitle/i.test(nm);
+                    if (!isCap) continue;
+                }
+                if (tryStyle(item)) styledCount++;
+            }
         }
-    } catch(e) {}
+    }
+
+    try { scanTracks(seq.captionTracks, false); } catch(e) {}
+    try { scanTracks(seq.videoTracks,   true); } catch(e) {}
 
     var msg = "Transcribed " + groups.length + " " + groupStyle + " caption(s)";
     if (placed) msg += " and placed via " + placedHow + ".";
