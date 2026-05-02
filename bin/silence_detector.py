@@ -96,12 +96,12 @@ def probe_volume(ffmpeg, path):
 
 
 def suggest_threshold(mean_db, max_db):
-    """Pick a sensible silencedetect threshold from observed levels.
-    Mean + 6dB tends to catch genuine pauses without eating speech."""
+    """Pick threshold 8 dB below the mean — sits in the gap between
+    speech (near mean) and room-tone/pauses (much quieter than mean)."""
     if mean_db is None:
         return None
-    candidate = round(mean_db + 6.0)
-    # Clamp into a reasonable speech range
+    candidate = round(mean_db - 8.0)
+    # Never louder than -15 (would shred speech) or quieter than -55 (useless)
     if candidate > -15:
         candidate = -15
     if candidate < -55:
