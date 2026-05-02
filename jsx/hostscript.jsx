@@ -1639,24 +1639,45 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
         groups.push({start: s, end: e, text: t});
     }
 
+    // IMPORTANT: We split by the segment TEXT (whitespace) rather than by
+    // Whisper's tokens. Whisper tokens are subword units — for Arabic this
+    // means a single shaped word like "ستخدمك" arrives as 3-4 tokens
+    // ["س","تخ","دم","ك"]. Treating each token as a caption breaks the
+    // Arabic shaping context. Splitting the joined text on whitespace gives
+    // real words whose letters stay connected.
+    function splitWords(s) {
+        s = (s || "").replace(/^\s+|\s+$/g, "");
+        if (!s) return [];
+        return s.split(/\s+/);
+    }
+
     if (groupStyle === "line") {
         for (var i = 0; i < segs.length; i++) pushGroup(segs[i].start, segs[i].end, segs[i].text);
     } else if (groupStyle === "word") {
         for (var i = 0; i < segs.length; i++) {
-            var ws = segs[i].words || [];
-            for (var w = 0; w < ws.length; w++) pushGroup(ws[w].start, ws[w].end, ws[w].text);
+            var seg = segs[i];
+            var words = splitWords(seg.text);
+            if (words.length === 0) continue;
+            var segDur = seg.end - seg.start;
+            var per = segDur / words.length;
+            for (var w = 0; w < words.length; w++) {
+                pushGroup(seg.start + w * per, seg.start + (w + 1) * per, words[w]);
+            }
         }
-    } else { // phrase: ~3–5 words per caption
+    } else { // phrase: ~3–5 words per caption, split by whitespace
         for (var i = 0; i < segs.length; i++) {
-            var ws = segs[i].words || [];
-            if (ws.length === 0) { pushGroup(segs[i].start, segs[i].end, segs[i].text); continue; }
+            var seg = segs[i];
+            var words = splitWords(seg.text);
+            if (words.length === 0) continue;
+            var segDur = seg.end - seg.start;
+            var per = segDur / words.length;
             var step = 4;
-            for (var k = 0; k < ws.length; k += step) {
-                var chunk = ws.slice(k, Math.min(k + step, ws.length));
-                if (chunk.length === 0) continue;
-                var t = "";
-                for (var c = 0; c < chunk.length; c++) t += (c ? " " : "") + chunk[c].text;
-                pushGroup(chunk[0].start, chunk[chunk.length - 1].end, t);
+            for (var k = 0; k < words.length; k += step) {
+                var chunkN = Math.min(step, words.length - k);
+                var chunkWords = words.slice(k, k + chunkN);
+                pushGroup(seg.start + k * per,
+                          seg.start + (k + chunkN) * per,
+                          chunkWords.join(" "));
             }
         }
     }

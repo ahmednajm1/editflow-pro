@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>EditFlow Pro</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=15.1">
     <script src="js/CSInterface.js"></script>
 </head>
 <body>
@@ -11,7 +11,7 @@
     <!-- SETTINGS OVERLAY -->
     <div id="settings-overlay" class="settings-overlay hidden">
         <div class="settings-panel">
-            <h2>⚙️ Settings</h2>
+            <h2>Settings</h2>
             <label>Voice Level Presets (dB)</label>
             <div class="settings-row">
                 <input type="number" id="cfg-voice-1" value="2" min="-30" max="30">
@@ -39,15 +39,15 @@
             </div>
             <label>Default Beat Precision</label>
             <div class="settings-row">
-                <select id="cfg-beat-precision" style="flex:1;">
+                <select id="cfg-beat-precision">
                     <option value="normal">Normal</option>
                     <option value="precision" selected>Precision</option>
                 </select>
             </div>
             <hr class="settings-divider">
-            <div style="display:flex; gap:8px;">
-                <button id="btn-settings-save" class="primary" style="flex:1;">Save</button>
-                <button id="btn-settings-cancel" class="secondary" style="flex:1;">Cancel</button>
+            <div class="modal-actions">
+                <button id="btn-settings-cancel" class="secondary">Cancel</button>
+                <button id="btn-settings-save" class="primary">Save</button>
             </div>
         </div>
     </div>
@@ -55,7 +55,7 @@
     <!-- CONFIRM MODAL -->
     <div id="confirm-modal" class="modal-overlay hidden">
         <div class="modal-content">
-            <h2 id="confirm-title">⚠️ Confirm</h2>
+            <h2 id="confirm-title">Confirm</h2>
             <p id="confirm-text">Are you sure?</p>
             <div class="modal-actions">
                 <button id="btn-confirm-no" class="secondary">Cancel</button>
@@ -67,22 +67,14 @@
     <!-- WELCOME MODAL -->
     <div id="welcome-modal" class="modal-overlay hidden">
         <div class="modal-content">
-            <h2>🎬 EditFlow Pro v14</h2>
-            <p style="font-size:12px; line-height:1.5; color:#ccc;">
-                <strong style="color:#4ade80;">Fixed:</strong><br>
-                ✓ Speed controls now use QE DOM — real speed change on clips<br>
-                ✓ Auto-Cut Silence rebuilt with FFmpeg analysis + QE razor<br>
-                ✓ All operations support Cmd+Z / Ctrl+Z undo<br><br>
-                <strong style="color:#60a5fa;">New:</strong><br>
-                ✓ Color Match — 30+ cinematic Lumetri preset looks<br>
-                ✓ Dedicated Reset 0dB buttons for Voice & Music<br>
-                ✓ Keyboard shortcuts for common operations<br><br>
-                <strong style="color:#ef4444;">Removed:</strong><br>
-                ✗ Fake Ramp In/Out/Freeze+Burst buttons (API limitation)<br>
-                ✗ Browser-side silence analysis (replaced with FFmpeg)
+            <h2>EditFlow Pro v15</h2>
+            <p>
+                <strong>New:</strong> AI Captions powered by Whisper. Multi-language transcription with animated caption styles.
+                <br><br>
+                <strong>Improved:</strong> All operations support Cmd+Z undo. Settings persist across sessions.
             </p>
             <div class="modal-actions">
-                <button id="btn-welcome-close" class="primary" style="flex:1;">Get Started</button>
+                <button id="btn-welcome-close" class="primary">Get started</button>
             </div>
         </div>
     </div>
@@ -97,179 +89,180 @@
         </div>
         <div class="header-right">
             <div class="badge badge-pro">v15</div>
-            <button class="settings-gear" id="btn-settings" data-tooltip="Customize presets and defaults">⚙</button>
+            <button class="settings-gear" id="btn-settings" data-tooltip="Customize presets and defaults">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
         </div>
     </div>
 
     <div class="panel-content">
 
-        <!-- 1. AUDIO LEVELS -->
+        <!-- 1. AUDIO LEVEL -->
         <div class="action-group">
-            <h3>🔊 Audio Level</h3>
-            <p class="description">Select audio clip → Nudge volume. Cmd+Z to undo.</p>
+            <h3>
+                <span class="icon"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></span>
+                Audio Level
+            </h3>
+            <p class="description">Select an audio clip → Nudge volume in 1 dB increments. Cmd+Z to undo.</p>
 
-            <!-- Current level display -->
-            <div id="audio-level-display" style="
-                text-align:center;
-                font-size:18px;
-                font-weight:bold;
-                color:#4fc3f7;
-                font-family:monospace;
-                padding:8px;
-                background:rgba(255,255,255,0.05);
-                border:1px solid rgba(255,255,255,0.1);
-                border-radius:6px;
-                margin-bottom:8px;
-            ">0 dB</div>
+            <div id="audio-level-display">0 dB</div>
 
-            <!-- Nudge controls -->
-            <div style="display:flex; gap:4px; margin-bottom:6px;">
-                <button id="btn-audio-down" style="flex:1; padding:10px; background:#1e293b; color:#f87171; border:1px solid #334155; border-radius:4px; cursor:pointer; font-size:16px; font-weight:bold;" title="Decrease 1 dB">▼ −1 dB</button>
-                <button id="btn-audio-up" style="flex:1; padding:10px; background:#1e293b; color:#81c784; border:1px solid #334155; border-radius:4px; cursor:pointer; font-size:16px; font-weight:bold;" title="Increase 1 dB">▲ +1 dB</button>
+            <div class="input-row">
+                <button id="btn-audio-down" title="Decrease 1 dB">▼ −1 dB</button>
+                <button id="btn-audio-up"   title="Increase 1 dB">▲ +1 dB</button>
             </div>
         </div>
 
-
-        <!-- 3. STATIC SCALE -->
-        <div class="action-group" style="border-left: 3px solid #14b8a6;">
-            <h3>🖼️ Static Scale (Cut-in)</h3>
-            <p class="description">Select clips. Instantly resizes base scale (no keyframes).</p>
-            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:4px;" id="scale-grid">
+        <!-- 2. STATIC SCALE -->
+        <div class="action-group">
+            <h3>
+                <span class="icon"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></span>
+                Static Scale
+            </h3>
+            <p class="description">Cut-in resize of selected clips without keyframes.</p>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;" id="scale-grid">
                 <button id="btn-scale-115" class="scale-btn">115</button>
                 <button id="btn-scale-130" class="scale-btn">130</button>
                 <button id="btn-scale-150" class="scale-btn">150</button>
                 <button id="btn-scale-175" class="scale-btn">175</button>
                 <button id="btn-scale-200" class="scale-btn">200</button>
-                <button id="btn-scale-reset" class="scale-btn" style="background:#444; color:#ef4444;">↺ 100</button>
+                <button id="btn-scale-reset" class="scale-btn secondary">↺ 100</button>
             </div>
         </div>
 
-        <!-- TRANSFORM & CLIPBOARD (merged, right after Scale) -->
-        <div class="action-group" style="border-left: 3px solid #06b6d4;">
-            <h3>📐 Transform & Tools</h3>
+        <!-- 3. TRANSFORM & TOOLS -->
+        <div class="action-group">
+            <h3>
+                <span class="icon"><svg viewBox="0 0 24 24"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></span>
+                Transform &amp; Tools
+            </h3>
 
-            <!-- NUDGE ARROWS -->
-            <div style="display:flex; gap:4px; margin-bottom:6px; align-items:center;">
-                <button id="refresh-clip-info" style="padding:4px 6px; font-size:10px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15); color:#aaa; border-radius:3px; cursor:pointer;" title="Refresh">🔄</button>
-                <button id="nudge-left" style="padding:4px 8px; background:#1e293b; color:#4fc3f7; border:1px solid #334155; border-radius:3px; cursor:pointer; font-size:12px; font-weight:bold;" title="Move Left">◀</button>
-                <button id="nudge-up" style="padding:4px 8px; background:#1e293b; color:#4fc3f7; border:1px solid #334155; border-radius:3px; cursor:pointer; font-size:12px; font-weight:bold;" title="Move Up">▲</button>
-                <button id="nudge-down" style="padding:4px 8px; background:#1e293b; color:#4fc3f7; border:1px solid #334155; border-radius:3px; cursor:pointer; font-size:12px; font-weight:bold;" title="Move Down">▼</button>
-                <button id="nudge-right" style="padding:4px 8px; background:#1e293b; color:#4fc3f7; border:1px solid #334155; border-radius:3px; cursor:pointer; font-size:12px; font-weight:bold;" title="Move Right">▶</button>
-                <input type="number" id="nudge-step" value="10" min="1" max="500" style="width:36px; padding:3px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:9px; text-align:center;" title="Step size">
-                <span style="font-size:8px; color:#666;">px</span>
+            <div class="input-row">
+                <button id="refresh-clip-info" title="Refresh" style="width:auto; padding:6px 10px;">↻</button>
+                <button id="nudge-left"  title="Move Left"  style="width:auto; padding:6px 10px;">◀</button>
+                <button id="nudge-up"    title="Move Up"    style="width:auto; padding:6px 10px;">▲</button>
+                <button id="nudge-down"  title="Move Down"  style="width:auto; padding:6px 10px;">▼</button>
+                <button id="nudge-right" title="Move Right" style="width:auto; padding:6px 10px;">▶</button>
+                <input type="number" id="nudge-step" value="10" min="1" max="500" title="Step size" style="width:48px; text-align:center;">
+                <span style="font-size:10px; color:var(--text-mute);">px</span>
             </div>
 
-            <!-- Position & Scale (compact) -->
-            <div style="display:flex; gap:3px; margin-bottom:4px; align-items:center;">
-                <label style="font-size:9px; color:#888; width:32px;">Pos</label>
-                <input type="number" id="pos-x" placeholder="X" step="0.1" style="flex:1; padding:3px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:9px;">
-                <input type="number" id="pos-y" placeholder="Y" step="0.1" style="flex:1; padding:3px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:9px;">
-                <button id="apply-position" style="padding:2px 6px; background:#334155; color:#06b6d4; border:1px solid #06b6d4; border-radius:2px; cursor:pointer; font-size:8px; font-weight:600;">Set</button>
-            </div>
-            <div style="display:flex; gap:3px; margin-bottom:6px; align-items:center;">
-                <label style="font-size:9px; color:#888; width:32px;">Scl%</label>
-                <input type="number" id="scale-value" placeholder="100" style="flex:1; padding:3px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:9px;">
-                <button id="apply-scale" style="padding:2px 6px; background:#334155; color:#06b6d4; border:1px solid #06b6d4; border-radius:2px; cursor:pointer; font-size:8px; font-weight:600;">Set</button>
+            <div class="input-row">
+                <span style="font-size:10px; color:var(--text-mute); width:32px;">Pos</span>
+                <input type="number" id="pos-x" placeholder="X" step="0.1">
+                <input type="number" id="pos-y" placeholder="Y" step="0.1">
+                <button id="apply-position" style="width:auto; padding:6px 12px;">Set</button>
             </div>
 
-            <!-- Clipboard (merged) -->
-            <button id="btn-paste-clipboard" style="width:100%; padding:5px; background:linear-gradient(135deg, #3b82f6, #1d4ed8); border:none; color:#fff; font-weight:600; font-size:10px; border-radius:4px; cursor:pointer;" data-tooltip="Paste any image copied from the internet directly onto your timeline.">
-                📋 Paste Image from Internet
+            <div class="input-row">
+                <span style="font-size:10px; color:var(--text-mute); width:32px;">Scl%</span>
+                <input type="number" id="scale-value" placeholder="100">
+                <button id="apply-scale" style="width:auto; padding:6px 12px;">Set</button>
+            </div>
+
+            <button id="btn-paste-clipboard" data-tooltip="Paste any image copied from the internet directly onto your timeline.">
+                Paste Image from Internet
             </button>
-            <p id="paste-status" style="font-size:9px; color:#666; margin-top:2px;"></p>
+            <p id="paste-status"></p>
         </div>
 
-        <!-- EXPORT ENGINE -->
-        <div class="action-group" style="border-left: 3px solid #f59e0b;">
-            <h3>📤 Export Engine</h3>
-            <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap;">
-                <label style="color:#999; font-size:10px; white-space:nowrap;">File:</label>
-                <input type="text" id="export-filename" placeholder="sequence name" style="flex:1; min-width:80px; padding:3px 6px; background:#2a2a2a; border:1px solid #444; border-radius:3px; color:#eee; font-size:10px;">
-                <label style="color:#999; font-size:10px;">Mbps:</label>
-                <input type="number" id="batch-bitrate-input" value="10" min="1" max="100" style="width:40px; padding:3px; background:#2a2a2a; border:1px solid #444; border-radius:3px; color:#eee; font-size:10px;">
+        <!-- 4. EXPORT ENGINE -->
+        <div class="action-group">
+            <h3>
+                <span class="icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+                Export Engine
+            </h3>
+
+            <div class="input-row">
+                <span style="font-size:10px; color:var(--text-mute); white-space:nowrap;">File</span>
+                <input type="text" id="export-filename" placeholder="sequence name">
+                <span style="font-size:10px; color:var(--text-mute);">Mbps</span>
+                <input type="number" id="batch-bitrate-input" value="10" min="1" max="100" style="width:60px;">
             </div>
-            <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
-                <label style="color:#999; font-size:10px; white-space:nowrap;">Save to:</label>
-                <input type="text" id="export-path" placeholder="Desktop/EditFlowPro_Exports" style="flex:1; padding:3px 6px; background:#2a2a2a; border:1px solid #444; border-radius:3px; color:#eee; font-size:10px;">
-                <button id="btn-export-browse" style="padding:3px 8px; font-size:10px; background:#444; color:#eee; border:1px solid #555; border-radius:3px; cursor:pointer; white-space:nowrap;">📁</button>
+
+            <div class="input-row">
+                <span style="font-size:10px; color:var(--text-mute); white-space:nowrap;">Save to</span>
+                <input type="text" id="export-path" placeholder="Desktop/EditFlowPro_Exports">
+                <button id="btn-export-browse" style="width:auto; padding:6px 10px;">Browse</button>
             </div>
-            <button id="btn-export-selected" style="background:linear-gradient(135deg, #f59e0b, #d97706); border:none; color:#000; font-weight:bold; margin-bottom:6px;" data-tooltip="Export only the currently selected clip respecting its in/out range markers.">
-                📤 Export Selected Clip In-Out Only
+
+            <button id="btn-export-selected" data-tooltip="Export only the currently selected clip respecting its in/out range markers.">
+                Export Selected Clip
             </button>
-            <button id="btn-export-all" class="secondary" data-tooltip="Export the entire timeline as one continuous video file.">
-                📦 Export All Timeline Clips
+            <button id="btn-export-all" class="secondary" data-tooltip="Export the entire timeline as one continuous video file." style="margin-top:8px;">
+                Export All Timeline Clips
             </button>
         </div>
 
-        <!-- AI CAPTIONS — Whisper transcription + animated captions -->
-        <div class="action-group" style="border-left: 3px solid #a855f7;">
-            <h3>🎤 AI Captions</h3>
-            <p class="description">Select an audio/video clip → transcribe & place animated captions on timeline.</p>
+        <!-- 5. AI CAPTIONS — brand-feature highlight -->
+        <div class="action-group brand-feature">
+            <h3>
+                <span class="icon"><svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
+                AI Captions
+            </h3>
+            <p class="description">Whisper transcription with animated captions placed on the timeline.</p>
 
-            <!-- Row 1: Language + Model -->
-            <div style="display:flex; gap:4px; margin-bottom:6px; align-items:center;">
-                <label style="font-size:9px; color:#888; width:42px;">Lang</label>
-                <select id="cap-language" style="flex:1; padding:4px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:10px;" data-tooltip="Language of the spoken audio. 'Auto' lets Whisper detect.">
-                    <option value="auto" selected>🌐 Auto-detect</option>
-                    <option value="ar">🇸🇦 Arabic</option>
-                    <option value="en">🇬🇧 English</option>
-                    <option value="es">🇪🇸 Spanish</option>
-                    <option value="fr">🇫🇷 French</option>
-                    <option value="de">🇩🇪 German</option>
-                    <option value="it">🇮🇹 Italian</option>
-                    <option value="pt">🇵🇹 Portuguese</option>
-                    <option value="tr">🇹🇷 Turkish</option>
-                    <option value="ru">🇷🇺 Russian</option>
-                    <option value="ja">🇯🇵 Japanese</option>
-                    <option value="ko">🇰🇷 Korean</option>
-                    <option value="zh">🇨🇳 Chinese</option>
-                    <option value="hi">🇮🇳 Hindi</option>
-                    <option value="ur">🇵🇰 Urdu</option>
+            <div class="input-row">
+                <span style="font-size:10px; color:var(--text-mute); width:42px;">Lang</span>
+                <select id="cap-language" style="flex:1;" data-tooltip="Language of the spoken audio.">
+                    <option value="auto" selected>Auto-detect</option>
+                    <option value="ar">Arabic</option>
+                    <option value="en">English</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="it">Italian</option>
+                    <option value="pt">Portuguese</option>
+                    <option value="tr">Turkish</option>
+                    <option value="ru">Russian</option>
+                    <option value="ja">Japanese</option>
+                    <option value="ko">Korean</option>
+                    <option value="zh">Chinese</option>
+                    <option value="hi">Hindi</option>
+                    <option value="ur">Urdu</option>
                 </select>
-                <label style="font-size:9px; color:#888; width:42px;">Model</label>
-                <select id="cap-model" style="flex:1; padding:4px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:10px;" data-tooltip="Larger = more accurate but slower & bigger download.">
-                    <option value="tiny">tiny (75 MB · fastest)</option>
-                    <option value="base">base (140 MB · fast)</option>
-                    <option value="small" selected>small (460 MB · balanced)</option>
-                    <option value="medium">medium (1.5 GB · accurate)</option>
-                    <option value="large">large (3 GB · best)</option>
+                <span style="font-size:10px; color:var(--text-mute); width:42px;">Model</span>
+                <select id="cap-model" style="flex:1;" data-tooltip="Larger = more accurate but slower.">
+                    <option value="tiny">tiny · 75 MB</option>
+                    <option value="base">base · 140 MB</option>
+                    <option value="small" selected>small · 460 MB</option>
+                    <option value="medium">medium · 1.5 GB</option>
+                    <option value="large">large · 3 GB</option>
                 </select>
             </div>
 
-            <!-- Row 2: Caption style + Words per line -->
-            <div style="display:flex; gap:4px; margin-bottom:6px; align-items:center;">
-                <label style="font-size:9px; color:#888; width:42px;">Style</label>
-                <select id="cap-style" style="flex:1; padding:4px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:10px;" data-tooltip="How the words are grouped on screen.">
-                    <option value="word">Word-by-word (TikTok)</option>
-                    <option value="phrase" selected>Short phrases (3–5 words)</option>
-                    <option value="line">Full lines (subtitle)</option>
+            <div class="input-row">
+                <span style="font-size:10px; color:var(--text-mute); width:42px;">Style</span>
+                <select id="cap-style" style="flex:1;">
+                    <option value="word">Word-by-word</option>
+                    <option value="phrase" selected>Short phrases</option>
+                    <option value="line">Full lines</option>
                 </select>
-                <label style="font-size:9px; color:#888; width:42px;">Anim</label>
-                <select id="cap-animation" style="flex:1; padding:4px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:10px;" data-tooltip="Entrance animation for each caption.">
-                    <option value="pop" selected>✨ Pop</option>
-                    <option value="fade">🌫️ Fade</option>
-                    <option value="slide-up">⬆️ Slide Up</option>
-                    <option value="bounce">🏀 Bounce</option>
-                    <option value="karaoke">🎤 Karaoke</option>
-                    <option value="typewriter">⌨️ Typewriter</option>
-                    <option value="shake">📳 Shake</option>
-                    <option value="glow">💡 Glow Pulse</option>
-                    <option value="none">— None</option>
+                <span style="font-size:10px; color:var(--text-mute); width:42px;">Anim</span>
+                <select id="cap-animation" style="flex:1;">
+                    <option value="pop" selected>Pop</option>
+                    <option value="fade">Fade</option>
+                    <option value="slide-up">Slide Up</option>
+                    <option value="bounce">Bounce</option>
+                    <option value="karaoke">Karaoke</option>
+                    <option value="typewriter">Typewriter</option>
+                    <option value="shake">Shake</option>
+                    <option value="glow">Glow Pulse</option>
+                    <option value="none">None</option>
                 </select>
             </div>
 
-            <!-- Row 3: Font + Color + Size -->
-            <div style="display:flex; gap:4px; margin-bottom:8px; align-items:center;">
-                <label style="font-size:9px; color:#888; width:42px;">Font</label>
-                <select id="cap-font" style="flex:1; padding:4px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:10px;">
-                    <optgroup label="🌐 Latin">
-                        <option value="Arial" selected>Arial Bold</option>
-                        <option value="Helvetica">Helvetica Bold</option>
+            <div class="input-row">
+                <span style="font-size:10px; color:var(--text-mute); width:42px;">Font</span>
+                <select id="cap-font" style="flex:1;">
+                    <optgroup label="Latin">
+                        <option value="Inter" selected>Inter</option>
+                        <option value="Arial">Arial</option>
+                        <option value="Helvetica">Helvetica</option>
                         <option value="Impact">Impact</option>
-                        <option value="Montserrat">Montserrat Black</option>
-                        <option value="Poppins">Poppins Black</option>
+                        <option value="Montserrat">Montserrat</option>
                     </optgroup>
-                    <optgroup label="🇸🇦 Arabic">
+                    <optgroup label="Arabic">
                         <option value="Makeen">مكين — Makeen</option>
                         <option value="VIP Hala Bold">VIP Hala Bold</option>
                         <option value="Digi Madasi Bold">Digi Madasi Bold</option>
@@ -278,37 +271,50 @@
                         <option value="MadaniArabic-Thin">Madani Arabic Thin</option>
                     </optgroup>
                 </select>
-                <label style="font-size:9px; color:#888; width:30px;">Size</label>
-                <input type="number" id="cap-size" value="72" min="20" max="200" step="2" style="width:46px; padding:4px; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:3px; font-size:10px;">
-                <label style="font-size:9px; color:#888; width:30px;">Color</label>
-                <input type="color" id="cap-color" value="#ffffff" style="width:34px; height:24px; padding:0; background:transparent; border:1px solid #334155; border-radius:3px; cursor:pointer;">
-                <input type="color" id="cap-highlight" value="#a855f7" title="Highlight color (Karaoke / Glow)" style="width:34px; height:24px; padding:0; background:transparent; border:1px solid #334155; border-radius:3px; cursor:pointer;">
+                <span style="font-size:10px; color:var(--text-mute); width:30px;">Size</span>
+                <select id="cap-size" style="width:74px;" title="Caption font size">
+                    <option value="32">32 px</option>
+                    <option value="48">48 px</option>
+                    <option value="64">64 px</option>
+                    <option value="72" selected>72 px</option>
+                    <option value="96">96 px</option>
+                    <option value="120">120 px</option>
+                    <option value="160">160 px</option>
+                </select>
+                <input type="color" id="cap-color"     value="#ffffff" title="Caption color" style="width:38px; height:28px;">
+                <input type="color" id="cap-highlight" value="#1F8FFF" title="Highlight color (Karaoke / Glow)" style="width:38px; height:28px;">
             </div>
 
-            <button id="btn-generate-captions" style="width:100%; background:linear-gradient(135deg, #a855f7, #7c3aed); border:none; color:#fff; font-weight:bold; padding:9px; border-radius:4px; cursor:pointer; font-size:11px;" data-tooltip="Transcribe with Whisper and place animated captions on the timeline.">
-                🎤 Generate Animated Captions
+            <button id="btn-generate-captions" data-tooltip="Transcribe with Whisper and place animated captions on the timeline." style="margin-top:8px;">
+                Generate Animated Captions
             </button>
-            <p id="cap-status" style="font-size:9px; color:#666; margin-top:3px; text-align:center;"></p>
+            <p id="cap-status"></p>
         </div>
 
-        <!-- BEAT DETECTION (last section) -->
-
-        <div class="action-group" style="border-left: 3px solid #f43f5e;">
-            <h3>🎵 AI Beat Detection</h3>
-            <div class="input-row" style="margin-bottom:6px;">
+        <!-- 6. AI BEAT DETECTION -->
+        <div class="action-group">
+            <h3>
+                <span class="icon"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
+                AI Beat Detection
+            </h3>
+            <div class="input-row">
                 <select id="beat-band-select" style="flex:1;" data-tooltip="Filter which percussion hits to detect.">
-                    <option value="all">🎶 All Percussion</option>
-                    <option value="kicks">🥁 Kicks</option>
-                    <option value="snares">🪘 Snares</option>
-                    <option value="hihats">🔔 Hi-Hats</option>
+                    <option value="all">All Percussion</option>
+                    <option value="kicks">Kicks</option>
+                    <option value="snares">Snares</option>
+                    <option value="hihats">Hi-Hats</option>
                 </select>
-                <select id="beat-precision-select" style="flex:1;" data-tooltip="Higher precision = slower processing but more accurate markers.">
+                <select id="beat-precision-select" style="flex:1;" data-tooltip="Higher precision = slower but more accurate.">
                     <option value="normal">Normal</option>
                     <option value="precision" selected>Precision</option>
                 </select>
             </div>
-            <button id="btn-beat-markers" class="secondary" style="margin-bottom:4px;" data-tooltip="Analyze audio and place sequence markers on every detected beat. Supports Cmd+Z undo.">Place Musical Markers</button>
-            <button id="btn-clear-markers" style="font-size:10px; color:#ff6b6b; padding:2px; border:none; background:none; cursor:pointer; width:auto;" data-tooltip="Remove all sequence markers. Requires confirmation.">Clear All Markers</button>
+            <button id="btn-beat-markers" data-tooltip="Analyze audio and place sequence markers on every detected beat.">
+                Place Musical Markers
+            </button>
+            <button id="btn-clear-markers" data-tooltip="Remove all sequence markers." style="margin-top:8px;">
+                Clear All Markers
+            </button>
         </div>
 
         <!-- PROGRESS -->
@@ -322,12 +328,12 @@
         <!-- STATUS BAR -->
         <div class="status-box status-info" id="status-box">
             <div class="pulsing-orb"></div>
-            <span id="status-text">EditFlow Pro v14.0 ready.</span>
+            <span id="status-text">EditFlow Pro · ready</span>
         </div>
     </div>
 
     <div id="ai-insights-panel" class="ai-insights hidden">
-        <h4>💡 Task Report</h4><p id="ai-insight-text"></p>
+        <h4>Task Report</h4><p id="ai-insight-text"></p>
     </div>
 
     <script src="js/dspTools.js"></script>
