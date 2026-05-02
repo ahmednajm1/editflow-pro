@@ -142,74 +142,62 @@ document.addEventListener("DOMContentLoaded", function() {
     // ============================================================
 
     // ---- LIVE INFO BAR ----
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setStyle(id, prop, v) { var el = document.getElementById(id); if (el) el.style[prop] = v; }
+    function setPlaceholder(id, v) { var el = document.getElementById(id); if (el) el.placeholder = v; }
+
     function updateClipInfo() {
         csInterface.evalScript('$._editflow.getSequenceInfo()', function(seqResult) {
             try {
                 var seq = JSON.parse(seqResult);
-                if (seq.error) {
-                    document.getElementById('seq-info').textContent = '⚠️ ' + seq.error;
-                    return;
-                }
-                document.getElementById('seq-info').textContent =
-                    '📺 ' + seq.resolution + ' — ' + seq.orientation +
-                    ' (center: ' + seq.centerX + ', ' + seq.centerY + ')';
-            } catch(e) {
-                document.getElementById('seq-info').textContent = '📺 Error reading sequence';
-            }
+                if (seq.error) { setText('seq-info', seq.error); return; }
+                setText('seq-info', seq.resolution + ' — ' + seq.orientation +
+                    ' (center: ' + seq.centerX + ', ' + seq.centerY + ')');
+            } catch(e) { setText('seq-info', 'Error reading sequence'); }
         });
 
         csInterface.evalScript('$._editflow.getClipPositionInfo()', function(result) {
             try {
                 var info = JSON.parse(result);
-
                 if (info.error) {
-                    document.getElementById('pos-info').style.display = 'none';
-                    document.getElementById('offset-info').style.display = 'none';
-                    document.getElementById('scale-info').style.display = 'none';
-                    document.getElementById('coord-type-info').style.display = 'none';
+                    setStyle('pos-info',       'display', 'none');
+                    setStyle('offset-info',    'display', 'none');
+                    setStyle('scale-info',     'display', 'none');
+                    setStyle('coord-type-info','display', 'none');
                     return;
                 }
-
-                // Position
-                document.getElementById('pos-info').style.display = 'block';
-                document.getElementById('current-pos').textContent =
+                setStyle('pos-info', 'display', 'block');
+                setText('current-pos',
                     'X=' + Math.round(info.posX * 100) / 100 +
-                    '  Y=' + Math.round(info.posY * 100) / 100;
-                document.getElementById('center-pos').textContent =
-                    'X=' + info.centerX + '  Y=' + info.centerY;
+                    '  Y=' + Math.round(info.posY * 100) / 100);
+                setText('center-pos', 'X=' + info.centerX + '  Y=' + info.centerY);
 
-                // Offset
-                document.getElementById('offset-info').style.display = 'block';
+                setStyle('offset-info', 'display', 'block');
                 var offsetEl = document.getElementById('offset-text');
-                if (info.isCentered) {
-                    offsetEl.textContent = '✅ Centered!';
-                    offsetEl.style.color = '#81c784';
-                } else {
-                    var xDir = info.offsetX > 0 ? 'right' : 'left';
-                    var yDir = info.offsetY > 0 ? 'down' : 'up';
-                    offsetEl.textContent =
-                        '⚠️ Off-center: ' +
-                        Math.abs(info.offsetX) + 'px ' + xDir + ', ' +
-                        Math.abs(info.offsetY) + 'px ' + yDir;
-                    offsetEl.style.color = '#ffb74d';
+                if (offsetEl) {
+                    if (info.isCentered) {
+                        offsetEl.textContent = 'Centered'; offsetEl.style.color = '#81c784';
+                    } else {
+                        var xDir = info.offsetX > 0 ? 'right' : 'left';
+                        var yDir = info.offsetY > 0 ? 'down' : 'up';
+                        offsetEl.textContent = 'Off-center: ' +
+                            Math.abs(info.offsetX) + 'px ' + xDir + ', ' +
+                            Math.abs(info.offsetY) + 'px ' + yDir;
+                        offsetEl.style.color = '#ffb74d';
+                    }
                 }
+                setStyle('scale-info', 'display', 'block');
+                setText('current-scale', info.scale + '%');
 
-                // Scale
-                document.getElementById('scale-info').style.display = 'block';
-                document.getElementById('current-scale').textContent = info.scale + '%';
-
-                // Coord type
-                document.getElementById('coord-type-info').style.display = 'block';
-                document.getElementById('coord-type-text').textContent =
-                    '🔧 Component: ' + info.component +
+                setStyle('coord-type-info', 'display', 'block');
+                setText('coord-type-text',
+                    'Component: ' + info.component +
                     ' | Coords: ' + info.coordType +
-                    ' | Clip: ' + info.clipName;
+                    ' | Clip: ' + info.clipName);
 
-                // Update placeholders
-                document.getElementById('pos-x').placeholder = Math.round(info.posX * 100) / 100;
-                document.getElementById('pos-y').placeholder = Math.round(info.posY * 100) / 100;
-                document.getElementById('scale-value').placeholder = Math.round(info.scale);
-
+                setPlaceholder('pos-x', Math.round(info.posX * 100) / 100);
+                setPlaceholder('pos-y', Math.round(info.posY * 100) / 100);
+                setPlaceholder('scale-value', Math.round(info.scale));
             } catch(e) {
                 console.log('[CLIP-INFO] Parse error:', e, result);
             }
@@ -380,6 +368,25 @@ document.addEventListener("DOMContentLoaded", function() {
     // ============================================================
     // AI CAPTIONS — Whisper transcription + animated captions
     // ============================================================
+    // ── COLOR SWATCH SYNC ────────────────────────────────────
+    (function() {
+        function linkSwatch(inputId, swatchId) {
+            var input  = document.getElementById(inputId);
+            var swatch = document.getElementById(swatchId);
+            if (!input || !swatch) return;
+            function sync() {
+                var v = input.value;
+                if (/^#[0-9a-fA-F]{6}$/.test(v)) swatch.style.background = v;
+            }
+            sync();
+            input.addEventListener("input",  sync);
+            input.addEventListener("change", sync);
+            swatch.addEventListener("click", function() { input.focus(); input.select(); });
+        }
+        linkSwatch("cap-color",     "cap-color-swatch");
+        linkSwatch("cap-highlight", "cap-hl-swatch");
+    })();
+
     safeBind("btn-generate-captions", function() {
         if (!fsModule || !execModule || !osModule) {
             showStatus("Node modules unavailable.", "red"); return;
