@@ -1,49 +1,60 @@
-# Debug & Manual Installation Guide (Developer Mode)
+# EditFlow Pro v16 — Installation Guide
 
-Because ZXP Compilation requires specific Adobe CMD binaries (ZXPSignCmd), installing the extension manually via Developer Mode is standard for beta versions.
-
-## 1. Entering Developer Mode (Mac)
-Adobe prevents unsigned plugins from running unless debug mode is active.
-1. Open up the `Terminal` application on your Mac.
-2. Run this command:
-   ```bash
-   defaults write com.adobe.CSXS.11 PlayerDebugMode 1
-   ```
-   *(Note: Depending on your exact Premiere Pro version year, the CSXS number changes. Run it for `.11`, `.10`, `.9`, etc., to be safe).*
-
-## 2. Moving the Plugin Folder
-Instead of a `.zxp` file, Adobe reads direct system folders.
-1. Copy the entire `EditFlowPro` folder.
-2. Open Finder. In the top bar, click **Go > Go to Folder...**
-3. Type: `~/Library/Application Support/Adobe/CEP/extensions/`
-4. Paste the `EditFlowPro` folder there.
-5. Restart Adobe Premiere Pro.
-6. Look under **Window > Extensions > EditFlow Pro**.
+## Requirements
+- macOS (10.14+)
+- Adobe Premiere Pro 2021 or later (CC 15.0+)
+- Python 3 installed — required for AI Captions (`python3 --version` in Terminal to verify)
 
 ---
 
-## Technical Debugging
+## Installation (Mac)
 
-### Where do logs appear?
-EditFlow Pro has a built-in `logger.js`. Errors in the DSP or frontend layer are automatically funneled there. If you want to view live Javascript readouts or trace execution:
+1. Extract `EditFlowPro_v16_install.zip`
+2. Open the `EditFlowPro` folder
+3. **Right-click** on `Install EditFlow Pro.command` → choose **Open**
+4. A warning will appear — click **Open** to confirm
+5. The installer runs and shows "Installation complete!"
+6. Open Adobe Premiere Pro → **Window → Extensions → EditFlow Pro**
 
-### Opening the Local CEP Console (Chromium Debugger)
-1. Since we bypass UXP utilizing CEP, you can connect an external Chrome browser to inspect the panel while it runs!
-2. Create a file named `.debug` inside the `EditFlowPro` plugin folder.
-3. Add this code into it:
-   ```xml
-   <?xml version="1.0" encoding="UTF-8"?>
-   <ExtensionList>
-     <Extension Id="com.editflowpro.panel.extension">
-       <HostList>
-         <Host Name="PPRO" Port="8088"/>
-       </HostList>
-     </Extension>
-   </ExtensionList>
-   ```
-4. Restart Premiere and open the EditFlow Pro panel.
-5. Open your standard **Google Chrome** browser and navigate to: `http://localhost:8088`.
-6. You will see the familiar Chrome Developer Tools panel linked directly live to your Premiere Extension. 
+> **Why Right-click instead of double-click?**
+> macOS blocks unrecognised scripts by default (Gatekeeper). Right-click → Open bypasses this once. The file is safe — it only copies the extension folder and sets a registry preference.
+>
+> If you see "Move to Trash / Done" with no Open option: click **Done**, then go to  
+> **System Settings → Privacy & Security → scroll down → "Open Anyway"**
 
-### Why did "Smart Edit" abort?
-If the confirmation modal showed zero cut estimates and failed, it means `dspWorker.js` threw a math error analyzing the offline buffer. Open the CEF port (`localhost:8088`) console to view the exact error stack trace.
+---
+
+## Installation (Windows)
+
+1. Extract `EditFlowPro_v16_install.zip`
+2. Open the `EditFlowPro` folder
+3. Double-click `Install EditFlow Pro.bat`
+4. If SmartScreen appears, click **More info → Run anyway**
+5. The installer runs and shows "Installation complete!"
+6. Open Adobe Premiere Pro → **Window → Extensions → EditFlow Pro**
+
+---
+
+## Troubleshooting
+
+**Panel doesn't appear in Window → Extensions**
+- Make sure the installer ran successfully and Premiere was fully restarted
+- Verify the folder is named exactly `EditFlowPro` (case-sensitive)
+
+**AI Captions button is greyed out or fails**
+- Install Python 3: `brew install python` or from python.org
+- Make sure Premiere has permission to run shell scripts (System Settings → Privacy → Full Disk Access)
+
+**CEP Debugger (for developers)**
+Create a `.debug` file inside the `EditFlowPro/` folder with this content:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<ExtensionList>
+  <Extension Id="com.editflowpro.panel.extension">
+    <HostList>
+      <Host Name="PPRO" Port="8088"/>
+    </HostList>
+  </Extension>
+</ExtensionList>
+```
+Then open `http://localhost:8088` in Chrome while the panel is open in Premiere.

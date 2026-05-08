@@ -196,46 +196,8 @@ $._editflow = {
                 }
             }
 
-            // Method 2: If selection didn't work, search audio tracks at playhead
-            if (count === 0) {
-                var time = seq.getPlayerPosition();
-                for (var t = 0; t < seq.audioTracks.numTracks; t++) {
-                    var track = seq.audioTracks[t];
-                    for (var ci = 0; ci < track.clips.numItems; ci++) {
-                        var aClip = track.clips[ci];
-                        // Check if clip is at playhead position
-                        if (aClip.start.ticks <= time.ticks && aClip.end.ticks > time.ticks) {
-                            for (var ac = 0; ac < aClip.components.numItems; ac++) {
-                                var aComp = aClip.components[ac];
-                                if (aComp.displayName === "Volume") {
-                                    for (var ap = 0; ap < aComp.properties.numItems; ap++) {
-                                        var aProp = aComp.properties[ap];
-                                        if (aProp.displayName === "Level") {
-                                            var aOld = aProp.getValue();
-                                            if (aProp.isTimeVarying()) aProp.setTimeVarying(false);
-                                            aProp.setValue(linear, 1);
-                                            var aNew = aProp.getValue();
-                                            if (Math.abs(aNew - linear) < 0.01) {
-                                                count++;
-                                                debugInfo = "TRACK" + t + " old=" + aOld.toFixed(3) + " new=" + aNew.toFixed(3);
-                                            } else {
-                                                // Try without 2nd param
-                                                aProp.setValue(linear);
-                                                aNew = aProp.getValue();
-                                                count++;
-                                                debugInfo = "TRACK" + t + "-noflag old=" + aOld.toFixed(3) + " new=" + aNew.toFixed(3);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (count > 0) return '{"status":"success","message":"' + db + 'dB=' + linear.toFixed(4) + ' (' + debugInfo + ')","count":' + count + '}';
-            return '{"status":"error","message":"No audio at playhead. Select an audio clip."}';
+                if (count > 0) return '{"status":"success","message":"' + db + 'dB=' + linear.toFixed(4) + ' (' + debugInfo + ')","count":' + count + '}';
+            return '{"status":"error","message":"Select an audio clip first."}';
         } catch(e) {
             return '{"status":"error","message":"' + e.message + '"}';
         }
@@ -605,14 +567,22 @@ $._editflow = {
     importClipboardImage: function(filePath) {
         try {
             var project = app.project;
-            if (!project) {return '{"status":"error","message":"Open a project."}'; }
-            project.importFiles([filePath], true, project.rootItem, false);
-            var root = project.rootItem;
-            var lastItem = root.children[root.children.numItems - 1];
-            var seq = app.project.activeSequence;
-            if (seq) { seq.videoTracks[0].insertClip(lastItem, seq.getPlayerPosition());return '{"status":"success","message":"Image on timeline"}'; }
-return '{"status":"success","message":"Imported to bin"}';
-        } catch(e) {return '{"status":"error","message":"' + e.message + '"}'; }
+            if (!project) { return '{"status":"error","message":"Open a project."}'; }
+
+            // Find or create an EFP_Clipboard bin to keep things tidy
+            var bin = null;
+            try {
+                var root = project.rootItem;
+                for (var i = 0; i < root.children.numItems; i++) {
+                    var child = root.children[i];
+                    if (child.name === "EFP_Clipboard" && child.type === 2) { bin = child; break; }
+                }
+                if (!bin) bin = root.createBin("EFP_Clipboard");
+            } catch(e) { bin = project.rootItem; }
+
+            project.importFiles([filePath], true, bin, false);
+            return '{"status":"success","message":"Added to Project → EFP_Clipboard bin. Drag to place."}';
+        } catch(e) { return '{"status":"error","message":"' + e.message + '"}'; }
     },
 
     openSpeedDialog: function() {
@@ -1325,6 +1295,50 @@ $._editflow.setScaleValue = function(scaleStr) {
 };
 
 // -------------------------------------------------------
+// Reset clip transform: position → sequence center, scale → 100%
+// -------------------------------------------------------
+$._editflow.resetClipTransform = function() {
+    try {
+        var seq = app.project.activeSequence;
+        if (!seq) return '{"status":"error","message":"No active sequence"}';
+
+        var sel = seq.getSelection();
+        if (!sel || sel.length === 0) return '{"status":"error","message":"Select a clip first."}';
+
+        var seqW = seq.frameSizeHorizontal;
+        var seqH = seq.frameSizeVertical;
+
+        var count = 0;
+        for (var i = 0; i < sel.length; i++) {
+            var posInfo = $._editflow._findPositionInfo(sel[i]);
+            if (posInfo) {
+                var compName = posInfo.compName;
+                var curVal = posInfo.prop.getValue();
+                var isNormalized = (compName === "Align and Transform" || compName === "Transform" ||
+                                    (Math.abs(curVal[0]) < 50 && Math.abs(curVal[1]) < 50));
+                if (isNormalized) {
+                    posInfo.prop.setValue([0.5, 0.5], true);
+                } else {
+                    posInfo.prop.setValue([seqW / 2, seqH / 2], true);
+                }
+            }
+            var scaleInfo = $._editflow._findScaleProp(sel[i]);
+            if (scaleInfo) {
+                scaleInfo.prop.setValue(100, true);
+                count++;
+            }
+        }
+
+        if (count > 0) {
+            return '{"status":"success","message":"Reset: centered + 100%","count":' + count + '}';
+        }
+        return '{"status":"error","message":"No transform found on selected clip."}';
+    } catch(e) {
+        return '{"status":"error","message":"' + e.message + '"}';
+    }
+};
+
+// -------------------------------------------------------
 // DEBUG — print all components and properties
 // -------------------------------------------------------
 $._editflow.debugClipComponents = function() {
@@ -1390,30 +1404,8 @@ $._editflow.resetAudioGain = function() {
             }
         }
 
-        // Fallback: audio tracks at playhead
-        if (count === 0) {
-            var time = seq.getPlayerPosition();
-            for (var t = 0; t < seq.audioTracks.numTracks; t++) {
-                var track = seq.audioTracks[t];
-                for (var ci = 0; ci < track.clips.numItems; ci++) {
-                    var aClip = track.clips[ci];
-                    if (aClip.start.ticks <= time.ticks && aClip.end.ticks > time.ticks) {
-                        for (var ac = 0; ac < aClip.components.numItems; ac++) {
-                            if (aClip.components[ac].displayName === "Volume") {
-                                for (var ap = 0; ap < aClip.components[ac].properties.numItems; ap++) {
-                                    if (aClip.components[ac].properties[ap].displayName === "Level") {
-                                        resetProp(aClip.components[ac].properties[ap]);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         if (count > 0) return '{"status":"success","message":"Reset to 0 dB","count":' + count + '}';
-        return '{"status":"error","message":"No audio clip found"}';
+        return '{"status":"error","message":"Select an audio clip first."}';
     } catch(e) {
         return '{"status":"error","message":"' + e.message + '"}';
     }
@@ -1425,52 +1417,32 @@ $._editflow.resetAudioGain = function() {
 $._editflow.getAudioLevel = function() {
     try {
         var seq = app.project.activeSequence;
-        if (!seq) return '{"error":"no sequence"}';
+        if (!seq) return '{"db":0,"no_selection":true}';
 
-        // Try selection first
         var sel = seq.getSelection();
-        if (sel && sel.length > 0) {
-            for (var i = 0; i < sel.length; i++) {
-                var clip = sel[i];
-                for (var c = 0; c < clip.components.numItems; c++) {
-                    if (clip.components[c].displayName === "Volume") {
-                        for (var p = 0; p < clip.components[c].properties.numItems; p++) {
-                            if (clip.components[c].properties[p].displayName === "Level") {
-                                var linear = clip.components[c].properties[p].getValue();
-                                var db = 20 * (Math.log(linear) / Math.LN10);
-                                return '{"db":' + Math.round(db * 10) / 10 + ',"linear":' + linear + '}';
-                            }
+        if (!sel || sel.length === 0) return '{"db":0,"no_selection":true}';
+
+        for (var i = 0; i < sel.length; i++) {
+            var clip = sel[i];
+            if (!clip.components) continue;
+            for (var c = 0; c < clip.components.numItems; c++) {
+                if (clip.components[c].displayName === "Volume") {
+                    for (var p = 0; p < clip.components[c].properties.numItems; p++) {
+                        if (clip.components[c].properties[p].displayName === "Level") {
+                            var linear = clip.components[c].properties[p].getValue();
+                            if (!linear || linear <= 0) return '{"db":0,"linear":' + linear + '}';
+                            var db = 20 * (Math.log(linear) / Math.LN10);
+                            return '{"db":' + Math.round(db * 10) / 10 + ',"linear":' + linear + '}';
                         }
                     }
                 }
             }
         }
 
-        // Try audio tracks at playhead
-        var time = seq.getPlayerPosition();
-        for (var t = 0; t < seq.audioTracks.numTracks; t++) {
-            var track = seq.audioTracks[t];
-            for (var ci = 0; ci < track.clips.numItems; ci++) {
-                var aClip = track.clips[ci];
-                if (aClip.start.ticks <= time.ticks && aClip.end.ticks > time.ticks) {
-                    for (var ac = 0; ac < aClip.components.numItems; ac++) {
-                        if (aClip.components[ac].displayName === "Volume") {
-                            for (var ap = 0; ap < aClip.components[ac].properties.numItems; ap++) {
-                                if (aClip.components[ac].properties[ap].displayName === "Level") {
-                                    var lin2 = aClip.components[ac].properties[ap].getValue();
-                                    var db2 = 20 * (Math.log(lin2) / Math.LN10);
-                                    return '{"db":' + Math.round(db2 * 10) / 10 + ',"linear":' + lin2 + '}';
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return '{"error":"no audio clip found"}';
+        // Selected clip found but no Volume component (e.g. video-only) — show 0
+        return '{"db":0,"no_selection":true}';
     } catch(e) {
-        return '{"error":"' + e.message + '"}';
+        return '{"db":0,"no_selection":true}';
     }
 };
 
@@ -1519,33 +1491,222 @@ $._editflow.nudgeAudioLevel = function(deltaDbStr) {
             }
         }
 
-        // Fallback: audio tracks at playhead
-        if (count === 0) {
-            var time = seq.getPlayerPosition();
-            for (var t = 0; t < seq.audioTracks.numTracks; t++) {
-                var track = seq.audioTracks[t];
-                for (var ci = 0; ci < track.clips.numItems; ci++) {
-                    var aClip = track.clips[ci];
-                    if (aClip.start.ticks <= time.ticks && aClip.end.ticks > time.ticks) {
-                        for (var ac = 0; ac < aClip.components.numItems; ac++) {
-                            if (aClip.components[ac].displayName === "Volume") {
-                                for (var ap = 0; ap < aClip.components[ac].properties.numItems; ap++) {
-                                    if (aClip.components[ac].properties[ap].displayName === "Level") {
-                                        nudgeProp(aClip.components[ac].properties[ap]);
-                                    }
-                                }
-                            }
-                        }
+        if (count > 0) {
+            var rounded = Math.round(newDb * 10) / 10;
+            return '{"status":"success","message":"' + (deltaDd > 0 ? '+' : '') + deltaDd + 'dB -> ' + rounded + 'dB","db":' + rounded + ',"count":' + count + '}';
+        }
+        return '{"status":"error","message":"Select an audio clip first."}';
+    } catch(e) {
+        return '{"status":"error","message":"' + e.message + '"}';
+    }
+};
+
+// -------------------------------------------------------
+// AUDIO FADE — keyframe Volume > Level for fade in/out
+// direction: "in" or "out"
+// durationStr: seconds as string (e.g. "0.5", "1.0", "2.0")
+// -------------------------------------------------------
+$._editflow.applyAudioFade = function(direction, durationStr) {
+    try {
+        var dur = parseFloat(durationStr);
+        if (isNaN(dur) || dur <= 0) return '{"status":"error","message":"Bad duration"}';
+
+        var seq = app.project.activeSequence;
+        if (!seq) return '{"status":"error","message":"No sequence"}';
+
+        var sel = seq.getSelection();
+        if (!sel || sel.length === 0) return '{"status":"error","message":"Select an audio clip first."}';
+
+        var count = 0;
+
+        for (var i = 0; i < sel.length; i++) {
+            var clip = sel[i];
+            if (!clip.components) continue;
+
+            var clipStartSec = clip.start.seconds;
+            var clipEndSec = clip.end.seconds;
+            var clipDur = clipEndSec - clipStartSec;
+            var fadeDur = dur > clipDur ? clipDur / 2 : dur;
+
+            for (var c = 0; c < clip.components.numItems; c++) {
+                var comp = clip.components[c];
+                if (comp.displayName !== "Volume") continue;
+
+                for (var p = 0; p < comp.properties.numItems; p++) {
+                    var prop = comp.properties[p];
+                    if (prop.displayName !== "Level") continue;
+
+                    var currentLinear = prop.getValue();
+                    if (!currentLinear || currentLinear <= 0) currentLinear = 1.0;
+
+                    prop.setTimeVarying(true);
+
+                    if (direction === "in") {
+                        prop.addKey(clipStartSec);
+                        prop.setValueAtKey(clipStartSec, 0.0001, 1);
+                        prop.addKey(clipStartSec + fadeDur);
+                        prop.setValueAtKey(clipStartSec + fadeDur, currentLinear, 1);
+                    } else {
+                        prop.addKey(clipEndSec - fadeDur);
+                        prop.setValueAtKey(clipEndSec - fadeDur, currentLinear, 1);
+                        prop.addKey(clipEndSec);
+                        prop.setValueAtKey(clipEndSec, 0.0001, 1);
                     }
+                    count++;
                 }
             }
         }
 
         if (count > 0) {
-            var rounded = Math.round(newDb * 10) / 10;
-            return '{"status":"success","message":"' + (deltaDd > 0 ? '+' : '') + deltaDd + 'dB -> ' + rounded + 'dB","db":' + rounded + ',"count":' + count + '}';
+            return '{"status":"success","message":"Fade ' + direction + ' ' + dur + 's","count":' + count + '}';
         }
-        return '{"status":"error","message":"No audio clip found"}';
+        return '{"status":"error","message":"Selected clip has no Volume component."}';
+    } catch(e) {
+        return '{"status":"error","message":"' + e.message + '"}';
+    }
+};
+
+// -------------------------------------------------------
+// AUDIO PRESET — apply named audio effect(s) via QE DOM
+// presetName drives which effect(s) get added to the
+// selected audio clip(s). We match DOM selection ↔ QE clip
+// by start.ticks since both report identical values.
+// -------------------------------------------------------
+$._editflow.AUDIO_PRESETS = {
+    "voice":     ["Highpass"],
+    "telephone": ["Highpass", "Lowpass"],
+    "bass":      ["Bass"],
+    "treble":    ["Treble"],
+    "reverb":    ["Studio Reverb"],
+    "denoise":   ["DeNoiser"]
+};
+
+$._editflow.applyAudioPreset = function(presetName) {
+    try {
+        var presetEffects = $._editflow.AUDIO_PRESETS[presetName];
+        if (!presetEffects) return '{"status":"error","message":"Unknown preset: ' + presetName + '"}';
+
+        var seq = app.project.activeSequence;
+        if (!seq) return '{"status":"error","message":"No sequence"}';
+
+        var sel = seq.getSelection();
+        if (!sel || sel.length === 0) return '{"status":"error","message":"Select an audio clip first."}';
+
+        // Build a set of selected start.ticks (as strings for safe comparison)
+        var selTicks = {};
+        var selCount = 0;
+        for (var i = 0; i < sel.length; i++) {
+            try {
+                selTicks[String(sel[i].start.ticks)] = true;
+                selCount++;
+            } catch(e) {}
+        }
+        if (selCount === 0) return '{"status":"error","message":"Cannot read selection."}';
+
+        var qeSeq = qe.project.getActiveSequence();
+        if (!qeSeq) return '{"status":"error","message":"QE sequence unavailable."}';
+
+        var applied = 0;
+        var failures = "";
+        var numTracks = qeSeq.numAudioTracks;
+        for (var t = 0; t < numTracks; t++) {
+            var qeTrack = qeSeq.getAudioTrackAt(t);
+            if (!qeTrack) continue;
+            var numItems = qeTrack.numItems;
+            for (var ci = 0; ci < numItems; ci++) {
+                var qeClip = qeTrack.getItemAt(ci);
+                if (!qeClip || qeClip.type !== "Clip") continue;
+                var qStart;
+                try { qStart = String(qeClip.start.ticks); } catch(e) { continue; }
+                if (!selTicks[qStart]) continue;
+
+                for (var e = 0; e < presetEffects.length; e++) {
+                    try {
+                        qeClip.addAudioEffect(presetEffects[e]);
+                        applied++;
+                    } catch(err) {
+                        failures += presetEffects[e] + " ";
+                    }
+                }
+            }
+        }
+
+        if (applied > 0) {
+            var msg = "Applied " + presetName + " (" + applied + " fx)";
+            if (failures) msg += " — missed: " + failures;
+            return '{"status":"success","message":"' + msg + '","count":' + applied + '}';
+        }
+        return '{"status":"error","message":"Could not apply effects. Missed: ' + (failures || "all") + '"}';
+    } catch(e) {
+        return '{"status":"error","message":"' + e.message + '"}';
+    }
+};
+
+// -------------------------------------------------------
+// CLEAR AUDIO FX — strip non-default audio effects + flatten
+// volume keyframes on the selected audio clip(s).
+// -------------------------------------------------------
+$._editflow.clearAudioEffects = function() {
+    try {
+        var seq = app.project.activeSequence;
+        if (!seq) return '{"status":"error","message":"No sequence"}';
+
+        var sel = seq.getSelection();
+        if (!sel || sel.length === 0) return '{"status":"error","message":"Select an audio clip first."}';
+
+        // Flatten Volume > Level keyframes on DOM clips
+        var flattened = 0;
+        for (var i = 0; i < sel.length; i++) {
+            var clip = sel[i];
+            if (!clip.components) continue;
+            for (var c = 0; c < clip.components.numItems; c++) {
+                var comp = clip.components[c];
+                if (comp.displayName !== "Volume") continue;
+                for (var p = 0; p < comp.properties.numItems; p++) {
+                    var prop = comp.properties[p];
+                    if (prop.displayName !== "Level") continue;
+                    try {
+                        var cur = prop.getValue();
+                        if (prop.isTimeVarying()) prop.setTimeVarying(false);
+                        prop.setValue(cur, 1);
+                        flattened++;
+                    } catch(e) {}
+                }
+            }
+        }
+
+        // Build set of selected start.ticks
+        var selTicks = {};
+        for (var s = 0; s < sel.length; s++) {
+            try { selTicks[String(sel[s].start.ticks)] = true; } catch(e) {}
+        }
+
+        // Remove audio effects via QE
+        var removed = 0;
+        try {
+            var qeSeq = qe.project.getActiveSequence();
+            if (qeSeq) {
+                for (var t = 0; t < qeSeq.numAudioTracks; t++) {
+                    var qeTrack = qeSeq.getAudioTrackAt(t);
+                    if (!qeTrack) continue;
+                    for (var ci = 0; ci < qeTrack.numItems; ci++) {
+                        var qeClip = qeTrack.getItemAt(ci);
+                        if (!qeClip || qeClip.type !== "Clip") continue;
+                        var qStart;
+                        try { qStart = String(qeClip.start.ticks); } catch(e) { continue; }
+                        if (!selTicks[qStart]) continue;
+
+                        // Try every removal API a Premiere version might expose
+                        try { qeClip.removeEffects(false, true, false, false, false, false, false); removed++; }
+                        catch(e1) {
+                            try { qeClip.removeEffects(); removed++; } catch(e2) {}
+                        }
+                    }
+                }
+            }
+        } catch(e) {}
+
+        return '{"status":"success","message":"Cleared FX (flattened:' + flattened + ', removed:' + removed + ')"}';
     } catch(e) {
         return '{"status":"error","message":"' + e.message + '"}';
     }
@@ -1654,36 +1815,70 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
     if (groupStyle === "line") {
         for (var i = 0; i < segs.length; i++) pushGroup(segs[i].start, segs[i].end, segs[i].text);
     } else if (groupStyle === "word") {
+        // Use actual word-level timestamps from Groq for precise timing
         for (var i = 0; i < segs.length; i++) {
             var seg = segs[i];
-            var words = splitWords(seg.text);
-            if (words.length === 0) continue;
-            var segDur = seg.end - seg.start;
-            var per = segDur / words.length;
-            for (var w = 0; w < words.length; w++) {
-                pushGroup(seg.start + w * per, seg.start + (w + 1) * per, words[w]);
+            var segWords = seg.words || [];
+            if (segWords.length > 0) {
+                for (var w = 0; w < segWords.length; w++) {
+                    pushGroup(segWords[w].start, segWords[w].end, segWords[w].text);
+                }
+            } else {
+                // Fallback: split text and divide duration equally
+                var words = splitWords(seg.text);
+                if (words.length === 0) continue;
+                var per = (seg.end - seg.start) / words.length;
+                for (var w = 0; w < words.length; w++) {
+                    pushGroup(seg.start + w * per, seg.start + (w + 1) * per, words[w]);
+                }
             }
         }
-    } else { // phrase: ~3–5 words per caption, split by whitespace
+    } else { // phrase: ~3–5 words per caption, using actual word timestamps
         for (var i = 0; i < segs.length; i++) {
             var seg = segs[i];
-            var words = splitWords(seg.text);
-            if (words.length === 0) continue;
-            var segDur = seg.end - seg.start;
-            var per = segDur / words.length;
-            var step = 4;
-            for (var k = 0; k < words.length; k += step) {
-                var chunkN = Math.min(step, words.length - k);
-                var chunkWords = words.slice(k, k + chunkN);
-                pushGroup(seg.start + k * per,
-                          seg.start + (k + chunkN) * per,
-                          chunkWords.join(" "));
+            var segWords = seg.words || [];
+            var step = 3;
+            if (segWords.length > 0) {
+                // Use real word timestamps for accurate phrase timing
+                for (var k = 0; k < segWords.length; k += step) {
+                    var chunkEnd = Math.min(k + step, segWords.length);
+                    var chunkTexts = [];
+                    for (var cw = k; cw < chunkEnd; cw++) {
+                        chunkTexts.push(segWords[cw].text);
+                    }
+                    pushGroup(segWords[k].start, segWords[chunkEnd - 1].end,
+                              chunkTexts.join(" "));
+                }
+            } else {
+                // Fallback: split text and divide duration equally
+                var words = splitWords(seg.text);
+                if (words.length === 0) continue;
+                var per = (seg.end - seg.start) / words.length;
+                for (var k = 0; k < words.length; k += step) {
+                    var chunkN = Math.min(step, words.length - k);
+                    var chunkWords = words.slice(k, k + chunkN);
+                    pushGroup(seg.start + k * per,
+                              seg.start + (k + chunkN) * per,
+                              chunkWords.join(" "));
+                }
             }
         }
     }
 
     if (groups.length === 0) {
         return '{"status":"error","message":"No transcript groups produced."}';
+    }
+
+    // ── CRITICAL: Shift all timestamps by the clip's timeline position ──
+    // Groq returns timestamps starting at 0 (relative to audio file).
+    // The audio clip may sit at e.g. 5.2s on the timeline.
+    // We must add offsetSecs so captions land at the correct timeline time.
+    this.log("placeAnimatedCaptions: offsetSecs=" + offsetSecs + ", groups=" + groups.length + ", style=" + groupStyle);
+    if (offsetSecs > 0) {
+        for (var gi = 0; gi < groups.length; gi++) {
+            groups[gi].start += offsetSecs;
+            groups[gi].end   += offsetSecs;
+        }
     }
 
     // ---- Emit our own SRT next to the JSON. Whisper-cli writes one too,
@@ -1709,59 +1904,153 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
     for (var i = 0; i < groups.length; i++) {
         var g = groups[i];
         sf.write((i + 1) + "\r\n");
-        sf.write(secToSRT(g.start + offsetSecs) + " --> " + secToSRT(g.end + offsetSecs) + "\r\n");
+        sf.write(secToSRT(g.start) + " --> " + secToSRT(g.end) + "\r\n");
         sf.write(g.text + "\r\n");
         sf.write("\r\n");
     }
     sf.close();
 
-    // ---- Import the SRT into the project root
+    // ---- Import the SRT into a dedicated bin (keeps project tidy)
     var imported = null;
+    var capBin = null;
     try {
-        var beforeCount = app.project.rootItem.children.numItems;
-        app.project.importFiles([srtPath], false, app.project.rootItem, false);
-        var afterCount = app.project.rootItem.children.numItems;
-        // Pick the most recently added item that ends with .srt
-        for (var i = afterCount - 1; i >= 0; i--) {
-            var item = app.project.rootItem.children[i];
+        // Find or create EFP_Captions bin
+        var root = app.project.rootItem;
+        for (var bi = 0; bi < root.children.numItems; bi++) {
+            var ch = root.children[bi];
+            if (ch.name === "EFP_Captions" && ch.type === 2) { capBin = ch; break; }
+        }
+        if (!capBin) capBin = root.createBin("EFP_Captions");
+    } catch(e) { capBin = app.project.rootItem; }
+    try {
+        app.project.importFiles([srtPath], false, capBin, false);
+        // Find the imported SRT item
+        for (var i = capBin.children.numItems - 1; i >= 0; i--) {
+            var item = capBin.children[i];
             if (item && item.name && /\.srt$/i.test(item.name)) { imported = item; break; }
         }
     } catch(e) {
-        return '{"status":"error","message":"SRT import failed: ' + e.message + '"}';
+        this.log("SRT import failed: " + e.message);
     }
 
-    // ---- Try to attach as a captions track. The Premiere DOM has shipped
-    //      several different captions APIs across versions; we attempt the
-    //      most likely ones and fall back to placing the SRT on a video
-    //      track so the user can right-click → "Convert to Captions".
+    // ---- Try to place captions on the timeline.
+    //      Multiple APIs across Premiere versions — try all.
     var placed = false;
     var placedHow = "";
 
-    // Attempt 1: native Sequence.createCaptionTrack from imported subtitle
+    // Attempt 1: Sequence.importCaptionFile (Premiere 2024+)
+    // This is the most reliable method — places captions at SRT timestamps directly
+    if (!placed) {
+        try {
+            if (typeof seq.importCaptionFile === "function") {
+                seq.importCaptionFile(srtPath);
+                placed = true; placedHow = "importCaptionFile";
+                this.log("Caption placed via importCaptionFile");
+            }
+        } catch(e) { this.log("importCaptionFile err: " + e.message); }
+    }
+
+    // Attempt 2: createCaptionTrack — try multiple parameter signatures
     if (!placed && imported) {
         try {
             if (typeof seq.createCaptionTrack === "function") {
-                seq.createCaptionTrack(imported);
-                placed = true; placedHow = "createCaptionTrack";
+                try {
+                    seq.createCaptionTrack(imported, 0, 0);
+                    placed = true; placedHow = "createCaptionTrack(item,0,0)";
+                } catch(e1) {
+                    this.log("createCaptionTrack(item,0,0): " + e1.message);
+                    try {
+                        seq.createCaptionTrack(imported, "EditFlowPro", 0);
+                        placed = true; placedHow = "createCaptionTrack(item,name,0)";
+                    } catch(e2) {
+                        this.log("createCaptionTrack(item,name,0): " + e2.message);
+                        try {
+                            seq.createCaptionTrack(imported, srtPath, 0, 0);
+                            placed = true; placedHow = "createCaptionTrack(item,path,0,0)";
+                        } catch(e3) {
+                            this.log("createCaptionTrack(item,path,0,0): " + e3.message);
+                            try {
+                                seq.createCaptionTrack(srtPath);
+                                placed = true; placedHow = "createCaptionTrack(path)";
+                            } catch(e4) {
+                                this.log("createCaptionTrack(path): " + e4.message);
+                            }
+                        }
+                    }
+                }
+                if (placed) this.log("Caption placed via " + placedHow);
             }
-        } catch(e) {}
+        } catch(e) { this.log("createCaptionTrack outer: " + e.message); }
     }
-    // Attempt 2: insert on existing captions track
+
+    // Attempt 3: QE DOM — addCaptionTrack / importCaptionFile
+    if (!placed) {
+        try {
+            app.enableQE();
+            var qeSeq = qe.project.getActiveSequence();
+            if (qeSeq) {
+                var qeMethods = ["addCaptionTrack", "importCaptionFile", "addCaptions"];
+                for (var qm = 0; qm < qeMethods.length; qm++) {
+                    try {
+                        if (typeof qeSeq[qeMethods[qm]] === "function") {
+                            qeSeq[qeMethods[qm]](srtPath, 0);
+                            placed = true;
+                            placedHow = "QE " + qeMethods[qm];
+                            this.log("Caption placed via QE " + qeMethods[qm]);
+                            break;
+                        }
+                    } catch(eqm) { this.log("QE " + qeMethods[qm] + " err: " + eqm.message); }
+                }
+            }
+        } catch(e) { this.log("QE caption err: " + e.message); }
+    }
+
+    // Attempt 4: insert on existing captions track
     if (!placed && imported) {
         try {
             if (seq.captionTracks && seq.captionTracks.numTracks > 0) {
                 var ct = seq.captionTracks[0];
-                if (ct.insertClip) { ct.insertClip(imported, 0); placed = true; placedHow = "captionTracks.insertClip"; }
+                if (typeof ct.insertClip === "function") {
+                    ct.insertClip(imported, 0);
+                    placed = true; placedHow = "captionTracks.insertClip";
+                    this.log("Caption placed via captionTracks.insertClip");
+                }
             }
-        } catch(e) {}
+        } catch(e) { this.log("captionTracks insertClip err: " + e.message); }
     }
-    // Attempt 3: drop on the topmost video track at the playhead
+
+    // Attempt 5: overwriteClip on captions track
     if (!placed && imported) {
         try {
-            var topV = seq.videoTracks[seq.videoTracks.numTracks - 1];
-            topV.insertClip(imported, seq.getPlayerPosition());
-            placed = true; placedHow = "videoTrack (manual: right-click → Convert to Captions)";
-        } catch(e) {}
+            if (seq.captionTracks && seq.captionTracks.numTracks > 0) {
+                var ct2 = seq.captionTracks[0];
+                if (typeof ct2.overwriteClip === "function") {
+                    ct2.overwriteClip(imported, 0);
+                    placed = true; placedHow = "captionTracks.overwriteClip";
+                    this.log("Caption placed via captionTracks.overwriteClip");
+                }
+            }
+        } catch(e) { this.log("captionTracks overwriteClip err: " + e.message); }
+    }
+
+    // Attempt 6: Place on the topmost video track as a subtitle clip
+    if (!placed && imported) {
+        try {
+            var topVTrack = seq.videoTracks[seq.videoTracks.numTracks - 1];
+            topVTrack.insertClip(imported, this.secToTicks(groups[0].start));
+            placed = true; placedHow = "videoTrack.insertClip";
+            this.log("Caption placed via videoTrack.insertClip");
+        } catch(e) { this.log("videoTrack insertClip err: " + e.message); }
+    }
+
+    // Attempt 7: overwriteClip on top video track
+    if (!placed && imported) {
+        try {
+            var topVTrack2 = seq.videoTracks[seq.videoTracks.numTracks - 1];
+            topVTrack2.overwriteClip(imported, this.secToTicks(groups[0].start));
+            placed = true; placedHow = "videoTrack.overwriteClip";
+            this.log("Caption placed via videoTrack.overwriteClip");
+        } catch(e) { this.log("videoTrack overwriteClip err: " + e.message); }
     }
 
     // ---- Best-effort styling. Premiere parks the imported subtitle
@@ -1822,11 +2111,11 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
     try { scanTracks(seq.captionTracks, false); } catch(e) {}
     try { scanTracks(seq.videoTracks,   true); } catch(e) {}
 
-    var msg = "Transcribed " + groups.length + " " + groupStyle + " caption(s)";
-    if (placed) msg += " and placed via " + placedHow + ".";
-    else msg += ". SRT imported to project — drag onto a captions track.";
-    if (styledCount > 0) msg += " Styled " + styledCount + " with " + font + ".";
-    else msg += " Manual style: open Essential Graphics, set Font='" + font + "'.";
+    var firstTC = (groups.length > 0) ? secToSRT(groups[0].start) : "00:00:00,000";
+    var msg = groups.length + " " + groupStyle + " caption(s)";
+    if (placed) msg += " placed on timeline via " + placedHow + " — synced at " + firstTC + ".";
+    else msg += ". SRT imported to project (timing synced at " + firstTC + ") — drag onto Caption track.";
+    if (styledCount > 0) msg += " Styled " + styledCount + " clips.";
 
     return '{"status":"success","message":"' + msg.replace(/"/g,'\\"') + '","groups":' + groups.length +
            ',"placed":' + placed + ',"styled":' + styledCount + ',"font":"' + font.replace(/"/g,'\\"') + '","animation":"' + anim + '","srt":"' + srtPath.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '"}';
@@ -2060,6 +2349,135 @@ $._editflow.applySilenceCuts = function(jsonPath, offsetSecs, rippleFlag) {
     }
 
     return '{"status":"success","message":"Cut ' + silences.length + ' silences (' + deletedCount + ' segments removed, ' + razorCount + ' razors).","silences":' + silences.length + ',"razors":' + razorCount + ',"deleted":' + deletedCount + ',"ripple":' + ripple + '}';
+};
+
+// ============================================
+// UPGRADE CAPTION TO GRAPHIC
+// Scans for the correct command ID in the
+// user's Premiere version and executes it.
+// ============================================
+$._editflow.upgradeCaptionToGraphic = function() {
+    try {
+        var seq = app.project.activeSequence;
+        if (!seq) return '{"status":"error","message":"No active sequence"}';
+
+        try { app.enableQE(); } catch(e) {}
+
+        // Scan a wide range of command IDs to find the right one.
+        // Premiere's "Upgrade Caption to Graphic" sits somewhere in the
+        // 4300–4600 range but changes per version/build.
+        var executed = false;
+        var usedId = -1;
+
+        // First: try the known IDs most likely to match
+        var knownIds = [4442, 4440, 4441, 4443, 4445, 4450, 4435, 4436, 4437, 4438, 4439,
+                        4444, 4446, 4447, 4448, 4449, 4451, 4452, 4453, 4454, 4455,
+                        4460, 4465, 4470, 4475, 4480, 4485, 4490, 4495, 4500];
+        for (var i = 0; i < knownIds.length; i++) {
+            try {
+                app.executeCommand(knownIds[i]);
+                executed = true;
+                usedId = knownIds[i];
+                break;
+            } catch(e) {}
+        }
+
+        // Extended scan: try 4300-4600 if nothing matched
+        if (!executed) {
+            for (var id = 4300; id <= 4600; id++) {
+                try {
+                    app.executeCommand(id);
+                    executed = true;
+                    usedId = id;
+                    break;
+                } catch(e) {}
+            }
+        }
+
+        // QE fallback: try known QE method names
+        if (!executed) {
+            try {
+                var qeSeq = qe.project.getActiveSequence();
+                if (qeSeq) {
+                    var qeMethods = ["upgradeCaptionsToGraphics", "convertCaptionsToGraphics",
+                                     "upgradeCaptions", "captionToGraphic"];
+                    for (var m = 0; m < qeMethods.length; m++) {
+                        try {
+                            if (typeof qeSeq[qeMethods[m]] === "function") {
+                                qeSeq[qeMethods[m]]();
+                                executed = true;
+                                break;
+                            }
+                        } catch(e) {}
+                    }
+                }
+            } catch(e) {}
+        }
+
+        if (executed) {
+            var msg = "Captions upgraded to graphic clips — add transitions, effects, and customize freely.";
+            if (usedId > 0) msg += " (cmd:" + usedId + ")";
+            return '{"status":"success","message":"' + msg + '"}';
+        } else {
+            return '{"status":"error","message":"Could not find the Upgrade command. Open Graphics menu > Upgrade Caption to Graphic manually."}';
+        }
+
+    } catch(e) {
+        return '{"status":"error","message":"' + e.message + '"}';
+    }
+};
+
+// ============================================
+// DIAGNOSTIC: Scan Premiere commands
+// Returns info about the Premiere version and
+// available caption/graphic commands.
+// ============================================
+$._editflow.scanPremiereInfo = function() {
+    try {
+        var info = {};
+        info.version = app.version || "unknown";
+        info.buildNumber = app.build || "unknown";
+
+        // List available methods on the active sequence
+        var seq = app.project.activeSequence;
+        var seqMethods = [];
+        if (seq) {
+            for (var key in seq) {
+                if (/caption|graphic|subtitle/i.test(key)) {
+                    seqMethods.push(key + " (" + typeof seq[key] + ")");
+                }
+            }
+        }
+        info.seqCaptionMethods = seqMethods.join(", ") || "none found";
+
+        // Check QE sequence methods
+        var qeMethods = [];
+        try {
+            app.enableQE();
+            var qeSeq = qe.project.getActiveSequence();
+            if (qeSeq) {
+                for (var qKey in qeSeq) {
+                    if (/caption|graphic|subtitle|upgrade/i.test(qKey)) {
+                        qeMethods.push(qKey + " (" + typeof qeSeq[qKey] + ")");
+                    }
+                }
+            }
+        } catch(e) {}
+        info.qeCaptionMethods = qeMethods.join(", ") || "none found";
+
+        // Check caption tracks
+        var captionInfo = "not available";
+        try {
+            if (seq && seq.captionTracks) {
+                captionInfo = seq.captionTracks.numTracks + " track(s)";
+            }
+        } catch(e) { captionInfo = "error: " + e.message; }
+        info.captionTracks = captionInfo;
+
+        return '{"status":"success","info":' + JSON.stringify(info) + '}';
+    } catch(e) {
+        return '{"status":"error","message":"' + e.message + '"}';
+    }
 };
 
 $._editflow_loaded = true;

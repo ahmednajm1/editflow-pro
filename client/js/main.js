@@ -5,7 +5,204 @@ var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, execModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
 var operationRunning = false, statusTimer = null;
-var settings = {voice:[2,3,5], music:[-9,-16,-21], scale:[115,130,150,175,200], bitrate:10};
+var DEFAULT_SETTINGS = {
+    language: "en",
+    audioStep: 1,
+    showWelcome: true,
+    autoRefresh: true,
+    scale: [115, 130, 150, 175, 200],
+    moveStep: [5, 10, 20, 50],
+    transformScale: [75, 100, 110, 125, 150],
+    captions: {
+        language: "auto",
+        model: "large",
+        style: "phrase",
+        animation: "pop",
+        font: "Inter",
+        size: "72",
+        color: "#ffffff",
+        highlight: "#1F8FFF"
+    },
+    bitrate: 10,
+    exportPath: "",
+    filenamePattern: "sequence",
+    groqApiKey: ""
+};
+var settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+var currentLang = "en";
+
+var i18n = {
+    en: {
+        audio_title: "Audio Level",
+        audio_desc: "Select an audio clip → Nudge volume in 1 dB increments. Cmd+Z to undo.",
+        audio_down: "▼ −1 dB",
+        audio_up: "▲ +1 dB",
+        scale_title: "Static Scale",
+        scale_desc: "Cut-in resize of selected clips without keyframes.",
+        transform_title: "Transform & Tools",
+        transform_reset_tip: "Reset position to center + scale to 100%",
+        transform_left_tip: "Move Left",
+        transform_up_tip: "Move Up",
+        transform_down_tip: "Move Down",
+        transform_right_tip: "Move Right",
+        transform_step: "Move Step",
+        transform_px: "pixels",
+        transform_scl: "Scale %",
+        transform_set: "Set",
+        paste_title: "Paste from Web",
+        paste_desc: "Copy any image from a browser → click Paste. Added to your Project bin ready to drag in.",
+        paste_btn: "Paste Image from Internet",
+        export_title: "Export Engine",
+        export_file: "File",
+        export_file_ph: "sequence name",
+        export_saveto: "Save to",
+        export_browse: "Browse",
+        export_selected: "Export Selected Clip",
+        export_all: "Export All Timeline Clips",
+        captions_title: "AI Captions",
+        captions_desc: "Powered by next-gen AI speech recognition — auto-transcribe any language and place perfectly timed captions on your timeline.",
+        cap_mode_mov: "🎬 Video Overlay",
+        cap_mode_srt: "📝 Editable Subtitles",
+        cap_hint_mov: "Styled video with animations — ready to use on the timeline.",
+        cap_hint_srt: "Editable subtitles placed on the timeline.",
+        cap_lang: "Lang",
+        cap_accuracy: "Accuracy",
+        cap_style: "Style",
+        cap_anim: "Anim",
+        cap_font: "Font",
+        cap_size: "Size",
+        cap_generate: "🎬 Generate Animated Captions",
+        cap_generate_srt: "📝 Generate Editable Subtitles",
+        settings_title: "Settings",
+        tab_general: "General",
+        tab_presets: "Presets",
+        tab_captions: "Captions",
+        tab_export: "Export",
+        tab_about: "About",
+        cfg_language: "Default Language",
+        cfg_audio_step: "Audio Nudge Step (dB)",
+        cfg_show_welcome_text: "Show welcome screen on launch",
+        cfg_auto_refresh_text: "Auto-refresh clip info every 2 sec",
+        cfg_scale_presets: "Static Scale Presets (%)",
+        cfg_step_presets: "Move Step Presets (pixels)",
+        cfg_tscale_presets: "Transform Scale Chips (%)",
+        cfg_cap_lang: "Default Language",
+        cfg_cap_accuracy: "Default Accuracy",
+        cfg_cap_style: "Default Segmentation",
+        cfg_cap_anim: "Default Animation",
+        cfg_cap_font: "Default Font",
+        cfg_cap_size: "Default Font Size",
+        cfg_cap_colors: "Colors (Text · Highlight)",
+        cfg_bitrate: "Default Bitrate (Mbps)",
+        cfg_export_path: "Default Export Folder",
+        cfg_filename_pattern: "Default Filename Pattern",
+        cfg_reset: "Reset All Settings to Defaults",
+        about_tagline: "Professional one-click editing tools for Adobe Premiere Pro",
+        about_developed: "Developed by",
+        about_developer: "Developer",
+        about_contact: "Contact Us",
+        about_rights: "All rights reserved.",
+        btn_cancel: "Cancel",
+        btn_save: "Save Changes",
+        confirm_title: "Confirm",
+        confirm_text: "Are you sure?",
+        confirm_yes: "Confirm",
+        welcome_btn: "Get Started",
+        welcome_tagline: "One-click editing for Premiere Pro",
+        welcome_f1: "Smart audio · Static scale · Transform",
+        welcome_f2: "AI captions in 15+ languages with animated styles",
+        welcome_f3: "Fast export presets · One-tap paste from web",
+        welcome_dont_show: "Don't show this again",
+        welcome_made_by: "Crafted by",
+        status_ready: "EditFlow Pro · ready",
+        task_report: "Task Report"
+    },
+    ar: {
+        audio_title: "مستوى الصوت",
+        audio_desc: "حدد مقطع صوتي → اضبط مستوى الصوت بمقدار 1 ديسيبل. Cmd+Z للتراجع.",
+        audio_down: "▼ −1 dB",
+        audio_up: "▲ +1 dB",
+        scale_title: "تغيير الحجم",
+        scale_desc: "تغيير حجم المقاطع المحددة بدون إطارات مفتاحية.",
+        transform_title: "التحويل والأدوات",
+        transform_reset_tip: "إعادة الموضع للمركز + الحجم إلى 100%",
+        transform_left_tip: "تحريك يسار",
+        transform_up_tip: "تحريك لأعلى",
+        transform_down_tip: "تحريك لأسفل",
+        transform_right_tip: "تحريك يمين",
+        transform_step: "مدى التحريك",
+        transform_px: "بكسل",
+        transform_scl: "الحجم %",
+        transform_set: "تطبيق",
+        paste_title: "لصق من الويب",
+        paste_desc: "انسخ أي صورة من المتصفح → اضغط لصق. تضاف إلى ملفات المشروع جاهزة للسحب.",
+        paste_btn: "لصق صورة من الإنترنت",
+        export_title: "محرك التصدير",
+        export_file: "الملف",
+        export_file_ph: "اسم التسلسل",
+        export_saveto: "حفظ في",
+        export_browse: "استعراض",
+        export_selected: "تصدير المقطع المحدد",
+        export_all: "تصدير كل مقاطع التايملاين",
+        captions_title: "ترجمة ذكية",
+        captions_desc: "مدعومة بتقنية الذكاء الاصطناعي للتعرف على الكلام — تفريغ تلقائي لأي لغة ووضع ترجمة متزامنة على التايملاين.",
+        cap_mode_mov: "🎬 فيديو متحرك",
+        cap_mode_srt: "📝 ترجمة قابلة للتعديل",
+        cap_hint_mov: "فيديو مع حركات مميزة — جاهز للاستخدام على التايملاين.",
+        cap_hint_srt: "ترجمة قابلة للتعديل توضع على التايملاين.",
+        cap_lang: "اللغة",
+        cap_accuracy: "الدقة",
+        cap_style: "النمط",
+        cap_anim: "الحركة",
+        cap_font: "الخط",
+        cap_size: "الحجم",
+        cap_generate: "🎬 إنشاء ترجمة متحركة",
+        cap_generate_srt: "📝 إنشاء ترجمة قابلة للتعديل",
+        settings_title: "الإعدادات",
+        tab_general: "عام",
+        tab_presets: "القيم المسبقة",
+        tab_captions: "الترجمة",
+        tab_export: "التصدير",
+        tab_about: "حول",
+        cfg_language: "اللغة الافتراضية",
+        cfg_audio_step: "مقدار تعديل الصوت (dB)",
+        cfg_show_welcome_text: "إظهار شاشة الترحيب عند فتح الأداة",
+        cfg_auto_refresh_text: "تحديث معلومات المقطع كل ثانيتين تلقائياً",
+        cfg_scale_presets: "قيم الحجم الثابت المسبقة (%)",
+        cfg_step_presets: "قيم مدى التحريك المسبقة (بكسل)",
+        cfg_tscale_presets: "قيم تكبير التحويل (%)",
+        cfg_cap_lang: "اللغة الافتراضية للترجمة",
+        cfg_cap_accuracy: "الدقة الافتراضية",
+        cfg_cap_style: "تقسيم النص الافتراضي",
+        cfg_cap_anim: "الحركة الافتراضية",
+        cfg_cap_font: "الخط الافتراضي",
+        cfg_cap_size: "حجم الخط الافتراضي",
+        cfg_cap_colors: "الألوان (نص · تمييز)",
+        cfg_bitrate: "معدل البت الافتراضي (Mbps)",
+        cfg_export_path: "مجلد التصدير الافتراضي",
+        cfg_filename_pattern: "نمط اسم الملف الافتراضي",
+        cfg_reset: "استعادة جميع الإعدادات الافتراضية",
+        about_tagline: "أدوات احترافية بكبسة زر لـ Adobe Premiere Pro",
+        about_developed: "تطوير",
+        about_developer: "المطور",
+        about_contact: "تواصل معنا",
+        about_rights: "جميع الحقوق محفوظة.",
+        btn_cancel: "إلغاء",
+        btn_save: "حفظ التغييرات",
+        confirm_title: "تأكيد",
+        confirm_text: "هل أنت متأكد؟",
+        confirm_yes: "تأكيد",
+        welcome_btn: "ابدأ الآن",
+        welcome_tagline: "محرر بكبسة زر لـ Premiere Pro",
+        welcome_f1: "صوت ذكي · حجم ثابت · تحويل",
+        welcome_f2: "ترجمة AI بأكثر من 15 لغة مع حركات متنوعة",
+        welcome_f3: "إعدادات تصدير سريعة · لصق فوري من الويب",
+        welcome_dont_show: "لا تظهر هذه الرسالة مرة أخرى",
+        welcome_made_by: "صُنع بإتقان بواسطة",
+        status_ready: "EditFlow Pro · جاهز",
+        task_report: "تقرير المهمة"
+    }
+};
 
 document.addEventListener("DOMContentLoaded", function() {
     try { fsModule = require("fs"); } catch(e) { console.warn("[EFP] No fs:", e.message); }
@@ -47,93 +244,54 @@ document.addEventListener("DOMContentLoaded", function() {
 
 
     // ============================================================
-    // AUDIO LEVEL — Nudge Up/Down + Display
+    // AUDIO LEVEL — Nudge Up/Down
     // ============================================================
 
-    function updateAudioDisplay() {
-        csInterface.evalScript('$._editflow.getAudioLevel()', function(result) {
-            try {
-                var info = JSON.parse(result);
-                var display = document.getElementById('audio-level-display');
-                if (info.error) {
-                    display.textContent = '— dB';
-                    display.style.color = '#666';
-                    return;
-                }
-                var db = info.db;
-                display.textContent = (db > 0 ? '+' : '') + db + ' dB';
-                if (db > 0) {
-                    display.style.color = '#81c784'; // green
-                } else if (db < 0) {
-                    display.style.color = '#f87171'; // red
-                } else {
-                    display.style.color = '#4fc3f7'; // blue = 0
-                }
-            } catch(e) {
-                document.getElementById('audio-level-display').textContent = '— dB';
-            }
-        });
-    }
-
-    // Nudge UP (+1 dB)
+    // Nudge UP (+step dB)
     (function() {
         var btn = document.getElementById('btn-audio-up');
         if (!btn) return;
         btn.addEventListener('click', function() {
-            csInterface.evalScript('$._editflow.nudgeAudioLevel("1")', function(result) {
+            var step = settings.audioStep || 1;
+            csInterface.evalScript('$._editflow.nudgeAudioLevel("' + step + '")', function(result) {
                 console.log('[AUDIO] Up:', result);
                 handleJSXResult(result);
-                updateAudioDisplay();
             });
         });
     })();
 
-    // Nudge DOWN (-1 dB)
+    // Nudge DOWN (-step dB)
     (function() {
         var btn = document.getElementById('btn-audio-down');
         if (!btn) return;
         btn.addEventListener('click', function() {
-            csInterface.evalScript('$._editflow.nudgeAudioLevel("-1")', function(result) {
+            var step = settings.audioStep || 1;
+            csInterface.evalScript('$._editflow.nudgeAudioLevel("-' + step + '")', function(result) {
                 console.log('[AUDIO] Down:', result);
                 handleJSXResult(result);
-                updateAudioDisplay();
             });
         });
     })();
 
-
-
-    // Update display periodically
-    setInterval(updateAudioDisplay, 3000);
-    updateAudioDisplay();
-
     // ============================================================
     // SCALE BUTTONS
     // ============================================================
-    function bindScaleButton(buttonId, scaleValue) {
-        var el = document.getElementById(buttonId);
-        if (!el) {
-            console.log("[BIND] " + buttonId + " NOT FOUND");
-            return;
-        }
-        el.addEventListener("click", function() {
-            console.log("[->JSX] applyScale: " + scaleValue);
-            csInterface.evalScript(
-                '$._editflow.applyScale("' + scaleValue + '")',
-                function(result) {
-                    console.log("[<-JSX] applyScale result:", result);
-                    handleJSXResult(result);
-                }
-            );
-        });
-        console.log("[BIND] " + buttonId + " OK");
+    var scaleBtns = document.querySelectorAll('.scale-preset');
+    for (var sb = 0; sb < scaleBtns.length; sb++) {
+        (function(btn) {
+            btn.addEventListener("click", function() {
+                var v = btn.getAttribute("data-scale") || "100";
+                console.log("[->JSX] applyScale: " + v);
+                csInterface.evalScript(
+                    '$._editflow.applyScale("' + v + '")',
+                    function(result) {
+                        console.log("[<-JSX] applyScale result:", result);
+                        handleJSXResult(result);
+                    }
+                );
+            });
+        })(scaleBtns[sb]);
     }
-    bindScaleButton("btn-scale-115", "115");
-    bindScaleButton("btn-scale-130", "130");
-    bindScaleButton("btn-scale-150", "150");
-    bindScaleButton("btn-scale-175", "175");
-    bindScaleButton("btn-scale-200", "200");
-    bindScaleButton("btn-scale-reset", "100");
 
 
 
@@ -159,60 +317,35 @@ document.addEventListener("DOMContentLoaded", function() {
         csInterface.evalScript('$._editflow.getClipPositionInfo()', function(result) {
             try {
                 var info = JSON.parse(result);
-                if (info.error) {
-                    setStyle('pos-info',       'display', 'none');
-                    setStyle('offset-info',    'display', 'none');
-                    setStyle('scale-info',     'display', 'none');
-                    setStyle('coord-type-info','display', 'none');
-                    return;
+                if (!info.error) {
+                    setPlaceholder('scale-value', Math.round(info.scale));
                 }
-                setStyle('pos-info', 'display', 'block');
-                setText('current-pos',
-                    'X=' + Math.round(info.posX * 100) / 100 +
-                    '  Y=' + Math.round(info.posY * 100) / 100);
-                setText('center-pos', 'X=' + info.centerX + '  Y=' + info.centerY);
-
-                setStyle('offset-info', 'display', 'block');
-                var offsetEl = document.getElementById('offset-text');
-                if (offsetEl) {
-                    if (info.isCentered) {
-                        offsetEl.textContent = 'Centered'; offsetEl.style.color = '#81c784';
-                    } else {
-                        var xDir = info.offsetX > 0 ? 'right' : 'left';
-                        var yDir = info.offsetY > 0 ? 'down' : 'up';
-                        offsetEl.textContent = 'Off-center: ' +
-                            Math.abs(info.offsetX) + 'px ' + xDir + ', ' +
-                            Math.abs(info.offsetY) + 'px ' + yDir;
-                        offsetEl.style.color = '#ffb74d';
-                    }
-                }
-                setStyle('scale-info', 'display', 'block');
-                setText('current-scale', info.scale + '%');
-
-                setStyle('coord-type-info', 'display', 'block');
-                setText('coord-type-text',
-                    'Component: ' + info.component +
-                    ' | Coords: ' + info.coordType +
-                    ' | Clip: ' + info.clipName);
-
-                setPlaceholder('pos-x', Math.round(info.posX * 100) / 100);
-                setPlaceholder('pos-y', Math.round(info.posY * 100) / 100);
-                setPlaceholder('scale-value', Math.round(info.scale));
-            } catch(e) {
-                console.log('[CLIP-INFO] Parse error:', e, result);
-            }
+            } catch(e) {}
         });
     }
 
-    // Refresh button
-    document.getElementById('refresh-clip-info').addEventListener('click', function() {
-        updateClipInfo();
+    // Reset clip transform button
+    document.getElementById('reset-clip-transform').addEventListener('click', function() {
+        csInterface.evalScript('$._editflow.resetClipTransform()', function(result) {
+            console.log('[RESET] transform:', result);
+            handleJSXResult(result);
+            updateClipInfo();
+        });
     });
 
-    // Auto-refresh every 2 seconds
-    setInterval(updateClipInfo, 2000);
-
-    // Initial update
+    // Auto-refresh every 2 seconds (toggleable via settings)
+    var autoRefreshTimer = null;
+    function startAutoRefresh() {
+        if (autoRefreshTimer) return;
+        autoRefreshTimer = setInterval(updateClipInfo, 2000);
+    }
+    function stopAutoRefresh() {
+        if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+    }
+    window.__refreshAuto = function() {
+        if (settings.autoRefresh) startAutoRefresh(); else stopAutoRefresh();
+    };
+    window.__refreshAuto();
     updateClipInfo();
 
     // ---- ALIGNMENT BUTTONS (7 directions) ----
@@ -241,6 +374,58 @@ document.addEventListener("DOMContentLoaded", function() {
     bindAlignV2("align-center-v", "centerV");
     bindAlignV2("align-center-both", "centerBoth");
 
+    // ---- PRESET CHIPS — step size ----
+    (function() {
+        var chips = document.querySelectorAll('.step-chip');
+        var stepInput = document.getElementById('nudge-step');
+        for (var i = 0; i < chips.length; i++) {
+            (function(chip) {
+                chip.addEventListener('click', function() {
+                    for (var j = 0; j < chips.length; j++) chips[j].classList.remove('chip-active');
+                    chip.classList.add('chip-active');
+                    if (stepInput) stepInput.value = chip.getAttribute('data-val');
+                });
+            })(chips[i]);
+        }
+        // typing a custom value clears chip highlight
+        if (stepInput) {
+            stepInput.addEventListener('input', function() {
+                for (var j = 0; j < chips.length; j++) chips[j].classList.remove('chip-active');
+            });
+        }
+    })();
+
+    // ---- PRESET CHIPS — scale ----
+    (function() {
+        var chips = document.querySelectorAll('.scale-chip');
+        var scaleInput = document.getElementById('scale-value');
+        for (var i = 0; i < chips.length; i++) {
+            (function(chip) {
+                chip.addEventListener('click', function() {
+                    for (var j = 0; j < chips.length; j++) chips[j].classList.remove('chip-active');
+                    chip.classList.add('chip-active');
+                    if (scaleInput) {
+                        scaleInput.value = chip.getAttribute('data-val');
+                        // auto-apply on chip click
+                        csInterface.evalScript(
+                            '$._editflow.setScaleValue("' + chip.getAttribute('data-val') + '")',
+                            function(result) {
+                                console.log("[SCALE-CHIP] Result:", result);
+                                handleJSXResult(result);
+                                updateClipInfo();
+                            }
+                        );
+                    }
+                });
+            })(chips[i]);
+        }
+        if (scaleInput) {
+            scaleInput.addEventListener('input', function() {
+                for (var j = 0; j < chips.length; j++) chips[j].classList.remove('chip-active');
+            });
+        }
+    })();
+
     // ---- NUDGE ARROWS (move clip by step) ----
     function bindNudge(buttonId, direction) {
         var el = document.getElementById(buttonId);
@@ -251,7 +436,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 '$._editflow.nudgePosition("' + direction + '","' + step + '")',
                 function(result) {
                     console.log("[NUDGE] " + direction + ":", result);
-                    updateClipInfo(); // instant feedback
+                    updateClipInfo();
                 }
             );
         });
@@ -260,34 +445,6 @@ document.addEventListener("DOMContentLoaded", function() {
     bindNudge("nudge-right", "right");
     bindNudge("nudge-up", "up");
     bindNudge("nudge-down", "down");
-
-    // ---- MANUAL POSITION ----
-    (function() {
-        var btn = document.getElementById("apply-position");
-        var posX = document.getElementById("pos-x");
-        var posY = document.getElementById("pos-y");
-        if (!btn || !posX || !posY) return;
-
-        function applyPosition() {
-            var x = posX.value;
-            var y = posY.value;
-            if (!x || !y) return;
-            console.log("[POSITION] " + x + "," + y);
-            csInterface.evalScript(
-                '$._editflow.setPosition("' + x + '","' + y + '")',
-                function(result) {
-                    console.log("[POSITION] Result:", result);
-                    handleJSXResult(result);
-                    updateClipInfo();
-                }
-            );
-        }
-
-        btn.addEventListener("click", applyPosition);
-        posX.addEventListener("keydown", function(e) { if (e.keyCode === 13) applyPosition(); });
-        posY.addEventListener("keydown", function(e) { if (e.keyCode === 13) applyPosition(); });
-        console.log("[BIND] apply-position OK");
-    })();
 
     // ---- MANUAL SCALE ----
     (function() {
@@ -338,32 +495,7 @@ document.addEventListener("DOMContentLoaded", function() {
     // WORKING BUTTONS — kept exactly as-is
     // ============================================================
 
-    safeBind("btn-beat-markers", function() {
-        if (!fsModule || operationRunning || !dsp) return;
-        var band = document.getElementById("beat-band-select").value;
-        showProgress("Finding audio...", 5);
-        csInterface.evalScript('$._editflow.getAudioMedia()', function(raw) {
-            var r = safeParse(raw); if (!r || !r.mediaPath) { hideProgress(); return; }
-            showProgress("Reading file...", 15);
-            fsModule.readFile(r.mediaPath, function(err, buffer) {
-                if (err) { showStatus("Can't read file.", "red"); hideProgress(); return; }
-                var ab = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
-                showProgress("Detecting beats...", 30);
-                dsp.decodeAudio(ab).then(function(audioBuf) {
-                    var prec = document.getElementById("beat-precision-select").value;
-                    dsp.detectBeats(audioBuf, band, prec, function(pct) {
-                        showProgress("Detecting " + pct + "%", 30 + pct * 0.6);
-                    }).then(function(beats) {
-                        showProgress("Placing markers...", 95);
-                        csInterface.evalScript('$._editflow.placeBeatMarkers("[' + beats.join(",") + ']",' + (r.timelineStart||0) + ')', function(res) {
-                            showProgress("Done!", 100); setTimeout(hideProgress, 2000);
-                            handleJSXResult(res);
-                        });
-                    });
-                }).catch(function() { showStatus("Decode failed.", "red"); hideProgress(); });
-            });
-        });
-    });
+
 
     // ============================================================
     // AI CAPTIONS — Whisper transcription + animated captions
@@ -430,6 +562,91 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     })();
 
+    // ============================================================
+    // CAPTION MODE TOGGLE (MOV vs SRT)
+    // ============================================================
+    var capOutputMode = 'mov'; // default
+
+    (function() {
+        var movBtn = document.getElementById('cap-mode-mov');
+        var srtBtn = document.getElementById('cap-mode-srt');
+        var styleOpts = document.getElementById('cap-style-options');
+        var hint = document.getElementById('cap-mode-hint');
+        var genBtn = document.getElementById('btn-generate-captions');
+        var upgradeHint = document.getElementById('cap-upgrade-hint');
+
+        if (!movBtn || !srtBtn) return;
+
+        // Start with upgrade hint hidden (MOV mode default)
+        if (upgradeHint) upgradeHint.style.display = 'none';
+
+        movBtn.addEventListener('click', function() {
+            capOutputMode = 'mov';
+            movBtn.classList.add('cap-mode-active');
+            srtBtn.classList.remove('cap-mode-active');
+            if (styleOpts) styleOpts.classList.remove('cap-hidden');
+            if (hint) hint.textContent = 'Styled video with animations \u2014 ready to use on the timeline.';
+            if (genBtn) genBtn.innerHTML = '\ud83c\udfac Generate Animated Captions';
+            if (upgradeHint) upgradeHint.style.display = 'none';
+        });
+
+        srtBtn.addEventListener('click', function() {
+            capOutputMode = 'srt';
+            srtBtn.classList.add('cap-mode-active');
+            movBtn.classList.remove('cap-mode-active');
+            if (styleOpts) styleOpts.classList.add('cap-hidden');
+            if (hint) hint.textContent = 'Editable subtitles placed on the timeline.';
+            if (genBtn) genBtn.innerHTML = '\ud83d\udcdd Generate Editable Subtitles';
+            if (upgradeHint) upgradeHint.style.display = 'block';
+        });
+    })();
+
+    // Shows a professional download prompt when the AI engine binary is missing.
+    // Injected dynamically so the HTML stays clean.
+    function showCaptionDownloadBanner() {
+        var existing = document.getElementById('cap-download-banner');
+        if (existing) { existing.style.display = 'block'; return; }
+        var banner = document.createElement('div');
+        banner.id = 'cap-download-banner';
+        banner.style.cssText = [
+            'background:rgba(31,143,255,0.10)',
+            'border:1px solid rgba(31,143,255,0.35)',
+            'border-radius:8px',
+            'padding:14px 16px',
+            'margin:8px 0 4px',
+            'text-align:center'
+        ].join(';');
+        banner.innerHTML =
+            '<p style="font-size:13px;font-weight:600;color:#1F8FFF;margin:0 0 5px 0;">' +
+                '⬇️ AI Engine not installed' +
+            '</p>' +
+            '<p style="font-size:11px;color:var(--text-mute);margin:0 0 10px 0;line-height:1.6;">' +
+                'The AI caption engine requires a one-time download.<br>' +
+                'It’s a ~25 MB standalone binary — no Python or pip needed.' +
+            '</p>' +
+            '<a id="cap-dl-btn" href="#" style="' +
+                'display:inline-block;background:#1F8FFF;color:#fff;' +
+                'border-radius:6px;padding:7px 20px;font-size:12px;' +
+                'font-weight:600;text-decoration:none;cursor:pointer;' +
+            '">Download AI Engine →</a>' +
+            '<p style="font-size:10px;color:var(--text-mute);margin:8px 0 0 0;">' +
+                'Works offline after the first download' +
+            '</p>';
+        var statusEl = document.getElementById('cap-status');
+        if (statusEl && statusEl.parentNode) {
+            statusEl.parentNode.insertBefore(banner, statusEl);
+        }
+        var dlBtn = document.getElementById('cap-dl-btn');
+        if (dlBtn) {
+            dlBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                csInterface.openURLInDefaultBrowser(
+                    'https://github.com/ahmednajm1/editflow-pro/releases/latest'
+                );
+            });
+        }
+    }
+
     safeBind("btn-generate-captions", function() {
         if (!fsModule || !execModule || !osModule) {
             showStatus("Node modules unavailable.", "red"); return;
@@ -464,29 +681,43 @@ document.addEventListener("DOMContentLoaded", function() {
             var clipOut = info.clipOut || 0;
             var clipDur = info.duration || 0;
 
-            var transcriber = extensionPath + "/bin/transcriber.py";
-            if (!fsModule.existsSync(transcriber)) {
-                hideProgress(); setStatus(""); showStatus("transcriber.py missing.", "red"); return;
+            var EFP_BIN_DIR = osModule.homedir() + "/Library/Application Support/EditFlowPro";
+            var transcriberBin = EFP_BIN_DIR + "/whisper_runner";
+            if (!fsModule.existsSync(transcriberBin)) {
+                hideProgress(); setStatus(""); showCaptionDownloadBanner(); return;
             }
             var outBase = osModule.tmpdir() + "/efp_caps_" + Date.now();
 
-            var cmd = "/usr/bin/env python3 " + shq(transcriber) + " " + shq(mediaPath) + " " + shq(outBase) +
-                      " --lang " + shq(lang) + " --model " + shq(model);
+            var apiKey = settings.groqApiKey || "";
+            if (!apiKey) {
+                hideProgress(); setStatus("");
+                showStatus("Groq API key required — go to Settings ⚙ and enter your free key from console.groq.com", "red");
+                return;
+            }
+            var cmd = shq(transcriberBin) + " " + shq(mediaPath) + " " + shq(outBase) +
+                      " --lang " + shq(lang) + " --model " + shq(model) +
+                      " --api-key " + shq(apiKey);
             if (clipDur > 0.1 && clipOut > clipIn) {
                 cmd += " --start " + clipIn.toFixed(3) + " --end " + clipOut.toFixed(3);
             }
 
             var modelSize = ({tiny:75, base:140, small:460, medium:1500, large:3000})[model] || 460;
             var trimNote = (clipDur > 0.1) ? (" · " + clipDur.toFixed(1) + "s") : "";
-            showProgress("Transcribing with Whisper (" + model + ")…", 15);
-            setStatus("Whisper " + model + trimNote + " · model = " + modelSize + " MB on first run");
+            showProgress("Analyzing speech (" + model + ")…", 15);
+            setStatus("AI speech recognition" + trimNote + " · model = " + modelSize + " MB on first run");
             console.log("[Captions] running:", cmd);
 
             execModule(cmd, opts, function(err, stdout, stderr) {
                 if (err) {
                     hideProgress(); setStatus("");
-                    console.log("[Captions] err:", err.message, "\nstderr:", stderr);
-                    showStatus("Transcription failed: " + (err.message || "see console").slice(0, 80), "red");
+                    console.log("[Captions] err:", err.message, "\nstdout:", stdout, "\nstderr:", stderr);
+                    // whisper_runner writes JSON to stdout even on failure — parse it first
+                    var errData = safeParse(stdout);
+                    if (errData && errData.message) {
+                        showStatus("Caption error: " + errData.message.slice(0, 120), "red");
+                    } else {
+                        showStatus("Transcription failed: " + (stderr || err.message || "unknown").slice(0, 100), "red");
+                    }
                     return;
                 }
                 var summary = safeParse(stdout) || {};
@@ -499,18 +730,27 @@ document.addEventListener("DOMContentLoaded", function() {
 
                 setStatus("Detected " + summary.language + " · " + summary.words + " words · " + summary.segments + " segments");
 
-                // ── Phase 2: Get sequence resolution, then render clips ──
+                // ── SRT MODE: generate synced captions directly ──
+                if (capOutputMode === 'srt') {
+                    console.log("[Captions] SRT mode — placing synced captions");
+                    showProgress("Syncing captions to timeline…", 75);
+                    setStatus("Building timeline-synced captions…");
+                    fallbackSRT(summary, style, anim, font, size, color, hl, timelineStart, setStatus);
+                    return;
+                }
+
+                // ── Phase 2: MOV mode — Get sequence resolution, then render clips ──
                 csInterface.evalScript('$._editflow.getSequenceInfo()', function(seqRaw) {
                     var seqInfo = safeParse(seqRaw) || {};
                     var seqW = seqInfo.width  || 1920;
                     var seqH = seqInfo.height || 1080;
 
-                    var renderer = extensionPath + "/bin/caption_renderer.py";
+                    var renderer = EFP_BIN_DIR + "/caption_renderer";
                     var hasRenderer = false;
                     try { hasRenderer = fsModule.existsSync(renderer); } catch(e) {}
 
                     if (!hasRenderer) {
-                        console.log("[Captions] caption_renderer.py not found — falling back to SRT");
+                        console.log("[Captions] caption_renderer not found — falling back to SRT");
                         fallbackSRT(summary, style, anim, font, size, color, hl, timelineStart, setStatus);
                         return;
                     }
@@ -521,7 +761,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         width: seqW, height: seqH
                     });
                     var clipsDir = outBase + "_clips";
-                    var renderCmd = "/usr/bin/env python3 " + shq(renderer) + " " + shq(summary.json) +
+                    var renderCmd = shq(renderer) + " " + shq(summary.json) +
                                     " " + shq(clipsDir) + " --config " + shq(renderCfg);
 
                     showProgress("Rendering " + summary.words + " words (" + font + " / " + anim + ")…", 50);
@@ -577,10 +817,10 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     });
 
-    // SRT fallback — used when caption_renderer.py is missing or fails
+    // SRT generation — creates timeline-synced captions via Premiere Caption API
     function fallbackSRT(summary, style, anim, font, size, color, hl, timelineStart, setStatus) {
-        showProgress("Falling back to SRT import…", 80);
-        setStatus("Using SRT fallback (font/animation limited)…");
+        showProgress("Placing captions on timeline…", 80);
+        setStatus("Building synced captions (" + style + " mode)…");
         var cfg = {
             style: style, animation: anim, font: font,
             size: size, color: color, highlight: hl,
@@ -595,22 +835,19 @@ document.addEventListener("DOMContentLoaded", function() {
                 handleJSXResult(res);
                 var r = safeParse(res);
                 if (r && r.placed) {
-                    setStatus(summary.words + " words placed (SRT fallback — " + style + ")");
-                } else if (r) {
-                    setStatus("SRT imported — drag onto a captions track.");
+                    setStatus("✅ " + r.groups + " captions synced on timeline (" + style + ")");
+                } else if (r && r.groups) {
+                    setStatus("✅ " + r.groups + " captions ready → drag from EFP_Captions bin to Caption track (timing is synced)");
+                } else {
+                    setStatus("Caption generation completed.");
                 }
             }
         );
     }
 
-    safeBind("btn-clear-markers", function() {
-        showConfirm("Clear Markers", "Delete all markers?", function() {
-            csInterface.evalScript('$._editflow.clearMarkers()', function(res) {
-                console.log("[<-JSX] clearMarkers:", res);
-                handleJSXResult(res);
-            });
-        });
-    });
+    // (Upgrade Caption to Graphic has been removed due to Adobe API limitations in recent Premiere builds)
+
+
 
     safeBind("btn-export-selected", function() {
         if (!foundPresetPath || !fsModule) { showStatus("No export preset.", "red"); return; }
@@ -651,31 +888,65 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // SETTINGS
     safeBind("btn-settings", function() {
-        document.getElementById("cfg-voice-1").value = settings.voice[0];
-        document.getElementById("cfg-voice-2").value = settings.voice[1];
-        document.getElementById("cfg-voice-3").value = settings.voice[2];
-        document.getElementById("cfg-music-1").value = settings.music[0];
-        document.getElementById("cfg-music-2").value = settings.music[1];
-        document.getElementById("cfg-music-3").value = settings.music[2];
-        document.getElementById("cfg-scale-1").value = settings.scale[0];
-        document.getElementById("cfg-scale-2").value = settings.scale[1];
-        document.getElementById("cfg-scale-3").value = settings.scale[2];
-        document.getElementById("cfg-scale-4").value = settings.scale[3];
-        document.getElementById("cfg-scale-5").value = settings.scale[4];
-        document.getElementById("cfg-bitrate").value = settings.bitrate;
+        populateSettingsForm();
         document.getElementById("settings-overlay").classList.remove("hidden");
     });
     safeBind("btn-settings-save", function() {
-        settings.voice = [+document.getElementById("cfg-voice-1").value, +document.getElementById("cfg-voice-2").value, +document.getElementById("cfg-voice-3").value];
-        settings.music = [+document.getElementById("cfg-music-1").value, +document.getElementById("cfg-music-2").value, +document.getElementById("cfg-music-3").value];
-        settings.scale = [+document.getElementById("cfg-scale-1").value, +document.getElementById("cfg-scale-2").value, +document.getElementById("cfg-scale-3").value, +document.getElementById("cfg-scale-4").value, +document.getElementById("cfg-scale-5").value];
-        settings.bitrate = +document.getElementById("cfg-bitrate").value;
-        saveSettings(); applySettingsToUI();
+        readSettingsForm();
+        saveSettings();
+        applySettingsToUI();
         document.getElementById("settings-overlay").classList.add("hidden");
         showStatus("Settings saved.", "green");
     });
     safeBind("btn-settings-cancel", function() { document.getElementById("settings-overlay").classList.add("hidden"); });
-    safeBind("btn-welcome-close", function() { document.getElementById("welcome-modal").classList.add("hidden"); });
+    safeBind("btn-settings-close",  function() { document.getElementById("settings-overlay").classList.add("hidden"); });
+
+    // Settings tabs
+    var tabs = document.querySelectorAll('.settings-tab');
+    for (var t = 0; t < tabs.length; t++) {
+        (function(tab) {
+            tab.addEventListener('click', function() {
+                var name = tab.getAttribute('data-tab');
+                var allTabs = document.querySelectorAll('.settings-tab');
+                for (var i = 0; i < allTabs.length; i++) allTabs[i].classList.remove('settings-tab-active');
+                tab.classList.add('settings-tab-active');
+                var allSecs = document.querySelectorAll('.settings-section');
+                for (var j = 0; j < allSecs.length; j++) {
+                    allSecs[j].classList.toggle('settings-section-active', allSecs[j].getAttribute('data-section') === name);
+                }
+            });
+        })(tabs[t]);
+    }
+
+    // Reset to defaults
+    safeBind("btn-reset-defaults", function() {
+        if (!confirm("Reset all settings to defaults?")) return;
+        settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+        saveSettings();
+        populateSettingsForm();
+        applySettingsToUI();
+        showStatus("Defaults restored.", "green");
+    });
+
+    // Browse for default export folder in settings
+    safeBind("btn-cfg-browse-path", function() {
+        if (!csInterface) return;
+        try {
+            var result = window.cep.fs.showOpenDialog(false, true, "Choose default export folder", "");
+            if (result.data && result.data.length > 0) {
+                document.getElementById("cfg-export-path").value = result.data[0];
+            }
+        } catch(e) { console.log("Browse error:", e); }
+    });
+
+    safeBind("btn-welcome-close", function() {
+        var dontShow = document.getElementById("welcome-dont-show");
+        if (dontShow && dontShow.checked) {
+            settings.showWelcome = false;
+            saveSettings();
+        }
+        document.getElementById("welcome-modal").classList.add("hidden");
+    });
 
     // ESC key
     document.addEventListener("keydown", function(e) {
@@ -704,16 +975,24 @@ document.addEventListener("DOMContentLoaded", function() {
 
     checkFirstLaunch();
 
+    // ============================================================
+    // LANGUAGE TOGGLE — AR / EN
+    // ============================================================
+    (function() {
+        var btn = document.getElementById('btn-lang-toggle');
+        if (!btn) return;
+        btn.addEventListener('click', function() {
+            currentLang = (currentLang === 'en') ? 'ar' : 'en';
+            applyLanguage(currentLang);
+        });
+    })();
+
     // Step 4: Self-check — verify all expected buttons exist
     var expectedButtons = [
-        "btn-voice-2", "btn-voice-3", "btn-voice-5",
-        "btn-music-9", "btn-music-16", "btn-music-21",
-        "btn-audio-reset",
-        "btn-scale-115", "btn-scale-130", "btn-scale-150", "btn-scale-175", "btn-scale-200", "btn-scale-reset",
-        "btn-paste-clipboard", "btn-beat-markers", "btn-clear-markers",
-        "btn-export-selected", "btn-export-all", "btn-export-browse",
-        "align-left", "align-right", "align-top", "align-bottom",
-        "align-center-both", "apply-position", "apply-scale"
+        "btn-audio-up", "btn-audio-down",
+        "reset-clip-transform", "apply-scale",
+        "btn-paste-clipboard",
+        "btn-export-selected", "btn-export-all", "btn-export-browse"
     ];
     var missing = [];
     for (var i = 0; i < expectedButtons.length; i++) {
@@ -727,6 +1006,38 @@ document.addEventListener("DOMContentLoaded", function() {
         console.log("[OK] All button IDs found in HTML");
     }
 });
+
+// ── LANGUAGE ─────────────────────────────────────────────────
+function applyLanguage(lang) {
+    var t = i18n[lang] || i18n.en;
+    var html = document.documentElement;
+    html.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+    html.setAttribute('lang', lang);
+
+    var btn = document.getElementById('btn-lang-toggle');
+    if (btn) {
+        var langText = btn.querySelector('.lang-text');
+        if (langText) langText.textContent = lang === 'ar' ? 'EN' : 'عر';
+    }
+
+    var els = document.querySelectorAll('[data-i18n]');
+    for (var i = 0; i < els.length; i++) {
+        var key = els[i].getAttribute('data-i18n');
+        if (t[key]) els[i].textContent = t[key];
+    }
+
+    var titleEls = document.querySelectorAll('[data-i18n-title]');
+    for (var j = 0; j < titleEls.length; j++) {
+        var tKey = titleEls[j].getAttribute('data-i18n-title');
+        if (t[tKey]) titleEls[j].setAttribute('title', t[tKey]);
+    }
+
+    var phEls = document.querySelectorAll('[data-i18n-placeholder]');
+    for (var k = 0; k < phEls.length; k++) {
+        var pKey = phEls[k].getAttribute('data-i18n-placeholder');
+        if (t[pKey]) phEls[k].setAttribute('placeholder', t[pKey]);
+    }
+}
 
 // ── HELPERS ──────────────────────────────────────────────────
 function safeBind(id, fn) {
@@ -808,18 +1119,153 @@ function loadSettings() {
     try {
         if (fsModule && fsModule.existsSync(configPath)) {
             var d = JSON.parse(fsModule.readFileSync(configPath, "utf8"));
-            if (d.voice) settings.voice = d.voice;
-            if (d.music) settings.music = d.music;
-            if (d.scale) settings.scale = d.scale;
-            if (d.bitrate) settings.bitrate = d.bitrate;
+            // Merge known keys (preserve defaults for missing)
+            if (d.language) settings.language = d.language;
+            if (typeof d.audioStep === "number") settings.audioStep = d.audioStep;
+            if (typeof d.showWelcome === "boolean") settings.showWelcome = d.showWelcome;
+            if (typeof d.autoRefresh === "boolean") settings.autoRefresh = d.autoRefresh;
+            if (d.scale && d.scale.length === 5) settings.scale = d.scale;
+            if (d.moveStep && d.moveStep.length === 4) settings.moveStep = d.moveStep;
+            if (d.transformScale && d.transformScale.length === 5) settings.transformScale = d.transformScale;
+            if (d.captions && typeof d.captions === "object") {
+                for (var k in DEFAULT_SETTINGS.captions) {
+                    if (d.captions[k] !== undefined) settings.captions[k] = d.captions[k];
+                }
+            }
+            if (typeof d.bitrate === "number") settings.bitrate = d.bitrate;
+            if (typeof d.exportPath === "string") settings.exportPath = d.exportPath;
+            if (typeof d.groqApiKey === "string") settings.groqApiKey = d.groqApiKey;
         }
-    } catch(e) {}
+    } catch(e) { console.log("[loadSettings] error:", e); }
+    if (settings.language && typeof applyLanguage === "function") {
+        currentLang = settings.language;
+        applyLanguage(currentLang);
+    }
     applySettingsToUI();
 }
-function saveSettings() { try { if (fsModule) fsModule.writeFileSync(configPath, JSON.stringify(settings, null, 2), "utf8"); } catch(e) {} }
+function saveSettings() {
+    try {
+        if (fsModule) fsModule.writeFileSync(configPath, JSON.stringify(settings, null, 2), "utf8");
+    } catch(e) { console.log("[saveSettings] error:", e); }
+}
 function applySettingsToUI() {
+    // Bitrate input in Export section
     var bi = document.getElementById("batch-bitrate-input");
     if (bi) bi.value = settings.bitrate;
+
+    // Default export path
+    var ep = document.getElementById("export-path");
+    if (ep && settings.exportPath && !ep.value) ep.value = settings.exportPath;
+
+    // Static Scale buttons (5 main + 1 reset)
+    var scaleBtns = document.querySelectorAll('.scale-preset:not([data-reset])');
+    for (var i = 0; i < scaleBtns.length && i < settings.scale.length; i++) {
+        scaleBtns[i].textContent = settings.scale[i];
+        scaleBtns[i].setAttribute('data-scale', settings.scale[i]);
+    }
+
+    // Move Step chips
+    var stepChips = document.querySelectorAll('.step-chip');
+    for (var s = 0; s < stepChips.length && s < settings.moveStep.length; s++) {
+        stepChips[s].textContent = settings.moveStep[s];
+        stepChips[s].setAttribute('data-val', settings.moveStep[s]);
+    }
+    var stepInput = document.getElementById('nudge-step');
+    if (stepInput && settings.moveStep[0]) stepInput.value = settings.moveStep[0];
+
+    // Transform Scale chips
+    var tscaleChips = document.querySelectorAll('.scale-chip');
+    for (var c = 0; c < tscaleChips.length && c < settings.transformScale.length; c++) {
+        tscaleChips[c].textContent = settings.transformScale[c];
+        tscaleChips[c].setAttribute('data-val', settings.transformScale[c]);
+    }
+
+    // Caption defaults
+    setSel("cap-language",  settings.captions.language);
+    setSel("cap-model",     settings.captions.model);
+    setSel("cap-style",     settings.captions.style);
+    setSel("cap-animation", settings.captions.animation);
+    setSel("cap-font",      settings.captions.font);
+    setSel("cap-size",      settings.captions.size);
+    var cc = document.getElementById("cap-color");      if (cc) cc.value = settings.captions.color;
+    var ch = document.getElementById("cap-highlight");  if (ch) ch.value = settings.captions.highlight;
+    var ccs = document.getElementById("cap-color-swatch");   if (ccs) ccs.style.background = settings.captions.color;
+    var chs = document.getElementById("cap-hl-swatch");      if (chs) chs.style.background = settings.captions.highlight;
+}
+function setSel(id, val) {
+    var el = document.getElementById(id);
+    if (el && val !== undefined && val !== null) el.value = String(val);
+}
+
+function populateSettingsForm() {
+    setSel("cfg-language", settings.language);
+    setSel("cfg-audio-step", String(settings.audioStep));
+    var sw = document.getElementById("cfg-show-welcome");   if (sw) sw.checked = !!settings.showWelcome;
+    var ar = document.getElementById("cfg-auto-refresh");   if (ar) ar.checked = !!settings.autoRefresh;
+
+    for (var i = 1; i <= 5; i++) {
+        var sEl = document.getElementById("cfg-scale-" + i);
+        if (sEl) sEl.value = settings.scale[i-1];
+        var tEl = document.getElementById("cfg-tscale-" + i);
+        if (tEl) tEl.value = settings.transformScale[i-1];
+    }
+    for (var j = 1; j <= 4; j++) {
+        var stEl = document.getElementById("cfg-step-" + j);
+        if (stEl) stEl.value = settings.moveStep[j-1];
+    }
+
+    setSel("cfg-cap-language",  settings.captions.language);
+    setSel("cfg-cap-model",     settings.captions.model);
+    setSel("cfg-cap-style",     settings.captions.style);
+    setSel("cfg-cap-animation", settings.captions.animation);
+    setSel("cfg-cap-font",      settings.captions.font);
+    setSel("cfg-cap-size",      settings.captions.size);
+    var cc = document.getElementById("cfg-cap-color");     if (cc) cc.value = settings.captions.color;
+    var ch = document.getElementById("cfg-cap-highlight"); if (ch) ch.value = settings.captions.highlight;
+
+    var gk = document.getElementById("cfg-groq-key");        if (gk) gk.value = settings.groqApiKey || "";
+    var br = document.getElementById("cfg-bitrate");       if (br) br.value = settings.bitrate;
+    var ep = document.getElementById("cfg-export-path");   if (ep) ep.value = settings.exportPath || "";
+    setSel("cfg-filename-pattern", settings.filenamePattern);
+}
+
+function readSettingsForm() {
+    settings.language    = (document.getElementById("cfg-language")   || {value:"en"}).value;
+    settings.audioStep   = +(document.getElementById("cfg-audio-step")|| {value:1}).value || 1;
+    settings.showWelcome = !!(document.getElementById("cfg-show-welcome") || {}).checked;
+    settings.autoRefresh = !!(document.getElementById("cfg-auto-refresh") || {}).checked;
+
+    var newScale = [], newTScale = [], newStep = [];
+    for (var i = 1; i <= 5; i++) {
+        newScale.push( + (document.getElementById("cfg-scale-"  + i) || {value:settings.scale[i-1]}).value );
+        newTScale.push(+ (document.getElementById("cfg-tscale-" + i) || {value:settings.transformScale[i-1]}).value );
+    }
+    for (var j = 1; j <= 4; j++) {
+        newStep.push(+ (document.getElementById("cfg-step-" + j) || {value:settings.moveStep[j-1]}).value );
+    }
+    settings.scale = newScale;
+    settings.transformScale = newTScale;
+    settings.moveStep = newStep;
+
+    settings.captions.language  = (document.getElementById("cfg-cap-language")  || {value:settings.captions.language}).value;
+    settings.captions.model     = (document.getElementById("cfg-cap-model")     || {value:settings.captions.model}).value;
+    settings.captions.style     = (document.getElementById("cfg-cap-style")     || {value:settings.captions.style}).value;
+    settings.captions.animation = (document.getElementById("cfg-cap-animation") || {value:settings.captions.animation}).value;
+    settings.captions.font      = (document.getElementById("cfg-cap-font")      || {value:settings.captions.font}).value;
+    settings.captions.size      = (document.getElementById("cfg-cap-size")      || {value:settings.captions.size}).value;
+    settings.captions.color     = (document.getElementById("cfg-cap-color")     || {value:settings.captions.color}).value;
+    settings.captions.highlight = (document.getElementById("cfg-cap-highlight") || {value:settings.captions.highlight}).value;
+
+    settings.bitrate    = +(document.getElementById("cfg-bitrate")     || {value:settings.bitrate}).value || 10;
+    settings.groqApiKey = (document.getElementById("cfg-groq-key") || {value:""}).value;
+    settings.exportPath =  (document.getElementById("cfg-export-path") || {value:""}).value;
+    settings.filenamePattern = (document.getElementById("cfg-filename-pattern") || {value:"sequence"}).value;
+
+    if (settings.language !== currentLang) {
+        currentLang = settings.language;
+        applyLanguage(currentLang);
+    }
+    if (typeof window.__refreshAuto === "function") window.__refreshAuto();
 }
 function findExportPreset() {
     if (!execModule) return;
@@ -829,32 +1275,14 @@ function findExportPreset() {
 }
 function checkFirstLaunch() {
     try {
-        if (!fsModule) return;
-        var flag = extensionPath + "/.v16_launched";
-        if (!fsModule.existsSync(flag)) {
-            var m = document.getElementById("welcome-modal");
-            if (m) m.classList.remove("hidden");
-            fsModule.writeFileSync(flag, "1", "utf8");
-        }
+        var m = document.getElementById("welcome-modal");
+        if (!m) return;
+        // Show whenever user hasn't opted out via settings
+        if (settings.showWelcome) m.classList.remove("hidden");
     } catch(e) {}
 }
 
-// ── FFMPEG SILENCE PARSER ────────────────────────────────────
-function parseFFmpegSilence(output, padding) {
-    var silences = [], starts = [], ends = [], lines = output.split("\n");
-    for (var i = 0; i < lines.length; i++) {
-        var sm = lines[i].match(/silence_start:\s*([\d.]+)/);
-        var em = lines[i].match(/silence_end:\s*([\d.]+)/);
-        if (sm) starts.push(parseFloat(sm[1]));
-        if (em) ends.push(parseFloat(em[1]));
-    }
-    for (var i = 0; i < Math.min(starts.length, ends.length); i++) {
-        var s = starts[i] + (padding||0);
-        var e = ends[i] - (padding||0);
-        if (e > s) silences.push({start: Math.round(s*1000)/1000, end: Math.round(e*1000)/1000});
-    }
-    return silences;
-}
+
 
 // ── EXPORT PRESET ────────────────────────────────────────────
 function modifyPresetBitrate(cb) {
