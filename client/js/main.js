@@ -1,5 +1,12 @@
-// main.js - EditFlow Pro v17 — Pro Tools upgrade
+// main.js - EditFlow Pro v17 — Production Build
 // ES5 only. Direct csInterface.evalScript for ALL buttons.
+
+// Global error boundary — prevents silent crashes
+window.onerror = function(msg, url, line) {
+    console.error("[EFP] Uncaught error:", msg, "at", url, "line", line);
+    try { showStatus("An unexpected error occurred.", "red"); } catch(e) {}
+    return true;
+};
 
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, execModule = null;
@@ -64,18 +71,7 @@ var i18n = {
         export_capture: "📷 Capture Frame",
         captions_title: "Fast Captions",
         captions_desc: "Lightning-fast, studio-grade transcription. Auto-detect any language and get perfectly synced editable subtitles in seconds.",
-        cap_mode_mov: "🎬 Video Overlay",
-        cap_mode_srt: "📝 Editable Subtitles",
-        cap_hint_mov: "Styled video with animations, ready to use on the timeline.",
-        cap_hint_srt: "Editable subtitles placed on the timeline.",
-        cap_lang: "Lang",
-        cap_accuracy: "Accuracy",
-        cap_style: "Style",
-        cap_anim: "Anim",
-        cap_font: "Font",
-        cap_size: "Size",
-        cap_generate: "🎬 Generate Animated Captions",
-        cap_generate_srt: "📝 Generate Editable Subtitles",
+        cap_generate: "⚡ Generate Editable Subtitles",
         settings_title: "Settings",
         tab_general: "General",
         tab_presets: "Presets",
@@ -90,12 +86,7 @@ var i18n = {
         cfg_step_presets: "Move Step Presets (pixels)",
         cfg_tscale_presets: "Transform Scale Chips (%)",
         cfg_cap_lang: "Default Language",
-        cfg_cap_accuracy: "Default Accuracy",
         cfg_cap_style: "Default Segmentation",
-        cfg_cap_anim: "Default Animation",
-        cfg_cap_font: "Default Font",
-        cfg_cap_size: "Default Font Size",
-        cfg_cap_colors: "Colors (Text · Highlight)",
         cfg_bitrate: "Default Bitrate (Mbps)",
         cfg_export_path: "Default Export Folder",
         cfg_filename_pattern: "Default Filename Pattern",
@@ -561,106 +552,9 @@ document.addEventListener("DOMContentLoaded", function() {
     // ============================================================
     // AI CAPTIONS — Whisper transcription + animated captions
     // ============================================================
-    // ── COLOR PALETTE ──────────────────────────────────────────
-    (function() {
-        var COLORS = [
-            "#FFFFFF", "#000000", "#FFD700", "#FF4444",
-            "#1F8FFF", "#51CF66", "#FF6B6B", "#FF9F43",
-            "#A855F7", "#EC4899", "#14B8A6", "#F97316",
-            "#6366F1", "#8B5CF6", "#06B6D4", "#84CC16",
-            "#FBBF24", "#F472B6", "#22D3EE", "#EF4444",
-            "#10B981", "#3B82F6", "#F59E0B", "#E5E7EB"
-        ];
 
-        function setupPalette(inputId, swatchId, paletteId) {
-            var input   = document.getElementById(inputId);
-            var swatch  = document.getElementById(swatchId);
-            var palette = document.getElementById(paletteId);
-            if (!input || !swatch || !palette) return;
 
-            // Build color cells
-            for (var i = 0; i < COLORS.length; i++) {
-                var cell = document.createElement("div");
-                cell.className = "cp-cell";
-                cell.style.background = COLORS[i];
-                cell.setAttribute("data-color", COLORS[i]);
-                palette.appendChild(cell);
-            }
 
-            function sync() {
-                var v = input.value;
-                if (/^#[0-9a-fA-F]{6}$/.test(v)) swatch.style.background = v;
-            }
-            sync();
-            input.addEventListener("input",  sync);
-            input.addEventListener("change", sync);
-
-            swatch.addEventListener("click", function(e) {
-                e.stopPropagation();
-                var isOpen = !palette.classList.contains("hidden");
-                // Close all palettes first
-                var all = document.querySelectorAll(".color-palette");
-                for (var j = 0; j < all.length; j++) all[j].classList.add("hidden");
-                if (!isOpen) palette.classList.remove("hidden");
-            });
-
-            palette.addEventListener("click", function(e) {
-                var c = e.target.getAttribute("data-color");
-                if (c) {
-                    input.value = c;
-                    swatch.style.background = c;
-                    palette.classList.add("hidden");
-                }
-            });
-        }
-        setupPalette("cap-color",     "cap-color-swatch",  "cap-color-palette");
-        setupPalette("cap-highlight", "cap-hl-swatch",     "cap-hl-palette");
-
-        // Close palette on outside click
-        document.addEventListener("click", function() {
-            var all = document.querySelectorAll(".color-palette");
-            for (var j = 0; j < all.length; j++) all[j].classList.add("hidden");
-        });
-    })();
-
-    // ============================================================
-    // CAPTION MODE TOGGLE (MOV vs SRT)
-    // ============================================================
-    var capOutputMode = 'mov'; // default
-
-    (function() {
-        var movBtn = document.getElementById('cap-mode-mov');
-        var srtBtn = document.getElementById('cap-mode-srt');
-        var styleOpts = document.getElementById('cap-style-options');
-        var hint = document.getElementById('cap-mode-hint');
-        var genBtn = document.getElementById('btn-generate-captions');
-        var upgradeHint = document.getElementById('cap-upgrade-hint');
-
-        if (!movBtn || !srtBtn) return;
-
-        // Start with upgrade hint hidden (MOV mode default)
-        if (upgradeHint) upgradeHint.style.display = 'none';
-
-        movBtn.addEventListener('click', function() {
-            capOutputMode = 'mov';
-            movBtn.classList.add('cap-mode-active');
-            srtBtn.classList.remove('cap-mode-active');
-            if (styleOpts) styleOpts.classList.remove('cap-hidden');
-            if (hint) hint.textContent = 'Styled video with animations \u2014 ready to use on the timeline.';
-            if (genBtn) genBtn.innerHTML = '\ud83c\udfac Generate Animated Captions';
-            if (upgradeHint) upgradeHint.style.display = 'none';
-        });
-
-        srtBtn.addEventListener('click', function() {
-            capOutputMode = 'srt';
-            srtBtn.classList.add('cap-mode-active');
-            movBtn.classList.remove('cap-mode-active');
-            if (styleOpts) styleOpts.classList.add('cap-hidden');
-            if (hint) hint.textContent = 'Editable subtitles placed on the timeline.';
-            if (genBtn) genBtn.innerHTML = '\ud83d\udcdd Generate Editable Subtitles';
-            if (upgradeHint) upgradeHint.style.display = 'block';
-        });
-    })();
 
     // Shows a professional download prompt when the AI engine binary is missing.
     // Injected dynamically so the HTML stays clean.

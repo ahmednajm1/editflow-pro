@@ -4,7 +4,7 @@
 .LSOverride
 ._*
 
-# CEP runtime artifacts
+# CEP runtime / debug
 .debug
 *.log
 .v*_launched
@@ -25,8 +25,29 @@ __pycache__/
 # Node
 node_modules/
 
-# Editor
+# Editor / AI
 .vscode/
 .idea/
+.claude/
+CLAUDE.md
+MEMORY.md
 *.swp
 *.swo
+
+# Development artifacts (never ship)
+temp*.js
+temp*.patch
+dummy.*
+test_*.jsx
+test_*.js
+test_audio/
+strip_glass.js
+add_glass.js
+editflow_autocut.py
+voice-principles.md
+EDITFLOW_STATE.md
+BUSINESS_PLAN.md
+client/append_css.js
+client/append_settings_css.js
+client/brand_preview.html
+*.dmg

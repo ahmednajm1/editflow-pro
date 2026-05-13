@@ -443,42 +443,7 @@ button.secondary { color: var(--text-mute); }
 }
 .ai-insights p { margin: 0; font-size: var(--fs-sm); }
 
-/* ---------- COLOR SWATCH + PALETTE ---------- */
-.color-swatch {
-  display: inline-block;
-  width: 22px; height: 22px;
-  border: 1px solid var(--border-hi);
-  border-radius: var(--r);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: border-color .12s;
-}
-.color-swatch:hover { border-color: var(--accent); }
-.color-palette {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
-  background: var(--surface);
-  border: 1px solid var(--border-hi);
-  border-radius: var(--r);
-  padding: 6px;
-  display: grid;
-  grid-template-columns: repeat(6, 28px);
-  gap: 4px;
-  z-index: 200;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-}
-.color-palette .cp-cell {
-  width: 28px; height: 28px;
-  border-radius: var(--r);
-  border: 1px solid var(--glass-border);
-  cursor: pointer;
-  transition: transform .1s, border-color .1s;
-}
-.color-palette .cp-cell:hover {
-  transform: scale(1.15);
-  border-color: var(--text);
-}
+
 
 /* Utility */
 .hidden { display: none !important; }

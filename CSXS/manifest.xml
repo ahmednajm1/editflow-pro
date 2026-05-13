@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest Version="11.0" ExtensionBundleId="com.editflowpro.panel" ExtensionBundleVersion="1.0.0"
+<ExtensionManifest Version="11.0" ExtensionBundleId="com.editflowpro.panel" ExtensionBundleVersion="17.0.0"
   ExtensionBundleName="EditFlow Pro" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
     <Extension Id="com.editflowpro.panel.extension" Version="1.0"/>

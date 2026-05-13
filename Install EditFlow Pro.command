@@ -11,7 +11,7 @@ BOLD='\033[1m'; G='\033[0;32m'; B='\033[0;34m'; Y='\033[1;33m'; R='\033[0;31m'; 
 clear
 echo ""
 echo -e "${BOLD}  ╔═══════════════════════════════════════╗"
-echo    "  ║       EditFlow Pro  ·  v16            ║"
+echo    "  ║       EditFlow Pro  ·  v17            ║"
 echo    "  ║           by Najm Media               ║"
 echo -e "  ╚═══════════════════════════════════════╝${NC}"
 echo ""
