@@ -1,4 +1,4 @@
-// main.js - EditFlow Pro v16 — Fixed per fix prompt
+// main.js - EditFlow Pro v17 — Pro Tools upgrade
 // ES5 only. Direct csInterface.evalScript for ALL buttons.
 
 var csInterface = null, dsp = null;
@@ -34,11 +34,11 @@ var currentLang = "en";
 var i18n = {
     en: {
         audio_title: "Audio Level",
-        audio_desc: "Select an audio clip → Nudge volume in 1 dB increments. Cmd+Z to undo.",
+        audio_desc: "Select an audio clip → Nudge ±1 dB or set a quick preset level.",
         audio_down: "▼ −1 dB",
         audio_up: "▲ +1 dB",
         scale_title: "Static Scale",
-        scale_desc: "Cut-in resize of selected clips without keyframes.",
+        scale_desc: "Instant cut-in resize of selected clips. No keyframes.",
         transform_title: "Transform & Tools",
         transform_reset_tip: "Reset position to center + scale to 100%",
         transform_left_tip: "Move Left",
@@ -48,6 +48,9 @@ var i18n = {
         transform_step: "Move Step",
         transform_px: "pixels",
         transform_scl: "Scale %",
+        transform_tools: "Tools",
+        transform_desc: "Move, scale, and adjust selected clips directly on the timeline.",
+        audio_quick: "Quick",
         transform_set: "Set",
         paste_title: "Paste from Web",
         paste_desc: "Copy any image from a browser → click Paste. Added to your Project bin ready to drag in.",
@@ -58,12 +61,12 @@ var i18n = {
         export_saveto: "Save to",
         export_browse: "Browse",
         export_selected: "Export Selected Clip",
-        export_all: "Export All Timeline Clips",
-        captions_title: "AI Captions",
-        captions_desc: "Powered by next-gen AI speech recognition — auto-transcribe any language and place perfectly timed captions on your timeline.",
+        export_capture: "📷 Capture Frame",
+        captions_title: "Fast Captions",
+        captions_desc: "Lightning-fast, studio-grade transcription. Auto-detect any language and get perfectly synced editable subtitles in seconds.",
         cap_mode_mov: "🎬 Video Overlay",
         cap_mode_srt: "📝 Editable Subtitles",
-        cap_hint_mov: "Styled video with animations — ready to use on the timeline.",
+        cap_hint_mov: "Styled video with animations, ready to use on the timeline.",
         cap_hint_srt: "Editable subtitles placed on the timeline.",
         cap_lang: "Lang",
         cap_accuracy: "Accuracy",
@@ -108,22 +111,31 @@ var i18n = {
         confirm_text: "Are you sure?",
         confirm_yes: "Confirm",
         welcome_btn: "Get Started",
-        welcome_tagline: "One-click editing for Premiere Pro",
-        welcome_f1: "Smart audio · Static scale · Transform",
-        welcome_f2: "AI captions in 15+ languages with animated styles",
-        welcome_f3: "Fast export presets · One-tap paste from web",
+        welcome_tagline: "Professional one-click editing tools",
+        welcome_f1: "Audio presets · Quick volume · Static scale",
+        welcome_f2: "AI captions · Auto-transcribe 15+ languages",
+        welcome_f3: "Transform tools · Fit to frame · Web paste",
         welcome_dont_show: "Don't show this again",
         welcome_made_by: "Crafted by",
         status_ready: "EditFlow Pro · ready",
-        task_report: "Task Report"
+        task_report: "Task Report",
+        setup_api_title: "Activate Free Captions",
+        setup_api_desc: "For lightning-fast transcription, connect your free speech engine.",
+        setup_api_step1: "Click the button below to log in and get your free API key.",
+        setup_api_step2: "Paste it here:",
+        setup_api_get: "Get Free Key ↗",
+        setup_api_activate: "Activate Now",
+        setup_api_cancel: "Cancel",
+        settings_api_get: "Get Free Key ↗",
+        settings_api_steps: "1. Click 'Get Free Key' above & log in.<br>2. Click 'Create API Key' & copy it.<br>3. Paste the key in the box above."
     },
     ar: {
         audio_title: "مستوى الصوت",
-        audio_desc: "حدد مقطع صوتي → اضبط مستوى الصوت بمقدار 1 ديسيبل. Cmd+Z للتراجع.",
+        audio_desc: "حدد مقطع صوتي → اضبط ±١ ديسيبل أو اختر مستوى سريع.",
         audio_down: "▼ −1 dB",
         audio_up: "▲ +1 dB",
         scale_title: "تغيير الحجم",
-        scale_desc: "تغيير حجم المقاطع المحددة بدون إطارات مفتاحية.",
+        scale_desc: "تغيير حجم المقاطع فورياً. بدون إطارات مفتاحية.",
         transform_title: "التحويل والأدوات",
         transform_reset_tip: "إعادة الموضع للمركز + الحجم إلى 100%",
         transform_left_tip: "تحريك يسار",
@@ -133,6 +145,9 @@ var i18n = {
         transform_step: "مدى التحريك",
         transform_px: "بكسل",
         transform_scl: "الحجم %",
+        transform_tools: "أدوات",
+        transform_desc: "حرّك وغيّر حجم واضبط المقاطع مباشرةً على التايملاين.",
+        audio_quick: "سريع",
         transform_set: "تطبيق",
         paste_title: "لصق من الويب",
         paste_desc: "انسخ أي صورة من المتصفح → اضغط لصق. تضاف إلى ملفات المشروع جاهزة للسحب.",
@@ -143,21 +158,13 @@ var i18n = {
         export_saveto: "حفظ في",
         export_browse: "استعراض",
         export_selected: "تصدير المقطع المحدد",
-        export_all: "تصدير كل مقاطع التايملاين",
-        captions_title: "ترجمة ذكية",
-        captions_desc: "مدعومة بتقنية الذكاء الاصطناعي للتعرف على الكلام — تفريغ تلقائي لأي لغة ووضع ترجمة متزامنة على التايملاين.",
-        cap_mode_mov: "🎬 فيديو متحرك",
-        cap_mode_srt: "📝 ترجمة قابلة للتعديل",
-        cap_hint_mov: "فيديو مع حركات مميزة — جاهز للاستخدام على التايملاين.",
-        cap_hint_srt: "ترجمة قابلة للتعديل توضع على التايملاين.",
+        export_capture: "📷 التقاط إطار",
+        captions_title: "ترجمة سريعة",
+        captions_desc: "تفريغ صوتي فائق السرعة بدقة استوديو احترافية. كشف تلقائي لأي لغة وترجمة متزامنة قابلة للتعديل في ثوانٍ.",
         cap_lang: "اللغة",
         cap_accuracy: "الدقة",
         cap_style: "النمط",
-        cap_anim: "الحركة",
-        cap_font: "الخط",
-        cap_size: "الحجم",
-        cap_generate: "🎬 إنشاء ترجمة متحركة",
-        cap_generate_srt: "📝 إنشاء ترجمة قابلة للتعديل",
+        cap_generate_srt: "⚡ إنشاء ترجمة قابلة للتعديل",
         settings_title: "الإعدادات",
         tab_general: "عام",
         tab_presets: "القيم المسبقة",
@@ -174,10 +181,6 @@ var i18n = {
         cfg_cap_lang: "اللغة الافتراضية للترجمة",
         cfg_cap_accuracy: "الدقة الافتراضية",
         cfg_cap_style: "تقسيم النص الافتراضي",
-        cfg_cap_anim: "الحركة الافتراضية",
-        cfg_cap_font: "الخط الافتراضي",
-        cfg_cap_size: "حجم الخط الافتراضي",
-        cfg_cap_colors: "الألوان (نص · تمييز)",
         cfg_bitrate: "معدل البت الافتراضي (Mbps)",
         cfg_export_path: "مجلد التصدير الافتراضي",
         cfg_filename_pattern: "نمط اسم الملف الافتراضي",
@@ -193,14 +196,23 @@ var i18n = {
         confirm_text: "هل أنت متأكد؟",
         confirm_yes: "تأكيد",
         welcome_btn: "ابدأ الآن",
-        welcome_tagline: "محرر بكبسة زر لـ Premiere Pro",
-        welcome_f1: "صوت ذكي · حجم ثابت · تحويل",
-        welcome_f2: "ترجمة AI بأكثر من 15 لغة مع حركات متنوعة",
-        welcome_f3: "إعدادات تصدير سريعة · لصق فوري من الويب",
+        welcome_tagline: "أدوات احترافية بكبسة زر",
+        welcome_f1: "صوت سريع · مستويات جاهزة · تكبير ثابت",
+        welcome_f2: "ترجمة AI · تفريغ تلقائي لأكثر من ١٥ لغة",
+        welcome_f3: "أدوات تحويل · ملائمة الإطار · لصق من الويب",
         welcome_dont_show: "لا تظهر هذه الرسالة مرة أخرى",
         welcome_made_by: "صُنع بإتقان بواسطة",
         status_ready: "EditFlow Pro · جاهز",
-        task_report: "تقرير المهمة"
+        task_report: "تقرير المهمة",
+        setup_api_title: "تفعيل الترجمة المجانية",
+        setup_api_desc: "للحصول على تفريغ فائق السرعة، قم بربط محرك التفريغ المجاني.",
+        setup_api_step1: "اضغط على الزر أدناه لتسجيل الدخول والحصول على مفتاح API مجاني.",
+        setup_api_step2: "ألصقه هنا:",
+        setup_api_get: "احصل على المفتاح مجاناً ↗",
+        setup_api_activate: "تفعيل الآن",
+        setup_api_cancel: "إلغاء",
+        settings_api_get: "احصل على المفتاح مجاناً ↗",
+        settings_api_steps: "١. اضغط 'احصل على المفتاح مجاناً' وسجل دخولك.<br>٢. اضغط 'Create API Key' وانسخ الكود.<br>٣. ألصق الكود في المربع أعلاه."
     }
 };
 
@@ -472,6 +484,55 @@ document.addEventListener("DOMContentLoaded", function() {
     })();
 
     // ============================================================
+    // AUDIO QUICK LEVELS — Voice / SFX / BGM preset chips
+    // ============================================================
+    (function() {
+        var chips = document.querySelectorAll('.audio-level-chip');
+        for (var i = 0; i < chips.length; i++) {
+            (function(chip) {
+                chip.addEventListener('click', function() {
+                    var db = chip.getAttribute('data-db');
+                    console.log('[AUDIO-QUICK] Set ' + db + ' dB');
+                    csInterface.evalScript(
+                        '$._editflow.setAudioLevel("' + db + '")',
+                        function(result) {
+                            console.log('[AUDIO-QUICK] Result:', result);
+                            handleJSXResult(result);
+                        }
+                    );
+                });
+            })(chips[i]);
+        }
+    })();
+
+    // ============================================================
+    // TRANSFORM PRO TOOLS — Fit, Center Anchor
+    // ============================================================
+
+    safeBind("btn-fit-frame", function() {
+        console.log('[FIT] Fit to frame');
+        csInterface.evalScript(
+            '$._editflow.fitToFrame("fit")',
+            function(result) {
+                console.log('[FIT] Result:', result);
+                handleJSXResult(result);
+                updateClipInfo();
+            }
+        );
+    });
+
+    safeBind("btn-center-anchor", function() {
+        console.log('[ANCHOR] Center anchor point');
+        csInterface.evalScript(
+            '$._editflow.centerAnchorPoint()',
+            function(result) {
+                console.log('[ANCHOR] Result:', result);
+                handleJSXResult(result);
+            }
+        );
+    });
+
+    // ============================================================
     // EXPORT PATH BROWSER
     // ============================================================
     (function() {
@@ -656,11 +717,6 @@ document.addEventListener("DOMContentLoaded", function() {
         var lang  = document.getElementById("cap-language").value;
         var model = document.getElementById("cap-model").value;
         var style = document.getElementById("cap-style").value;
-        var anim  = document.getElementById("cap-animation").value;
-        var font  = document.getElementById("cap-font").value;
-        var size  = document.getElementById("cap-size").value;
-        var color = document.getElementById("cap-color").value;
-        var hl    = document.getElementById("cap-highlight").value;
 
         var statusLine = document.getElementById("cap-status");
         function setStatus(t) { if (statusLine) statusLine.textContent = t; }
@@ -672,14 +728,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
         csInterface.evalScript('$._editflow.getAudioMedia()', function(raw) {
             var info = safeParse(raw);
-            if (!info || !info.mediaPath) {
+            if (!info) {
                 hideProgress(); setStatus(""); showStatus("Select an audio/video clip first.", "red"); return;
             }
-            var mediaPath = info.mediaPath;
-            var timelineStart = info.timelineStart || 0;
-            var clipIn  = info.clipIn  || 0;
-            var clipOut = info.clipOut || 0;
-            var clipDur = info.duration || 0;
 
             var EFP_BIN_DIR = osModule.homedir() + "/Library/Application Support/EditFlowPro";
             var transcriberBin = EFP_BIN_DIR + "/whisper_runner";
@@ -687,27 +738,56 @@ document.addEventListener("DOMContentLoaded", function() {
                 hideProgress(); setStatus(""); showCaptionDownloadBanner(); return;
             }
             var outBase = osModule.tmpdir() + "/efp_caps_" + Date.now();
-
             var apiKey = settings.groqApiKey || "";
             if (!apiKey) {
                 hideProgress(); setStatus("");
-                showStatus("Groq API key required — go to Settings ⚙ and enter your free key from console.groq.com", "red");
+                var setupModal = document.getElementById("setup-api-modal");
+                if (setupModal) {
+                    setupModal.classList.remove("hidden");
+                    var setupInput = document.getElementById("setup-api-input");
+                    if (setupInput) setupInput.value = "";
+                    
+                    // Bind cancel
+                    safeBind("btn-setup-api-close", function() {
+                        setupModal.classList.add("hidden");
+                    });
+                    
+                    // Bind save
+                    safeBind("btn-setup-api-save", function() {
+                        if (setupInput && setupInput.value.trim().length > 10) {
+                            settings.groqApiKey = setupInput.value.trim();
+                            var gk = document.getElementById("cfg-groq-key");
+                            if (gk) gk.value = settings.groqApiKey;
+                            saveSettings();
+                            setupModal.classList.add("hidden");
+                            showStatus("Connected successfully! Click Generate again.", "green");
+                        } else {
+                            showStatus("Please paste a valid API key starting with gsk_", "red");
+                        }
+                    });
+                } else {
+                    showStatus("API key required. Go to Settings \u2699 and enter your free key.", "red");
+                }
                 return;
             }
-            var cmd = shq(transcriberBin) + " " + shq(mediaPath) + " " + shq(outBase) +
-                      " --lang " + shq(lang) + " --model " + shq(model) +
-                      " --api-key " + shq(apiKey);
-            if (clipDur > 0.1 && clipOut > clipIn) {
-                cmd += " --start " + clipIn.toFixed(3) + " --end " + clipOut.toFixed(3);
-            }
 
-            var modelSize = ({tiny:75, base:140, small:460, medium:1500, large:3000})[model] || 460;
-            var trimNote = (clipDur > 0.1) ? (" · " + clipDur.toFixed(1) + "s") : "";
-            showProgress("Analyzing speech (" + model + ")…", 15);
-            setStatus("AI speech recognition" + trimNote + " · model = " + modelSize + " MB on first run");
-            console.log("[Captions] running:", cmd);
+            // ── Determine media path and timeline info ──
+            // Variables used by dispatch logic below
 
-            execModule(cmd, opts, function(err, stdout, stderr) {
+            function runTranscriber(mPath, tlStart, cIn, cOut, cDur) {
+                var cmd = shq(transcriberBin) + " " + shq(mPath) + " " + shq(outBase) +
+                          " --lang " + shq(lang) + " --model " + shq(model) +
+                          " --api-key " + shq(apiKey);
+                if (cDur > 0.1 && cOut > cIn) {
+                    cmd += " --start " + cIn.toFixed(3) + " --end " + cOut.toFixed(3);
+                }
+                var modelSize = ({tiny:75, base:140, small:460, medium:1500, large:3000})[model] || 460;
+                var trimNote = (cDur > 0.1) ? (" · " + cDur.toFixed(1) + "s") : "";
+                showProgress("Analyzing speech (" + model + ")…", 15);
+                setStatus("AI speech recognition" + trimNote + " · model = " + modelSize + " MB on first run");
+                console.log("[Captions] running:", cmd);
+
+                execModule(cmd, opts, function(err, stdout, stderr) {
                 if (err) {
                     hideProgress(); setStatus("");
                     console.log("[Captions] err:", err.message, "\nstdout:", stdout, "\nstderr:", stderr);
@@ -730,90 +810,97 @@ document.addEventListener("DOMContentLoaded", function() {
 
                 setStatus("Detected " + summary.language + " · " + summary.words + " words · " + summary.segments + " segments");
 
-                // ── SRT MODE: generate synced captions directly ──
-                if (capOutputMode === 'srt') {
-                    console.log("[Captions] SRT mode — placing synced captions");
-                    showProgress("Syncing captions to timeline…", 75);
-                    setStatus("Building timeline-synced captions…");
-                    fallbackSRT(summary, style, anim, font, size, color, hl, timelineStart, setStatus);
-                    return;
-                }
+                // ── SRT MODE ONLY: generate synced captions directly ──
+                console.log("[Captions] placing synced editable captions");
+                showProgress("Syncing captions to timeline…", 75);
+                setStatus("Building timeline-synced captions…");
+                fallbackSRT(summary, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", tlStart, setStatus);
+                return;
+                });
+            }  // end runTranscriber()
 
-                // ── Phase 2: MOV mode — Get sequence resolution, then render clips ──
-                csInterface.evalScript('$._editflow.getSequenceInfo()', function(seqRaw) {
-                    var seqInfo = safeParse(seqRaw) || {};
-                    var seqW = seqInfo.width  || 1920;
-                    var seqH = seqInfo.height || 1080;
+            // ── Single clip (backward compat) ──
+            if (info.status === "success" && info.mediaPath) {
+                runTranscriber(info.mediaPath, info.timelineStart || 0,
+                               info.clipIn || 0, info.clipOut || 0, info.duration || 0);
+            }
+            // ── Multi-clip: extract and concatenate audio ──
+            else if (info.status === "multi" && info.clips && info.clips.length > 0) {
+                var clips = info.clips;
+                var firstTlStart = clips[0].timelineStart || 0;
+                var totalDur = 0;
+                console.log("[Captions] Multi-clip mode: " + clips.length + " clips selected");
+                showProgress("Extracting audio from " + clips.length + " clips…", 8);
+                setStatus("Combining " + clips.length + " clips for transcription…");
 
-                    var renderer = EFP_BIN_DIR + "/caption_renderer";
-                    var hasRenderer = false;
-                    try { hasRenderer = fsModule.existsSync(renderer); } catch(e) {}
+                // Build ffmpeg concat filter: extract the used portion from each clip
+                var ffmpegBin = EFP_BIN_DIR + "/ffmpeg";
+                if (!fsModule.existsSync(ffmpegBin)) ffmpegBin = "/opt/homebrew/bin/ffmpeg";
+                if (!fsModule.existsSync(ffmpegBin)) ffmpegBin = "/usr/local/bin/ffmpeg";
+                if (!fsModule.existsSync(ffmpegBin)) ffmpegBin = "ffmpeg"; // last resort: try PATH
 
-                    if (!hasRenderer) {
-                        console.log("[Captions] caption_renderer not found — falling back to SRT");
-                        fallbackSRT(summary, style, anim, font, size, color, hl, timelineStart, setStatus);
-                        return;
+                var concatList = osModule.tmpdir() + "/efp_concat_" + Date.now() + ".txt";
+                var partFiles = [];
+                var pending = clips.length;
+                var extractError = null;
+
+                clips.forEach(function(clip, idx) {
+                    var partFile = osModule.tmpdir() + "/efp_part_" + Date.now() + "_" + idx + ".wav";
+                    partFiles.push(partFile);
+                    var extractCmd = shq(ffmpegBin) + " -y -hide_banner -loglevel error" +
+                        " -i " + shq(clip.mediaPath);
+                    if (clip.clipOut > clip.clipIn && clip.duration > 0.1) {
+                        extractCmd += " -ss " + (clip.clipIn || 0).toFixed(3) +
+                                      " -to " + (clip.clipOut || 0).toFixed(3);
                     }
+                    // Extract to WAV to avoid MP3 padding/drift when concatenating
+                    extractCmd += " -vn -ac 1 -ar 16000 -c:a pcm_s16le " + shq(partFile);
 
-                    var renderCfg = JSON.stringify({
-                        font: font, size: size, color: color, highlight: hl,
-                        style: style, animation: anim,
-                        width: seqW, height: seqH
-                    });
-                    var clipsDir = outBase + "_clips";
-                    var renderCmd = shq(renderer) + " " + shq(summary.json) +
-                                    " " + shq(clipsDir) + " --config " + shq(renderCfg);
-
-                    showProgress("Rendering " + summary.words + " words (" + font + " / " + anim + ")…", 50);
-                    setStatus("Rendering captions with " + font + " font and " + anim + " animation…");
-                    console.log("[Captions] render cmd:", renderCmd);
-
-                    execModule(renderCmd, opts, function(err2, stdout2, stderr2) {
-                        if (err2) {
-                            console.log("[Captions] renderer failed:", err2.message, stderr2);
-                            fallbackSRT(summary, style, anim, font, size, color, hl, timelineStart, setStatus);
-                            return;
-                        }
-                        var renderResult = safeParse(stdout2) || {};
-                        console.log("[Captions] render result:", renderResult);
-                        if (renderResult.status !== "success" || !renderResult.clips || renderResult.clips.length === 0) {
-                            console.log("[Captions] renderer produced no clips — falling back to SRT");
-                            fallbackSRT(summary, style, anim, font, size, color, hl, timelineStart, setStatus);
-                            return;
-                        }
-
-                        // Write manifest for JSX to read
-                        var manifestPath = outBase + "_manifest.json";
-                        try {
-                            fsModule.writeFileSync(manifestPath, JSON.stringify(renderResult), "utf8");
-                        } catch(e) {
-                            console.log("[Captions] manifest write failed:", e);
-                            fallbackSRT(summary, style, anim, font, size, color, hl, timelineStart, setStatus);
-                            return;
-                        }
-
-                        showProgress("Placing " + renderResult.rendered + " clips on timeline…", 85);
-                        setStatus("Placing " + renderResult.rendered + " animated caption clips…");
-
-                        var jsxCfg = JSON.stringify({ offsetSecs: timelineStart });
-                        var mEsc = manifestPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-                        var cEsc = jsxCfg.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-
-                        csInterface.evalScript(
-                            '$._editflow.placeRenderedCaptions("' + mEsc + '","' + cEsc + '")',
-                            function(res) {
-                                showProgress("Done!", 100); setTimeout(hideProgress, 2500);
-                                console.log("[Captions] place result:", res);
-                                handleJSXResult(res);
-                                var r = safeParse(res);
-                                if (r && r.placed) {
-                                    setStatus(r.placed + " captions placed (" + font + " · " + anim + ")");
-                                }
+                    execModule(extractCmd, opts, function(err2) {
+                        if (err2) extractError = err2;
+                        pending--;
+                        if (pending === 0) {
+                            if (extractError) {
+                                hideProgress(); setStatus("");
+                                showStatus("Audio extraction failed: " + (extractError.message || "").slice(0,100), "red");
+                                return;
                             }
-                        );
+                            // Build concat list file
+                            var listContent = partFiles.map(function(f) {
+                                return "file '" + f.replace(/'/g, "'\\''") + "'";
+                            }).join("\n");
+                            fsModule.writeFileSync(concatList, listContent, "utf8");
+
+                            // Concatenate all parts
+                            var combinedFile = osModule.tmpdir() + "/efp_combined_" + Date.now() + ".wav";
+                            var concatCmd = shq(ffmpegBin) + " -y -hide_banner -loglevel error" +
+                                " -f concat -safe 0 -i " + shq(concatList) +
+                                " -c copy " + shq(combinedFile);
+
+                            execModule(concatCmd, opts, function(err3) {
+                                // Cleanup part files
+                                partFiles.forEach(function(f) { try { fsModule.unlinkSync(f); } catch(e){} });
+                                try { fsModule.unlinkSync(concatList); } catch(e){}
+
+                                if (err3) {
+                                    hideProgress(); setStatus("");
+                                    showStatus("Audio concat failed: " + (err3.message || "").slice(0,100), "red");
+                                    return;
+                                }
+
+                                // Run transcriber on combined audio (no --start/--end since we already trimmed)
+                                runTranscriber(combinedFile, firstTlStart, 0, 0, 0);
+                            });
+                        }
                     });
                 });
-            });
+            } else if (!info.mediaPath) {
+                hideProgress(); setStatus(""); showStatus("Select an audio/video clip first.", "red"); return;
+            } else {
+                // Fallback: treat as single clip
+                runTranscriber(info.mediaPath, info.timelineStart || 0,
+                               info.clipIn || 0, info.clipOut || 0, info.duration || 0);
+            }
         });
     });
 
@@ -869,19 +956,163 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     });
 
-    safeBind("btn-export-all", function() {
-        if (!foundPresetPath || !fsModule) { showStatus("No export preset.", "red"); return; }
-        var savePath = (document.getElementById("export-path").value || "").trim();
-        console.log("[Export All] Path: " + (savePath || "(default)"));
-        showProgress("Batch exporting...", 10);
-        modifyPresetBitrate(function(tmp, br) {
-            showProgress("Exporting (" + br + " Mbps)...", 30);
-            csInterface.evalScript('$._editflow.exportAll("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '")', function(res) {
-                showProgress("Done!", 100); setTimeout(hideProgress, 2000);
-                handleJSXResult(res);
-                try { fsModule.unlinkSync(tmp); } catch(e) {}
+    // Helper: Find built-in PNG Preset for native capture
+    var foundPngPreset = null;
+    function findPngPreset() {
+        if (!fsModule || foundPngPreset) return foundPngPreset;
+        var paths = [
+            "/Applications/Adobe Premiere Pro 2026/Adobe Premiere Pro 2026.app/Contents/MediaIO/systempresets/3F3F3F3F_504E4720/PNG Sequence (Match Source).epr",
+            "/Applications/Adobe Premiere Pro 2025/Adobe Premiere Pro 2025.app/Contents/MediaIO/systempresets/3F3F3F3F_504E4720/PNG Sequence (Match Source).epr",
+            "/Applications/Adobe Premiere Pro 2024/Adobe Premiere Pro 2024.app/Contents/MediaIO/systempresets/3F3F3F3F_504E4720/PNG Sequence (Match Source).epr",
+            "/Applications/Adobe Premiere Pro (Beta)/Adobe Premiere Pro (Beta).app/Contents/MediaIO/systempresets/3F3F3F3F_504E4720/PNG Sequence (Match Source).epr"
+        ];
+        for (var i = 0; i < paths.length; i++) {
+            if (fsModule.existsSync(paths[i])) { foundPngPreset = paths[i]; return paths[i]; }
+        }
+        return null;
+    }
+
+    safeBind("btn-capture-frame", function() {
+        if (!execModule || !fsModule) {
+            showStatus("System modules not available.", "red");
+            return;
+        }
+        
+        var pngPreset = findPngPreset();
+        
+        // If we have the PNG preset, use NATIVE TIMELINE RENDER (100% accurate, captures zooms/effects)
+        if (pngPreset) {
+            console.log('[CAPTURE] Using Native MediaDirect...');
+            showProgress("Rendering frame...", 30);
+            
+            var safeTempDir = osModule.tmpdir().replace(/\\/g, "/");
+            var safePreset = pngPreset.replace(/\\/g, "/");
+            
+            csInterface.evalScript('$._editflow.exportNativeFrame("' + safePreset + '", "' + safeTempDir + '")', function(res) {
+                try {
+                    var r = JSON.parse(res);
+                    if (r.status !== "success" || r.method !== "media_direct") {
+                        showProgress("", 0); hideProgress();
+                        handleJSXResult(res);
+                        return;
+                    }
+                    
+                    showProgress("Saving to clipboard...", 60);
+                    var baseName = r.baseName;
+                    var tempDir = r.tempDir;
+                    var checks = 0;
+                    var expectedFile = null;
+                    
+                    var interval = setInterval(function() {
+                        checks++;
+                        // Search for the file in the temp directory (Premiere appends dynamic zeroes like '0.png' or '00000.png')
+                        try {
+                            var files = fsModule.readdirSync(tempDir);
+                            for (var i = 0; i < files.length; i++) {
+                                if (files[i].indexOf(baseName) === 0 && files[i].indexOf('.png') > -1) {
+                                    expectedFile = tempDir + "/" + files[i];
+                                    break;
+                                }
+                            }
+                        } catch(e) {}
+
+                        if (expectedFile && fsModule.existsSync(expectedFile)) {
+                            clearInterval(interval);
+                            // Restore In/Out points immediately
+                            csInterface.evalScript('$._editflow.restoreInOut("' + r.oldIn + '", "' + r.oldOut + '")');
+                            copyFrameToClipboard(expectedFile, 'PNG');
+                        } else if (checks > 40) { // 10 seconds timeout
+                            clearInterval(interval);
+                            csInterface.evalScript('$._editflow.restoreInOut("' + r.oldIn + '", "' + r.oldOut + '")');
+                            showProgress("", 0); hideProgress();
+                            showStatus("Capture timeout.", "red");
+                        }
+                    }, 250);
+                } catch(e) {
+                    showProgress("", 0); hideProgress();
+                    handleJSXResult(res);
+                }
             });
+            return;
+        }
+
+        // FALLBACK: ffmpeg Extraction (fast, but no timeline effects/zooms)
+        console.log('[CAPTURE] Starting fast ffmpeg capture...');
+        showProgress("Reading playhead...", 30);
+        csInterface.evalScript('$._editflow.getPlayheadFrameInfo()', function(result) {
+            console.log('[CAPTURE] Info:', result);
+            try {
+                var r = JSON.parse(result);
+                if (r.status !== "success") {
+                    showProgress("", 0); hideProgress();
+                    handleJSXResult(result);
+                    return;
+                }
+                
+                // If Premiere handled the export natively (via exportFramePNG in v24.0+)
+                if (r.method === "native" && r.path) {
+                    copyFrameToClipboard(r.path, 'PNG');
+                    return;
+                }
+
+                if (!r.mediaPath) {
+                    showProgress("", 0); hideProgress();
+                    showStatus("No media path found.", "red");
+                    return;
+                }
+
+                var pngPath = osModule.tmpdir() + '/editflow_frame_' + Date.now() + '.png';
+                showProgress("Extracting frame...", 60);
+
+                // Escape media path for shell
+                var safeMedia = r.mediaPath.replace(/'/g, "'\\''");
+                var safePng = pngPath.replace(/'/g, "'\\''");
+
+                // ffmpeg: Exact frame extraction (accurate seek by placing -ss AFTER -i)
+                var binPath = extensionPath + "/bin";
+                var cmd = "export PATH=\"" + binPath + ":/opt/homebrew/bin:/usr/local/bin:$PATH\" && " +
+                    "ffmpeg -y" +
+                    " -i '" + safeMedia + "'" +
+                    " -ss " + r.sourceTime.toFixed(6) +
+                    " -map 0:v:0 -vframes 1 -q:v 2" +
+                    " '" + safePng + "'";
+
+                execModule(cmd, function(ffErr, ffOut, ffStderr) {
+                    if (!fsModule.existsSync(pngPath)) {
+                        showProgress("", 0); hideProgress();
+                        var detail = ffStderr ? ffStderr.substring(ffStderr.lastIndexOf('\n', ffStderr.length - 2) + 1).trim() : "unknown";
+                        showStatus("Capture failed: " + detail.substring(0, 120), "red");
+                        return;
+                    }
+                    copyFrameToClipboard(pngPath, 'PNG');
+                });
+            } catch(e) {
+                showProgress("", 0); hideProgress();
+                handleJSXResult(result);
+            }
         });
+
+        function copyFrameToClipboard(imgPath, type) {
+            showProgress("Copying to clipboard...", 90);
+            var asClass = type === 'TIFF' ? '\u00ABclass TIFF\u00BB' : '\u00ABclass PNGf\u00BB';
+            var scptPath = imgPath.replace(/\.[^.]+$/, '.applescript');
+            var scptBody = 'set the clipboard to (read (POSIX file "' + imgPath + '") as ' + asClass + ')';
+            try {
+                fsModule.writeFileSync(scptPath, scptBody, 'utf8');
+                execModule('osascript "' + scptPath + '"', function(clipErr) {
+                    try { fsModule.unlinkSync(scptPath); } catch(e) {}
+                    showProgress("Done!", 100); setTimeout(hideProgress, 2000);
+                    if (clipErr) {
+                        showStatus("Frame saved to: " + imgPath, "green");
+                    } else {
+                        showStatus("Frame copied! Cmd+V to paste.", "green");
+                    }
+                });
+            } catch(wErr) {
+                showProgress("Done!", 100); setTimeout(hideProgress, 2000);
+                showStatus("Frame saved to: " + imgPath, "green");
+            }
+        }
     });
 
     safeBind("btn-paste-clipboard", function() { pasteFromClipboard(); });
@@ -992,7 +1223,7 @@ document.addEventListener("DOMContentLoaded", function() {
         "btn-audio-up", "btn-audio-down",
         "reset-clip-transform", "apply-scale",
         "btn-paste-clipboard",
-        "btn-export-selected", "btn-export-all", "btn-export-browse"
+        "btn-export-selected", "btn-capture-frame", "btn-export-browse"
     ];
     var missing = [];
     for (var i = 0; i < expectedButtons.length; i++) {
@@ -1101,16 +1332,58 @@ function showConfirm(title, text, onYes) {
     nn.addEventListener("click", function() { document.getElementById("confirm-modal").classList.add("hidden"); });
 }
 
+var _progressTimer = null;
+var _progressStartTime = 0;
+var _progressTargetPct = 0;
+var _progressCurrentPct = 0;
+
 function showProgress(msg, pct) {
-    document.getElementById("progress-container").classList.remove("hidden");
-    document.getElementById("progress-text").innerText = msg;
-    document.getElementById("progress-fill").style.width = (pct || 0) + "%";
+    var container = document.getElementById("progress-container");
+    var textEl = document.getElementById("progress-text");
+    var fillEl = document.getElementById("progress-fill");
+    container.classList.remove("hidden");
+    fillEl.classList.remove("done");
+    textEl.innerText = msg;
+    _progressTargetPct = pct || 0;
+    fillEl.style.width = _progressTargetPct + "%";
+    _progressCurrentPct = _progressTargetPct;
     operationRunning = true;
+
+    // Start elapsed timer if this is the "Analyzing" step (where the wait happens)
+    if (pct <= 15 && pct > 0) {
+        _progressStartTime = Date.now();
+        if (_progressTimer) clearInterval(_progressTimer);
+        _progressTimer = setInterval(function() {
+            var elapsed = Math.floor((Date.now() - _progressStartTime) / 1000);
+            var mins = Math.floor(elapsed / 60);
+            var secs = elapsed % 60;
+            var timeStr = mins > 0 ? mins + "m " + secs + "s" : secs + "s";
+
+            // Smoothly advance bar from current position toward 70% (but never past it)
+            // This gives visual feedback that progress is happening
+            if (_progressCurrentPct < 70) {
+                _progressCurrentPct += 0.5; // advance ~0.5% per second
+                fillEl.style.width = Math.min(_progressCurrentPct, 70) + "%";
+            }
+
+            textEl.innerText = msg + "  ⏱ " + timeStr;
+        }, 1000);
+    }
 }
 
 function hideProgress() {
-    document.getElementById("progress-container").classList.add("hidden");
-    document.getElementById("progress-fill").style.width = "0%";
+    if (_progressTimer) { clearInterval(_progressTimer); _progressTimer = null; }
+    var container = document.getElementById("progress-container");
+    var fillEl = document.getElementById("progress-fill");
+    fillEl.style.width = "100%";
+    fillEl.classList.add("done");
+    // Let the 100% animation play, then hide
+    setTimeout(function() {
+        container.classList.add("hidden");
+        fillEl.style.width = "0%";
+        fillEl.classList.remove("done");
+        _progressCurrentPct = 0;
+    }, 1500);
     operationRunning = false;
 }
 
@@ -1184,13 +1457,6 @@ function applySettingsToUI() {
     setSel("cap-language",  settings.captions.language);
     setSel("cap-model",     settings.captions.model);
     setSel("cap-style",     settings.captions.style);
-    setSel("cap-animation", settings.captions.animation);
-    setSel("cap-font",      settings.captions.font);
-    setSel("cap-size",      settings.captions.size);
-    var cc = document.getElementById("cap-color");      if (cc) cc.value = settings.captions.color;
-    var ch = document.getElementById("cap-highlight");  if (ch) ch.value = settings.captions.highlight;
-    var ccs = document.getElementById("cap-color-swatch");   if (ccs) ccs.style.background = settings.captions.color;
-    var chs = document.getElementById("cap-hl-swatch");      if (chs) chs.style.background = settings.captions.highlight;
 }
 function setSel(id, val) {
     var el = document.getElementById(id);
@@ -1217,11 +1483,6 @@ function populateSettingsForm() {
     setSel("cfg-cap-language",  settings.captions.language);
     setSel("cfg-cap-model",     settings.captions.model);
     setSel("cfg-cap-style",     settings.captions.style);
-    setSel("cfg-cap-animation", settings.captions.animation);
-    setSel("cfg-cap-font",      settings.captions.font);
-    setSel("cfg-cap-size",      settings.captions.size);
-    var cc = document.getElementById("cfg-cap-color");     if (cc) cc.value = settings.captions.color;
-    var ch = document.getElementById("cfg-cap-highlight"); if (ch) ch.value = settings.captions.highlight;
 
     var gk = document.getElementById("cfg-groq-key");        if (gk) gk.value = settings.groqApiKey || "";
     var br = document.getElementById("cfg-bitrate");       if (br) br.value = settings.bitrate;
@@ -1250,11 +1511,6 @@ function readSettingsForm() {
     settings.captions.language  = (document.getElementById("cfg-cap-language")  || {value:settings.captions.language}).value;
     settings.captions.model     = (document.getElementById("cfg-cap-model")     || {value:settings.captions.model}).value;
     settings.captions.style     = (document.getElementById("cfg-cap-style")     || {value:settings.captions.style}).value;
-    settings.captions.animation = (document.getElementById("cfg-cap-animation") || {value:settings.captions.animation}).value;
-    settings.captions.font      = (document.getElementById("cfg-cap-font")      || {value:settings.captions.font}).value;
-    settings.captions.size      = (document.getElementById("cfg-cap-size")      || {value:settings.captions.size}).value;
-    settings.captions.color     = (document.getElementById("cfg-cap-color")     || {value:settings.captions.color}).value;
-    settings.captions.highlight = (document.getElementById("cfg-cap-highlight") || {value:settings.captions.highlight}).value;
 
     settings.bitrate    = +(document.getElementById("cfg-bitrate")     || {value:settings.bitrate}).value || 10;
     settings.groqApiKey = (document.getElementById("cfg-groq-key") || {value:""}).value;
@@ -1268,9 +1524,29 @@ function readSettingsForm() {
     if (typeof window.__refreshAuto === "function") window.__refreshAuto();
 }
 function findExportPreset() {
+    if (!fsModule) return;
+    // Try direct known paths first (fast)
+    var knownPaths = [
+        "/Applications/Adobe Media Encoder 2026/Adobe Media Encoder 2026.app/Contents/MediaIO/systempresets/4E49434B_48323634/00 - Match Source - High bitrate.epr",
+        "/Applications/Adobe Media Encoder 2025/Adobe Media Encoder 2025.app/Contents/MediaIO/systempresets/4E49434B_48323634/00 - Match Source - High bitrate.epr",
+        "/Applications/Adobe Media Encoder 2024/Adobe Media Encoder 2024.app/Contents/MediaIO/systempresets/4E49434B_48323634/00 - Match Source - High bitrate.epr"
+    ];
+    for (var i = 0; i < knownPaths.length; i++) {
+        try {
+            if (fsModule.existsSync(knownPaths[i])) {
+                foundPresetPath = knownPaths[i];
+                console.log("[EFP] Preset found (direct): " + foundPresetPath);
+                return;
+            }
+        } catch(e) {}
+    }
+    // Fallback: search with find
     if (!execModule) return;
     execModule('find /Applications -name "*.epr" -path "*Match*Source*High*" 2>/dev/null | head -1', function(e, o) {
-        if (o && o.trim()) foundPresetPath = o.trim();
+        if (o && o.trim()) {
+            foundPresetPath = o.trim();
+            console.log("[EFP] Preset found (find): " + foundPresetPath);
+        }
     });
 }
 function checkFirstLaunch() {
@@ -1287,7 +1563,8 @@ function checkFirstLaunch() {
 // ── EXPORT PRESET ────────────────────────────────────────────
 function modifyPresetBitrate(cb) {
     if (!foundPresetPath || !fsModule) return;
-    var br = document.getElementById("batch-bitrate-input").value;
+    var brEl = document.getElementById("batch-bitrate-input");
+    var br = (brEl ? brEl.value : null) || String(settings.bitrate || 10);
     fsModule.readFile(foundPresetPath, "utf8", function(e, xml) {
         if (e) { showStatus("Can't read preset.", "red"); return; }
         var lines = xml.split("\n"), inB = false;

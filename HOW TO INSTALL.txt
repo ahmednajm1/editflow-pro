@@ -1,0 +1,38 @@
+EditFlow Pro — Installation Guide
+===================================
+
+STEP 1 — Open the DMG
+Double-click "EditFlow Pro Installer.dmg" to mount it.
+
+STEP 2 — Run the Installer
+Right-click "Install EditFlow Pro" → click Open → click Open again.
+(This one-time step is required on macOS for unnotarized apps.)
+
+STEP 3 — Wait for the success message
+The installer will automatically:
+  • Copy the extension to Adobe Premiere Pro
+  • Enable the extension for your version of Premiere
+
+STEP 4 — Restart Premiere Pro
+Close and reopen Adobe Premiere Pro.
+
+STEP 5 — Open the panel
+Go to:  Window → Extensions → EditFlow Pro
+
+That's it — you're ready to go.
+
+---
+
+FIRST-TIME AI CAPTIONS
+On the first use of AI Captions, the tool will automatically
+download a small AI model (~460 MB) in the background.
+Make sure you're connected to the internet for this step.
+
+---
+
+TROUBLESHOOTING
+• Extension not appearing? Make sure you restarted Premiere Pro after installing.
+• "Panel failed to load"? Try: Window → Extensions → EditFlow Pro again.
+• Still having issues? Contact: najmmediaa@gmail.com
+
+EditFlow Pro by Najm Media

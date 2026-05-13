@@ -1,0 +1,44 @@
+/* ---------- PRESET CHIPS LAYOUT ---------- */
+.preset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.preset-label {
+  font-size: 11px;
+  color: var(--primary);
+  white-space: nowrap;
+}
+.preset-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.chip {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.2s ease;
+  flex: 1;
+  text-align: center;
+}
+.chip:hover {
+  background: rgba(31,143,255,0.1);
+  border-color: var(--accent);
+}
+.chip.chip-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.unit-label {
+  font-size: 11px;
+  color: var(--primary);
+}

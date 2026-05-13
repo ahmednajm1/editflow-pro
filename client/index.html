@@ -1,53 +1,200 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" dir="ltr">
 <head>
     <meta charset="utf-8">
     <title>EditFlow Pro</title>
-    <link rel="stylesheet" href="css/style.css?v=16">
+    <link rel="stylesheet" href="css/style.css?v=21">
     <script src="js/CSInterface.js"></script>
 </head>
 <body>
 
     <!-- SETTINGS OVERLAY -->
     <div id="settings-overlay" class="settings-overlay hidden">
-        <div class="settings-panel">
-            <h2>Settings</h2>
-            <label>Voice Level Presets (dB)</label>
-            <div class="settings-row">
-                <input type="number" id="cfg-voice-1" value="2" min="-30" max="30">
-                <input type="number" id="cfg-voice-2" value="3" min="-30" max="30">
-                <input type="number" id="cfg-voice-3" value="5" min="-30" max="30">
+        <div class="settings-panel settings-panel-wide">
+            <div class="settings-header">
+                <h2 data-i18n="settings_title">Settings</h2>
+                <button class="settings-close-x" id="btn-settings-close" title="Close">×</button>
             </div>
-            <label>Music Level Presets (dB)</label>
-            <div class="settings-row">
-                <input type="number" id="cfg-music-1" value="-9" min="-60" max="0">
-                <input type="number" id="cfg-music-2" value="-16" min="-60" max="0">
-                <input type="number" id="cfg-music-3" value="-21" min="-60" max="0">
+
+            <div class="settings-tabs">
+                <button class="settings-tab settings-tab-active" data-tab="general" data-i18n="tab_general">General</button>
+                <button class="settings-tab" data-tab="presets" data-i18n="tab_presets">Presets</button>
+                <button class="settings-tab" data-tab="captions" data-i18n="tab_captions">Captions</button>
+                <button class="settings-tab" data-tab="export" data-i18n="tab_export">Export</button>
+                <button class="settings-tab" data-tab="about" data-i18n="tab_about">About</button>
             </div>
-            <label>Static Scale Presets (%)</label>
-            <div class="settings-row">
-                <input type="number" id="cfg-scale-1" value="115" min="100" max="500">
-                <input type="number" id="cfg-scale-2" value="130" min="100" max="500">
-                <input type="number" id="cfg-scale-3" value="150" min="100" max="500">
-                <input type="number" id="cfg-scale-4" value="175" min="100" max="500">
-                <input type="number" id="cfg-scale-5" value="200" min="100" max="500">
+
+            <div class="settings-body">
+
+                <!-- ============ GENERAL ============ -->
+                <div class="settings-section settings-section-active" data-section="general">
+                    <label data-i18n="cfg_language">Default Language</label>
+                    <div class="settings-row">
+                        <select id="cfg-language" style="flex:1;">
+                            <option value="en">English</option>
+                            <option value="ar">العربية</option>
+                        </select>
+                    </div>
+
+                    <label data-i18n="cfg_audio_step">Audio Nudge Step (dB)</label>
+                    <div class="settings-row">
+                        <select id="cfg-audio-step" style="flex:1;">
+                            <option value="0.5">0.5 dB · Fine</option>
+                            <option value="1" selected>1 dB · Standard</option>
+                            <option value="2">2 dB</option>
+                            <option value="3">3 dB</option>
+                            <option value="6">6 dB · Large</option>
+                        </select>
+                    </div>
+
+                    <label data-i18n="cfg_show_welcome" class="checkbox-label">
+                        <input type="checkbox" id="cfg-show-welcome" checked>
+                        <span data-i18n="cfg_show_welcome_text">Show welcome screen on launch</span>
+                    </label>
+
+                    <label data-i18n="cfg_auto_refresh" class="checkbox-label">
+                        <input type="checkbox" id="cfg-auto-refresh" checked>
+                        <span data-i18n="cfg_auto_refresh_text">Auto-refresh clip info every 2 sec</span>
+                    </label>
+                </div>
+
+                <!-- ============ PRESETS ============ -->
+                <div class="settings-section" data-section="presets">
+                    <label data-i18n="cfg_scale_presets">Static Scale Presets (%)</label>
+                    <div class="settings-row">
+                        <input type="number" id="cfg-scale-1" value="115" min="50" max="500">
+                        <input type="number" id="cfg-scale-2" value="130" min="50" max="500">
+                        <input type="number" id="cfg-scale-3" value="150" min="50" max="500">
+                        <input type="number" id="cfg-scale-4" value="175" min="50" max="500">
+                        <input type="number" id="cfg-scale-5" value="200" min="50" max="500">
+                    </div>
+
+                    <label data-i18n="cfg_step_presets">Move Step Presets (pixels)</label>
+                    <div class="settings-row">
+                        <input type="number" id="cfg-step-1" value="5" min="1" max="500">
+                        <input type="number" id="cfg-step-2" value="10" min="1" max="500">
+                        <input type="number" id="cfg-step-3" value="20" min="1" max="500">
+                        <input type="number" id="cfg-step-4" value="50" min="1" max="500">
+                    </div>
+
+                    <label data-i18n="cfg_tscale_presets">Transform Scale Chips (%)</label>
+                    <div class="settings-row">
+                        <input type="number" id="cfg-tscale-1" value="75"  min="10" max="500">
+                        <input type="number" id="cfg-tscale-2" value="100" min="10" max="500">
+                        <input type="number" id="cfg-tscale-3" value="110" min="10" max="500">
+                        <input type="number" id="cfg-tscale-4" value="125" min="10" max="500">
+                        <input type="number" id="cfg-tscale-5" value="150" min="10" max="500">
+                    </div>
+                </div>
+
+                <!-- ============ CAPTIONS ============ -->
+                <div class="settings-section" data-section="captions">
+                    <label data-i18n="cfg_cap_lang">Default Language</label>
+                    <div class="settings-row">
+                        <select id="cfg-cap-language" style="flex:1;">
+                            <option value="auto">Auto-detect</option>
+                            <option value="ar">Arabic</option>
+                            <option value="en">English</option>
+                            <option value="es">Spanish</option>
+                            <option value="fr">French</option>
+                            <option value="de">German</option>
+                            <option value="tr">Turkish</option>
+                            <option value="ja">Japanese</option>
+                        </select>
+                    </div>
+
+                    <label data-i18n="cfg_cap_accuracy">Default Accuracy</label>
+                    <div class="settings-row">
+                        <select id="cfg-cap-model" style="flex:1;">
+                            <option value="small">Standard Speed</option>
+                            <option value="large">Maximum Accuracy (Pro)</option>
+                        </select>
+                    </div>
+
+                    <label data-i18n="cfg_cap_style">Default Segmentation</label>
+                    <div class="settings-row">
+                        <select id="cfg-cap-style" style="flex:1;">
+                            <option value="word">Word-by-word</option>
+                            <option value="phrase">Short phrases</option>
+                            <option value="line">Full lines</option>
+                        </select>
+                    </div>
+
+                    <hr style="border-color:var(--border); margin:12px 0;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="font-weight:600; color:var(--accent); margin:0;">🔑 Groq API Key</label>
+                        <button onclick="if(window.csInterface) { window.csInterface.openURLInDefaultBrowser('https://console.groq.com/keys'); } else { require('shell').openExternal('https://console.groq.com/keys'); } return false;" style="width:auto; padding:4px 8px; font-size:10px; background:rgba(31,143,255,0.15); color:var(--accent); border:1px solid rgba(31,143,255,0.3); border-radius:6px; cursor:pointer;" data-i18n="settings_api_get">
+                            Get Free Key ↗
+                        </button>
+                    </div>
+                    <div class="settings-row" style="gap:6px; margin-top:8px;">
+                        <input type="password" id="cfg-groq-key" placeholder="Paste your gsk_... key here" style="flex:1; font-family:monospace; font-size:11px;">
+                        <button id="btn-show-groq-key" style="width:auto; padding:6px 10px;" title="Show Key" onclick="var f=document.getElementById('cfg-groq-key'); f.type=f.type==='password'?'text':'password';">👁</button>
+                    </div>
+                    <div style="font-size:10px; color:var(--text-muted); margin-top:4px; line-height:1.4;" data-i18n="settings_api_steps">
+                        1. Click 'Get Free Key' above & log in.<br>
+                        2. Click 'Create API Key' & copy it.<br>
+                        3. Paste the key in the box above.
+                    </div>
+                </div>
+
+
+                <div class="settings-section" data-section="export">
+                    <label data-i18n="cfg_bitrate">Default Bitrate (Mbps)</label>
+                    <div class="settings-row">
+                        <input type="number" id="cfg-bitrate" value="10" min="1" max="500" style="flex:1;">
+                    </div>
+
+                    <label data-i18n="cfg_export_path">Default Export Folder</label>
+                    <div class="settings-row">
+                        <input type="text" id="cfg-export-path" placeholder="Desktop/EditFlowPro_Exports" style="flex:1;">
+                        <button id="btn-cfg-browse-path" style="width:auto; padding:6px 12px;" data-i18n="export_browse">Browse</button>
+                    </div>
+
+                    <label data-i18n="cfg_filename_pattern">Default Filename Pattern</label>
+                    <div class="settings-row">
+                        <select id="cfg-filename-pattern" style="flex:1;">
+                            <option value="sequence">Sequence Name</option>
+                            <option value="sequence_date">Sequence + Date</option>
+                            <option value="sequence_time">Sequence + Time</option>
+                            <option value="custom">Custom (use input)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- ============ ABOUT ============ -->
+                <div class="settings-section" data-section="about">
+                    <div class="about-card">
+                        <div class="about-logo">NM</div>
+                        <h3>EditFlow Pro</h3>
+                        <p class="about-version">Version 17</p>
+                        <p class="about-tagline" data-i18n="about_tagline">Professional one-click editing tools for Adobe Premiere Pro</p>
+                        <hr class="about-divider">
+                        <p class="about-developer-label" data-i18n="about_developer">Developer</p>
+                        <p class="about-developer-name"><strong>Najm Media</strong></p>
+                        <p class="about-developer-sub">Ahmed Najm · Oman</p>
+                        <hr class="about-divider">
+                        <p class="about-contact-label" data-i18n="about_contact">Contact Us</p>
+                        <div class="about-contact-row">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                            <a href="mailto:najmmediaa@gmail.com">najmmediaa@gmail.com</a>
+                        </div>
+                        <div class="about-contact-row">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            <span>+968 9493 9544</span>
+                        </div>
+                        <hr class="about-divider">
+                        <p class="about-copyright">Copyright © Najm Media 2026</p>
+                        <p class="about-copyright-sub">Najm Media is a project owned and operated by Ahmed Najm, Oman.</p>
+                    </div>
+                    <button id="btn-reset-defaults" class="secondary" style="width:100%; margin-top:14px;" data-i18n="cfg_reset">Reset All Settings to Defaults</button>
+                </div>
+
             </div>
-            <hr class="settings-divider">
-            <label>Default Bitrate (Mbps)</label>
-            <div class="settings-row">
-                <input type="number" id="cfg-bitrate" value="10" min="1" max="100">
-            </div>
-            <label>Default Beat Precision</label>
-            <div class="settings-row">
-                <select id="cfg-beat-precision">
-                    <option value="normal">Normal</option>
-                    <option value="precision" selected>Precision</option>
-                </select>
-            </div>
-            <hr class="settings-divider">
+
             <div class="modal-actions">
-                <button id="btn-settings-cancel" class="secondary">Cancel</button>
-                <button id="btn-settings-save" class="primary">Save</button>
+                <button id="btn-settings-cancel" class="secondary" data-i18n="btn_cancel">Cancel</button>
+                <button id="btn-settings-save" class="primary" data-i18n="btn_save">Save Changes</button>
             </div>
         </div>
     </div>
@@ -55,27 +202,91 @@
     <!-- CONFIRM MODAL -->
     <div id="confirm-modal" class="modal-overlay hidden">
         <div class="modal-content">
-            <h2 id="confirm-title">Confirm</h2>
-            <p id="confirm-text">Are you sure?</p>
+            <h2 id="confirm-title" data-i18n="confirm_title">Confirm</h2>
+            <p id="confirm-text" data-i18n="confirm_text">Are you sure?</p>
             <div class="modal-actions">
-                <button id="btn-confirm-no" class="secondary">Cancel</button>
-                <button id="btn-confirm-yes" class="primary">Confirm</button>
+                <button id="btn-confirm-no" class="secondary" data-i18n="btn_cancel">Cancel</button>
+                <button id="btn-confirm-yes" class="primary" data-i18n="confirm_yes">Confirm</button>
             </div>
         </div>
     </div>
 
     <!-- WELCOME MODAL -->
     <div id="welcome-modal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <h2>EditFlow Pro v15</h2>
-            <p>
-                <strong>New:</strong> AI Captions powered by Whisper. Multi-language transcription with animated caption styles.
-                <br><br>
-                <strong>Improved:</strong> All operations support Cmd+Z undo. Settings persist across sessions.
-            </p>
-            <div class="modal-actions">
-                <button id="btn-welcome-close" class="primary">Get started</button>
+        <div class="modal-content welcome-content">
+            <div class="welcome-glow"></div>
+            <div class="welcome-logo">
+                <svg viewBox="0 0 64 64" width="56" height="56" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="8" y="14" width="48" height="36" rx="6"/>
+                    <path d="M26 26 l12 6 -12 6 z" fill="currentColor"/>
+                    <line x1="14" y1="20" x2="14" y2="22"/>
+                    <line x1="50" y1="20" x2="50" y2="22"/>
+                    <line x1="14" y1="42" x2="14" y2="44"/>
+                    <line x1="50" y1="42" x2="50" y2="44"/>
+                </svg>
             </div>
+            <h2 class="welcome-title">EditFlow <span class="welcome-pro">Pro</span></h2>
+            <p class="welcome-tagline" data-i18n="welcome_tagline">One-click editing for Premiere Pro</p>
+
+            <div class="welcome-features">
+                <div class="welcome-feature">
+                    <span class="welcome-feature-icon">🎚</span>
+                    <span data-i18n="welcome_f1">Smart audio · Static scale · Transform</span>
+                </div>
+                <div class="welcome-feature">
+                    <span class="welcome-feature-icon">🎬</span>
+                    <span data-i18n="welcome_f2">AI captions in 15+ languages with animated styles</span>
+                </div>
+                <div class="welcome-feature">
+                    <span class="welcome-feature-icon">🚀</span>
+                    <span data-i18n="welcome_f3">Fast export presets · One-tap paste from web</span>
+                </div>
+            </div>
+
+            <label class="welcome-dont-show">
+                <input type="checkbox" id="welcome-dont-show">
+                <span data-i18n="welcome_dont_show">Don't show this again</span>
+            </label>
+
+            <div class="modal-actions">
+                <button id="btn-welcome-close" class="primary welcome-btn" data-i18n="welcome_btn">Get Started</button>
+            </div>
+
+            <p class="welcome-credit">Crafted for video editors by <a href="#" onclick="if(window.csInterface) { window.csInterface.openURLInDefaultBrowser('https://yusur.app'); } else { require('shell').openExternal('https://yusur.app'); } return false;">Najm Media</a>.</p>
+        </div>
+    </div>
+
+    <!-- ── API SETUP WIZARD MODAL ── -->
+    <div id="setup-api-modal" class="modal-overlay hidden">
+        <div class="modal-content welcome-content" style="width: 440px;">
+            <div class="welcome-glow" style="background: radial-gradient(circle, rgba(168,85,247,0.3) 0%, transparent 70%);"></div>
+            <div class="welcome-logo" style="background: linear-gradient(135deg, #A855F7 0%, #6E8CFF 100%); margin-bottom: 20px;">
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+            </div>
+            <h2 class="welcome-title" style="font-size: 20px !important;" data-i18n="setup_api_title">Activate AI Captions</h2>
+            <p class="welcome-tagline" style="margin-bottom: 24px;" data-i18n="setup_api_desc">To get lightning-fast transcription, connect your free AI engine.</p>
+            
+            <div class="welcome-features" style="padding: 20px; text-align: left; background: rgba(0,0,0,0.2);">
+                <div style="font-size: 13px; color: var(--text); margin-bottom: 12px; display: flex; gap: 12px;">
+                    <div style="width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">1</div>
+                    <div style="line-height: 1.5;" data-i18n="setup_api_step1">Click the button below to log in and get your free Groq API key.</div>
+                </div>
+                <div style="font-size: 13px; color: var(--text); display: flex; gap: 12px;">
+                    <div style="width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">2</div>
+                    <div style="line-height: 1.5;">
+                        <span data-i18n="setup_api_step2">Paste it here:</span>
+                        <input type="password" id="setup-api-input" placeholder="gsk_..." style="margin-top: 8px; width: 100%; font-family: monospace; font-size: 12px;">
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions" style="gap: 12px; margin-top: 24px;">
+                <button onclick="if(window.csInterface) { window.csInterface.openURLInDefaultBrowser('https://console.groq.com/keys'); } else { require('shell').openExternal('https://console.groq.com/keys'); } return false;" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2);" data-i18n="setup_api_get">Get Free Key ↗</button>
+                <button id="btn-setup-api-save" class="primary welcome-btn" style="box-shadow: 0 6px 18px rgba(168,85,247,0.3) !important;" data-i18n="setup_api_activate">Activate Now</button>
+            </div>
+            <p class="welcome-dont-show" id="btn-setup-api-close" style="margin-top: 16px; cursor: pointer;" data-i18n="setup_api_cancel">Cancel</p>
         </div>
     </div>
 
@@ -88,9 +299,15 @@
             <h1>EditFlow Pro</h1>
         </div>
         <div class="header-right">
-            <div class="badge badge-pro">v15</div>
+            <button id="btn-lang-toggle" class="lang-toggle" title="عربي / English">
+                <svg class="lang-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z"/></svg>
+                <span class="lang-text">عر</span>
+            </button>
+            <div class="badge badge-pro">v17</div>
             <button class="settings-gear" id="btn-settings" data-tooltip="Customize presets and defaults">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                </svg>
             </button>
         </div>
     </div>
@@ -101,15 +318,31 @@
         <div class="action-group">
             <h3>
                 <span class="icon"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></span>
-                Audio Level
+                <span data-i18n="audio_title">Audio Level</span>
             </h3>
-            <p class="description">Select an audio clip → Nudge volume in 1 dB increments. Cmd+Z to undo.</p>
+            <p class="description" data-i18n="audio_desc">Select an audio clip → Nudge ±1 dB or set a quick preset level.</p>
 
-            <div id="audio-level-display">0 dB</div>
+            <div class="audio-wave-indicator" aria-hidden="true">
+                <span class="wave-bar"></span>
+                <span class="wave-bar"></span>
+                <span class="wave-bar"></span>
+                <span class="wave-bar"></span>
+                <span class="wave-bar"></span>
+            </div>
 
             <div class="input-row">
-                <button id="btn-audio-down" title="Decrease 1 dB">▼ −1 dB</button>
-                <button id="btn-audio-up"   title="Increase 1 dB">▲ +1 dB</button>
+                <button id="btn-audio-down" title="Decrease 1 dB"><span data-i18n="audio_down">▼ −1 dB</span></button>
+                <button id="btn-audio-up"   title="Increase 1 dB"><span data-i18n="audio_up">▲ +1 dB</span></button>
+            </div>
+
+            <!-- Quick Audio Levels -->
+            <div class="preset-row" style="margin-top:8px;">
+                <span class="preset-label" data-i18n="audio_quick">Quick</span>
+                <div class="preset-chips" id="audio-quick-chips">
+                    <button class="chip audio-level-chip" data-db="-6"  data-tooltip="Voice / Dialogue standard (-6 dB)">🎙 Voice</button>
+                    <button class="chip audio-level-chip" data-db="-12" data-tooltip="Sound effects level (-12 dB)">🔊 SFX</button>
+                    <button class="chip audio-level-chip" data-db="-25" data-tooltip="Background music level (-25 dB)">🎵 BGM</button>
+                </div>
             </div>
         </div>
 
@@ -117,16 +350,16 @@
         <div class="action-group">
             <h3>
                 <span class="icon"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></span>
-                Static Scale
+                <span data-i18n="scale_title">Static Scale</span>
             </h3>
-            <p class="description">Cut-in resize of selected clips without keyframes.</p>
+            <p class="description" data-i18n="scale_desc">Cut-in resize of selected clips without keyframes.</p>
             <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;" id="scale-grid">
-                <button id="btn-scale-115" class="scale-btn">115</button>
-                <button id="btn-scale-130" class="scale-btn">130</button>
-                <button id="btn-scale-150" class="scale-btn">150</button>
-                <button id="btn-scale-175" class="scale-btn">175</button>
-                <button id="btn-scale-200" class="scale-btn">200</button>
-                <button id="btn-scale-reset" class="scale-btn secondary">↺ 100</button>
+                <button class="scale-btn scale-preset" data-scale="115">115</button>
+                <button class="scale-btn scale-preset" data-scale="130">130</button>
+                <button class="scale-btn scale-preset" data-scale="150">150</button>
+                <button class="scale-btn scale-preset" data-scale="175">175</button>
+                <button class="scale-btn scale-preset" data-scale="200">200</button>
+                <button class="scale-btn secondary scale-preset" data-scale="100" data-reset="1">↺ 100</button>
             </div>
         </div>
 
@@ -134,76 +367,80 @@
         <div class="action-group">
             <h3>
                 <span class="icon"><svg viewBox="0 0 24 24"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></span>
-                Transform &amp; Tools
+                <span data-i18n="transform_title">Transform &amp; Tools</span>
             </h3>
+            <p class="description" data-i18n="transform_desc">Move, scale, and adjust selected clips directly on the timeline.</p>
 
+            <!-- Nudge arrows + reset -->
             <div class="input-row">
-                <button id="refresh-clip-info" title="Refresh" style="width:auto; padding:6px 10px;">↻</button>
-                <button id="nudge-left"  title="Move Left"  style="width:auto; padding:6px 10px;">◀</button>
-                <button id="nudge-up"    title="Move Up"    style="width:auto; padding:6px 10px;">▲</button>
-                <button id="nudge-down"  title="Move Down"  style="width:auto; padding:6px 10px;">▼</button>
-                <button id="nudge-right" title="Move Right" style="width:auto; padding:6px 10px;">▶</button>
-                <input type="number" id="nudge-step" value="10" min="1" max="500" title="Step size" style="width:48px; text-align:center;">
-                <span style="font-size:10px; color:var(--text-mute);">px</span>
+                <button id="reset-clip-transform" data-i18n-title="transform_reset_tip" title="Reset position to center + scale to 100%" style="width:auto; padding:6px 10px;">↺</button>
+                <button id="nudge-left"  data-i18n-title="transform_left_tip"  title="Move Left"  style="width:auto; padding:6px 10px;">◀</button>
+                <button id="nudge-up"    data-i18n-title="transform_up_tip"    title="Move Up"    style="width:auto; padding:6px 10px;">▲</button>
+                <button id="nudge-down"  data-i18n-title="transform_down_tip"  title="Move Down"  style="width:auto; padding:6px 10px;">▼</button>
+                <button id="nudge-right" data-i18n-title="transform_right_tip" title="Move Right" style="width:auto; padding:6px 10px;">▶</button>
             </div>
 
-            <div class="input-row">
-                <span style="font-size:10px; color:var(--text-mute); width:32px;">Pos</span>
-                <input type="number" id="pos-x" placeholder="X" step="0.1">
-                <input type="number" id="pos-y" placeholder="Y" step="0.1">
-                <button id="apply-position" style="width:auto; padding:6px 12px;">Set</button>
+            <!-- Step size presets -->
+            <div class="preset-row">
+                <span class="preset-label" data-i18n="transform_step">Move Step</span>
+                <div class="preset-chips" id="step-chips">
+                    <button class="chip step-chip chip-active" data-val="5">5</button>
+                    <button class="chip step-chip" data-val="10">10</button>
+                    <button class="chip step-chip" data-val="20">20</button>
+                    <button class="chip step-chip" data-val="50">50</button>
+                </div>
+                <input type="number" id="nudge-step" value="5" min="1" max="500" title="Step size in pixels">
+                <span class="unit-label" data-i18n="transform_px">pixels</span>
             </div>
 
-            <div class="input-row">
-                <span style="font-size:10px; color:var(--text-mute); width:32px;">Scl%</span>
+            <!-- Scale presets -->
+            <div class="preset-row">
+                <span class="preset-label" data-i18n="transform_scl">Scale %</span>
+                <div class="preset-chips" id="scale-chips">
+                    <button class="chip scale-chip" data-val="75">75</button>
+                    <button class="chip scale-chip" data-val="100">100</button>
+                    <button class="chip scale-chip" data-val="110">110</button>
+                    <button class="chip scale-chip" data-val="125">125</button>
+                    <button class="chip scale-chip" data-val="150">150</button>
+                </div>
                 <input type="number" id="scale-value" placeholder="100">
-                <button id="apply-scale" style="width:auto; padding:6px 12px;">Set</button>
+                <button id="apply-scale" style="width:auto; padding:6px 12px;" data-i18n="transform_set">Set</button>
             </div>
 
-            <button id="btn-paste-clipboard" data-tooltip="Paste any image copied from the internet directly onto your timeline.">
-                Paste Image from Internet
-            </button>
-            <p id="paste-status"></p>
+            <!-- Pro Tools: Flip, Fit, Anchor -->
+            <div class="preset-row" style="margin-top:4px;">
+                <span class="preset-label" data-i18n="transform_tools">Tools</span>
+                <div class="preset-chips" id="transform-tools-chips">
+                    <button class="chip tool-chip" id="btn-fit-frame" data-tooltip="Scale clip to fit inside the sequence frame">⊞ Fit</button>
+                    <button class="chip tool-chip" id="btn-center-anchor" data-tooltip="Reset anchor point to center of frame">◎ Anchor</button>
+                </div>
+            </div>
         </div>
 
-        <!-- 4. EXPORT ENGINE -->
-        <div class="action-group">
+        <!-- PASTE FROM INTERNET — standalone feature -->
+        <div class="action-group paste-group">
             <h3>
-                <span class="icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
-                Export Engine
+                <span class="icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span>
+                <span data-i18n="paste_title">Paste from Web</span>
             </h3>
-
-            <div class="input-row">
-                <span style="font-size:10px; color:var(--text-mute); white-space:nowrap;">File</span>
-                <input type="text" id="export-filename" placeholder="sequence name">
-                <span style="font-size:10px; color:var(--text-mute);">Mbps</span>
-                <input type="number" id="batch-bitrate-input" value="10" min="1" max="100" style="width:60px;">
-            </div>
-
-            <div class="input-row">
-                <span style="font-size:10px; color:var(--text-mute); white-space:nowrap;">Save to</span>
-                <input type="text" id="export-path" placeholder="Desktop/EditFlowPro_Exports">
-                <button id="btn-export-browse" style="width:auto; padding:6px 10px;">Browse</button>
-            </div>
-
-            <button id="btn-export-selected" data-tooltip="Export only the currently selected clip respecting its in/out range markers.">
-                Export Selected Clip
+            <p class="description" data-i18n="paste_desc">Copy any image from a browser → click Paste. Added to your Project bin ready to drag in.</p>
+            <button id="btn-paste-clipboard" class="paste-btn">
+                <svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:middle; margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span data-i18n="paste_btn">Paste Image from Internet</span>
             </button>
-            <button id="btn-export-all" class="secondary" data-tooltip="Export the entire timeline as one continuous video file." style="margin-top:8px;">
-                Export All Timeline Clips
-            </button>
+            <p id="paste-status" style="font-size:11px; color:var(--text-mute); margin:6px 0 0; text-align:center;"></p>
         </div>
 
-        <!-- 5. AI CAPTIONS — brand-feature highlight -->
+        <!-- 4. FAST CAPTIONS — brand-feature highlight -->
         <div class="action-group brand-feature">
             <h3>
                 <span class="icon"><svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
-                AI Captions
+                <span data-i18n="captions_title">Fast Captions</span>
             </h3>
-            <p class="description">Whisper transcription with animated captions placed on the timeline.</p>
+            <p class="description" data-i18n="captions_desc">Lightning-fast, studio-grade transcription. Auto-detect any language and get perfectly synced editable subtitles in seconds.</p>
 
             <div class="input-row">
-                <span style="font-size:10px; color:var(--text-mute); width:42px;">Lang</span>
+                <span style="font-size:10px; color:var(--text-mute); width:42px;" data-i18n="cap_lang">Lang</span>
                 <select id="cap-language" style="flex:1;" data-tooltip="Language of the spoken audio.">
                     <option value="auto" selected>Auto-detect</option>
                     <option value="ar">Arabic</option>
@@ -221,110 +458,60 @@
                     <option value="hi">Hindi</option>
                     <option value="ur">Urdu</option>
                 </select>
-                <span style="font-size:10px; color:var(--text-mute); width:42px;">Model</span>
-                <select id="cap-model" style="flex:1;" data-tooltip="Larger = more accurate but slower.">
-                    <option value="tiny">tiny · 75 MB</option>
-                    <option value="base">base · 140 MB</option>
-                    <option value="small" selected>small · 460 MB</option>
-                    <option value="medium">medium · 1.5 GB</option>
-                    <option value="large">large · 3 GB</option>
+                <span style="font-size:10px; color:var(--text-mute); width:42px;" data-i18n="cap_accuracy">Accuracy</span>
+                <select id="cap-model" style="flex:1;" data-tooltip="Speed vs Accuracy balance.">
+                    <option value="small">Standard Speed</option>
+                    <option value="large" selected>Maximum Accuracy (Pro)</option>
                 </select>
             </div>
 
+            <!-- STYLE -->
             <div class="input-row">
-                <span style="font-size:10px; color:var(--text-mute); width:42px;">Style</span>
-                <select id="cap-style" style="flex:1;">
+                <span style="font-size:10px; color:var(--text-mute); width:42px;" data-i18n="cap_style">Style</span>
+                <select id="cap-style" style="flex:1;" data-tooltip="How text is segmented on screen.">
                     <option value="word">Word-by-word</option>
                     <option value="phrase" selected>Short phrases</option>
                     <option value="line">Full lines</option>
                 </select>
-                <span style="font-size:10px; color:var(--text-mute); width:42px;">Anim</span>
-                <select id="cap-animation" style="flex:1;">
-                    <option value="pop" selected>Pop</option>
-                    <option value="fade">Fade</option>
-                    <option value="slide-up">Slide Up</option>
-                    <option value="bounce">Bounce</option>
-                    <option value="karaoke">Karaoke</option>
-                    <option value="typewriter">Typewriter</option>
-                    <option value="shake">Shake</option>
-                    <option value="glow">Glow Pulse</option>
-                    <option value="none">None</option>
-                </select>
             </div>
 
-            <div class="input-row">
-                <span style="font-size:10px; color:var(--text-mute); width:42px;">Font</span>
-                <select id="cap-font" style="flex:1;">
-                    <optgroup label="Latin">
-                        <option value="Inter" selected>Inter</option>
-                        <option value="Arial">Arial</option>
-                        <option value="Helvetica">Helvetica</option>
-                        <option value="Impact">Impact</option>
-                        <option value="Montserrat">Montserrat</option>
-                    </optgroup>
-                    <optgroup label="Arabic">
-                        <option value="Makeen">مكين — Makeen</option>
-                        <option value="VIP Hala Bold">VIP Hala Bold</option>
-                        <option value="Digi Madasi Bold">Digi Madasi Bold</option>
-                        <option value="MadaniArabic-Bold">Madani Arabic Bold</option>
-                        <option value="MadaniArabic-Light">Madani Arabic Light</option>
-                        <option value="MadaniArabic-Thin">Madani Arabic Thin</option>
-                    </optgroup>
-                </select>
-                <span style="font-size:10px; color:var(--text-mute); width:30px;">Size</span>
-                <select id="cap-size" style="width:74px;" title="Caption font size">
-                    <option value="32">32 px</option>
-                    <option value="48">48 px</option>
-                    <option value="64">64 px</option>
-                    <option value="72" selected>72 px</option>
-                    <option value="96">96 px</option>
-                    <option value="120">120 px</option>
-                    <option value="160">160 px</option>
-                    <option value="200">200 px</option>
-                    <option value="250">250 px</option>
-                    <option value="300">300 px</option>
-                </select>
-                <div style="position:relative;display:inline-flex;align-items:center;gap:4px;">
-                    <span id="cap-color-swatch" class="color-swatch" style="background:#ffffff;" title="Caption color"></span>
-                    <input type="text" id="cap-color" value="#ffffff" maxlength="7" style="width:58px;" placeholder="#ffffff">
-                    <div id="cap-color-palette" class="color-palette hidden"></div>
-                </div>
-                <div style="position:relative;display:inline-flex;align-items:center;gap:4px;">
-                    <span id="cap-hl-swatch" class="color-swatch" style="background:#1F8FFF;" title="Highlight color"></span>
-                    <input type="text" id="cap-highlight" value="#1F8FFF" maxlength="7" style="width:58px;" placeholder="#1F8FFF">
-                    <div id="cap-hl-palette" class="color-palette hidden"></div>
-                </div>
-            </div>
-
-            <button id="btn-generate-captions" data-tooltip="Transcribe with Whisper and place animated captions on the timeline." style="margin-top:8px;">
-                Generate Animated Captions
+            <button id="btn-generate-captions" data-tooltip="Generate captions and place them on the timeline." style="margin-top:8px;" data-i18n="cap_generate">
+                ⚡ Generate Editable Subtitles
             </button>
+
+            <!-- SRT UPGRADE HINT -->
+            <p id="cap-upgrade-hint" style="display:none; font-size:10px; color:var(--text-mute); margin-top:10px; text-align:center; padding: 6px; background: rgba(255,255,255,0.05); border-radius: 4px;">
+                💡 <b>Tip:</b> To add transitions, Go to:<br>
+                <b>Graphics and Titles &gt; Upgrade Caption to Graphic</b>
+            </p>
             <p id="cap-status"></p>
         </div>
 
-        <!-- 6. AI BEAT DETECTION -->
+        <!-- 5. EXPORT ENGINE -->
         <div class="action-group">
             <h3>
-                <span class="icon"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
-                AI Beat Detection
+                <span class="icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+                <span data-i18n="export_title">Export Engine</span>
             </h3>
+
             <div class="input-row">
-                <select id="beat-band-select" style="flex:1;" data-tooltip="Filter which percussion hits to detect.">
-                    <option value="all">All Percussion</option>
-                    <option value="kicks">Kicks</option>
-                    <option value="snares">Snares</option>
-                    <option value="hihats">Hi-Hats</option>
-                </select>
-                <select id="beat-precision-select" style="flex:1;" data-tooltip="Higher precision = slower but more accurate.">
-                    <option value="normal">Normal</option>
-                    <option value="precision" selected>Precision</option>
-                </select>
+                <span style="font-size:10px; color:var(--text-mute); white-space:nowrap;" data-i18n="export_file">File</span>
+                <input type="text" id="export-filename" data-i18n-placeholder="export_file_ph" placeholder="sequence name">
+                <span style="font-size:10px; color:var(--text-mute);">Mbps</span>
+                <input type="number" id="batch-bitrate-input" value="10" min="1" max="100" style="width:60px;">
             </div>
-            <button id="btn-beat-markers" data-tooltip="Analyze audio and place sequence markers on every detected beat.">
-                Place Musical Markers
+
+            <div class="input-row">
+                <span style="font-size:10px; color:var(--text-mute); white-space:nowrap;" data-i18n="export_saveto">Save to</span>
+                <input type="text" id="export-path" placeholder="Desktop/EditFlowPro_Exports">
+                <button id="btn-export-browse" style="width:auto; padding:6px 10px;" data-i18n="export_browse">Browse</button>
+            </div>
+
+            <button id="btn-export-selected" data-tooltip="Export only the currently selected clip respecting its in/out range markers." data-i18n="export_selected">
+                Export Selected Clip
             </button>
-            <button id="btn-clear-markers" data-tooltip="Remove all sequence markers." style="margin-top:8px;">
-                Clear All Markers
+            <button id="btn-capture-frame" class="secondary" data-tooltip="Capture the current frame at the playhead and copy it to your clipboard. Paste anywhere instantly." style="margin-top:8px;" data-i18n="export_capture">
+                📷 Capture Frame
             </button>
         </div>
 
@@ -339,12 +526,12 @@
         <!-- STATUS BAR -->
         <div class="status-box status-info" id="status-box">
             <div class="pulsing-orb"></div>
-            <span id="status-text">EditFlow Pro · ready</span>
+            <span id="status-text" data-i18n="status_ready">EditFlow Pro · ready</span>
         </div>
     </div>
 
     <div id="ai-insights-panel" class="ai-insights hidden">
-        <h4>Task Report</h4><p id="ai-insight-text"></p>
+        <h4 data-i18n="task_report">Task Report</h4><p id="ai-insight-text"></p>
     </div>
 
     <script src="js/dspTools.js"></script>

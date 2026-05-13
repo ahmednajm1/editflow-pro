@@ -138,9 +138,9 @@ def transcribe(ffmpeg, mp3, api_key, language):
     is_english = (language == "en")
     dur = audio_duration(ffmpeg, mp3)
 
-    # For English: chunk into ~15s segments to prevent Whisper's
+    # For English: chunk into ~25s segments to prevent Whisper's
     # early-stopping bug. For other languages: only chunk when >24 MB.
-    CHUNK_SECS = 15 if is_english else 9999
+    CHUNK_SECS = 25 if is_english else 9999
     if is_english and dur > CHUNK_SECS:
         n = math.ceil(dur / CHUNK_SECS)
         log(f"English: splitting {dur:.1f}s into {n} chunks of ~{CHUNK_SECS}s")
@@ -152,9 +152,10 @@ def transcribe(ffmpeg, mp3, api_key, language):
 
     cdur = dur / n
     results = []
+    base, ext = os.path.splitext(mp3)
     for i in range(n):
         s, e  = i * cdur, min((i+1) * cdur, dur)
-        chunk = mp3.replace(".mp3", f"_c{i}.mp3")
+        chunk = f"{base}_c{i}{ext}"
         subprocess.run([ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
                         "-i", mp3, "-ss", f"{s:.3f}", "-to", f"{e:.3f}",
                         "-c", "copy", chunk], check=True)

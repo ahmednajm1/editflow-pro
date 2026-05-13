@@ -1,4 +1,4 @@
-// hostscript.jsx - EditFlow Pro v15.2
+// hostscript.jsx - EditFlow Pro v17
 // ES3 only. Locale-independent component matching.
 
 var TICKS_PER_SECOND = 254016000000;
@@ -520,11 +520,33 @@ $._editflow = {
         try {
             var sel = seq.getSelection();
             if (sel && sel.length > 0) {
+                // Collect ALL selected clips (not just the first one)
+                var clips = [];
+                var seenStarts = {}; // To prevent duplicating linked video/audio clips
                 for (var i = 0; i < sel.length; i++) {
                     if (sel[i].projectItem) {
-                        var p = buildPayload(sel[i]);
-                        if (p) return p;
+                        var tlStart = 0;
+                        try { tlStart = me.ticksToSec(sel[i].start.ticks).toFixed(3); } catch(e) {}
+                        var mp = sel[i].projectItem.getMediaPath();
+                        var key = mp + "_" + tlStart;
+                        if (!seenStarts[key]) {
+                            var p = buildPayload(sel[i]);
+                            if (p) {
+                                clips.push(p);
+                                seenStarts[key] = true;
+                            }
+                        }
                     }
+                }
+                if (clips.length === 1) {
+                    return clips[0]; // single clip — return as-is for backward compat
+                } else if (clips.length > 1) {
+                    // Sort by timelineStart so captions are in order
+                    clips.sort(function(a, b) {
+                        var ja = JSON.parse(a), jb = JSON.parse(b);
+                        return (ja.timelineStart || 0) - (jb.timelineStart || 0);
+                    });
+                    return '{"status":"multi","clips":[' + clips.join(",") + ']}';
                 }
             }
         } catch(e) {}
@@ -2475,6 +2497,360 @@ $._editflow.scanPremiereInfo = function() {
         info.captionTracks = captionInfo;
 
         return '{"status":"success","info":' + JSON.stringify(info) + '}';
+    } catch(e) {
+        return '{"status":"error","message":"' + e.message + '"}';
+    }
+};
+
+// =========================================================
+// AUDIO QUICK LEVELS — set absolute dB on selected clips
+// Premiere Beta has a +15dB offset, so we compensate
+// =========================================================
+$._editflow.setAudioLevel = function(targetDbStr) {
+    try {
+        var targetDb = parseFloat(targetDbStr);
+        if (isNaN(targetDb)) return '{"status":"error","message":"Invalid dB value"}';
+
+        // Premiere Beta applies a +15dB internal offset.
+        // To get the desired dB readout, subtract 15 from the target.
+        var correctedDb = targetDb - 15;
+        var targetLinear = Math.pow(10, correctedDb / 20.0);
+
+        var seq = app.project.activeSequence;
+        if (!seq) return '{"status":"error","message":"No active sequence"}';
+
+        var count = 0;
+        var sel = seq.getSelection();
+        if (!sel || sel.length === 0) return '{"status":"error","message":"Select an audio clip first."}';
+
+        for (var i = 0; i < sel.length; i++) {
+            var clip = sel[i];
+            if (!clip.components) continue;
+            for (var c = 0; c < clip.components.numItems; c++) {
+                var comp = clip.components[c];
+                var cdn = comp.displayName;
+                if (cdn !== "Volume" && cdn !== "\u0645\u0633\u062A\u0648\u0649 \u0627\u0644\u0635\u0648\u062A" && cdn !== "Volumen") continue;
+                for (var p = 0; p < comp.properties.numItems; p++) {
+                    var prop = comp.properties[p];
+                    var pdn = prop.displayName;
+                    if (pdn !== "Level" && pdn !== "\u0645\u0633\u062A\u0648\u0649" && pdn !== "Nivel" && pdn !== "Pegel") continue;
+                    if (prop.isTimeVarying()) prop.setTimeVarying(false);
+                    prop.setValue(targetLinear, 1);
+                    count++;
+                }
+            }
+        }
+
+        if (count > 0) {
+            return '{"status":"success","message":"Set to ' + targetDb + ' dB on ' + count + ' clips","count":' + count + '}';
+        }
+        return '{"status":"error","message":"Selected clip has no Volume component."}';
+    } catch(e) {
+        return '{"status":"error","message":"' + e.message + '"}';
+    }
+};
+
+// =========================================================
+// CAPTURE FRAME — Get source clip info at playhead for ffmpeg
+// Returns media path + exact source timestamp for direct extraction
+// =========================================================
+$._editflow.getPlayheadFrameInfo = function() {
+    try {
+        var seq = app.project.activeSequence;
+        if (!seq) return '{"status":"error","message":"No active sequence"}';
+
+        var time = seq.getPlayerPosition();
+        if (!time) return '{"status":"error","message":"Cannot read playhead"}';
+
+        // ATTEMPT 1: Native Timeline Frame Export (Premiere 24.0+)
+        var tempPng = Folder.temp.fsName + "/editflow_frame_" + new Date().getTime() + ".png";
+        var safeTempPng = tempPng.replace(/\\/g, "/");
+        try {
+            if (typeof seq.exportFramePNG === 'function') {
+                seq.exportFramePNG(time.ticks, safeTempPng);
+                if (new File(safeTempPng).exists) {
+                    return '{"status":"success","method":"native","path":"' + safeTempPng + '"}';
+                }
+            }
+        } catch(e) {}
+        
+        // ATTEMPT 2: Fallback to FFmpeg Source Extraction (No timeline effects)
+        for (var t = seq.videoTracks.numTracks - 1; t >= 0; t--) {
+            var track = seq.videoTracks[t];
+            try { if (track.isMuted()) continue; } catch(e) {}
+
+            for (var c = 0; c < track.clips.numItems; c++) {
+                var clip = track.clips[c];
+                if (time.ticks >= clip.start.ticks && time.ticks < clip.end.ticks) {
+                    var mediaPath = "";
+                    try { mediaPath = clip.projectItem.getMediaPath(); } catch(e) {}
+                    if (!mediaPath) continue;
+
+                    // Source time = clip in-point + (playhead - clip start on timeline)
+                    var clipInSec = 0, clipOutSec = 0, startSec = 0, endSec = 0, playheadSec = 0;
+                    try { clipInSec = clip.inPoint.seconds; } catch(e) {}
+                    try { clipOutSec = clip.outPoint.seconds; } catch(e) {}
+                    try { startSec = clip.start.seconds; } catch(e) {}
+                    try { endSec = clip.end.seconds; } catch(e) {}
+                    try { playheadSec = time.seconds; } catch(e) {}
+                    
+                    var timelineDur = endSec - startSec;
+                    var sourceDur = clipOutSec - clipInSec;
+                    var speedRatio = timelineDur > 0 ? (sourceDur / timelineDur) : 1.0;
+                    
+                    var sourceTimeSec = clipInSec + ((playheadSec - startSec) * speedRatio);
+
+                    // Escape backslashes in path for JSON
+                    var safePath = mediaPath.replace(/\\/g, "/");
+
+                    return '{"status":"success","mediaPath":"' + safePath + '","sourceTime":' + sourceTimeSec.toFixed(6) + '}';
+                }
+            }
+        }
+        return '{"status":"error","message":"No video clip found at playhead"}';
+    } catch(e) {
+        return '{"status":"error","message":"' + e.message.replace(/"/g, "'") + '"}';
+    }
+};
+
+// =========================================================
+// CAPTURE FRAME — Native Export via Media Direct
+// Captures timeline effects perfectly without ffmpeg math
+// =========================================================
+$._editflow.exportNativeFrame = function(presetPath, tempDir) {
+    try {
+        var seq = app.project.activeSequence;
+        if (!seq) return '{"status":"error","message":"No active sequence"}';
+        var time = seq.getPlayerPosition();
+        
+        var oldIn = seq.getInPointAsTime().ticks;
+        var oldOut = seq.getOutPointAsTime().ticks;
+        
+        // Set In/Out to exactly the playhead (duration of 1 tick)
+        seq.setInPoint(time.ticks);
+        seq.setOutPoint(String(Number(time.ticks) + 254016000)); 
+        
+        var baseName = "editflow_frame_" + new Date().getTime();
+        var outPath = tempDir + "/" + baseName + ".png"; 
+        
+        // Export using Sequence In/Out (1)
+        seq.exportAsMediaDirect(outPath, presetPath, 1);
+        
+        return '{"status":"success","method":"media_direct","baseName":"' + baseName + '","tempDir":"' + tempDir + '","oldIn":"' + oldIn + '","oldOut":"' + oldOut + '"}';
+    } catch(e) {
+        return '{"status":"error","message":"' + e.message.replace(/"/g, "'") + '"}';
+    }
+};
+
+$._editflow.restoreInOut = function(inTicks, outTicks) {
+    try {
+        var seq = app.project.activeSequence;
+        if (seq) {
+            seq.setInPoint(inTicks);
+            seq.setOutPoint(outTicks);
+        }
+    } catch(e) {}
+};
+
+// =========================================================
+// CENTER ANCHOR POINT — Reset anchor to clip center
+// Detects coordinate system from Position property
+// =========================================================
+$._editflow.centerAnchorPoint = function() {
+    try {
+        var seq = app.project.activeSequence;
+        if (!seq) return '{"status":"error","message":"No active sequence"}';
+
+        var sel = seq.getSelection();
+        if (!sel || sel.length === 0) return '{"status":"error","message":"Select a video clip first."}';
+
+        var seqW = seq.frameSizeHorizontal;
+        var seqH = seq.frameSizeVertical;
+        var count = 0;
+        var me = this;
+
+        for (var i = 0; i < sel.length; i++) {
+            var clip = sel[i];
+            if (clip.mediaType !== "Video") continue;
+
+            // Use existing helper to detect coordinate system
+            var posInfo = me._findPositionInfo(clip);
+            if (!posInfo) continue;
+
+            var compName = posInfo.compName;
+            var curPos = posInfo.prop.getValue();
+
+            // Detect normalized vs pixel coords from current position values
+            var isNormalized = (compName === "Align and Transform" || compName === "Transform" ||
+                                (Math.abs(curPos[0]) < 50 && Math.abs(curPos[1]) < 50));
+
+            // Find anchor point in the same component
+            var motionComp = null;
+            for (var c = 0; c < clip.components.numItems; c++) {
+                var dn = clip.components[c].displayName;
+                if (dn === compName) {
+                    motionComp = clip.components[c];
+                    break;
+                }
+            }
+            if (!motionComp) continue;
+
+            var anchorProp = null;
+            for (var p = 0; p < motionComp.properties.numItems; p++) {
+                var pn = motionComp.properties[p].displayName;
+                if (pn === "Anchor Point" || pn === "\u0646\u0642\u0637\u0629 \u0627\u0644\u0627\u0631\u062A\u0643\u0627\u0632" || pn === "Ankerpunkt" || pn === "Punto de anclaje" || pn.toLowerCase() === "anchor point") {
+                    anchorProp = motionComp.properties[p];
+                    break;
+                }
+            }
+
+            if (anchorProp) {
+                if (anchorProp.isTimeVarying()) anchorProp.setTimeVarying(false);
+
+                if (isNormalized) {
+                    // Normalized: center is (0.5, 0.5)
+                    anchorProp.setValue([0.5, 0.5]);
+                } else {
+                    // Pixel coords: center is (seqW/2, seqH/2)
+                    anchorProp.setValue([seqW / 2, seqH / 2]);
+                }
+                count++;
+            }
+        }
+
+        if (count > 0) return '{"status":"success","message":"Anchor Point centered on ' + count + ' clips","count":' + count + '}';
+        return '{"status":"error","message":"Could not find Anchor Point property. Select video clips."}';
+    } catch(e) {
+        return '{"status":"error","message":"' + e.message + '"}';
+    }
+};
+
+// =========================================================
+// FIT TO FRAME — Scale clip to fill sequence dimensions
+// =========================================================
+$._editflow.fitToFrame = function(mode) {
+    try {
+        var seq = app.project.activeSequence;
+        if (!seq) { return '{"status":"error","message":"No active sequence"}'; }
+
+        var sel = seq.getSelection();
+        if (!sel || sel.length === 0) { return '{"status":"error","message":"Select a video clip first."}'; }
+
+        var seqW = seq.frameSizeHorizontal;
+        var seqH = seq.frameSizeVertical;
+        var count = 0;
+        var me = this;
+
+        for (var i = 0; i < sel.length; i++) {
+            var clip = sel[i];
+            if (clip.mediaType !== "Video") continue;
+
+            var srcW = 0, srcH = 0;
+            try {
+                var meta = clip.projectItem.getProjectMetadata();
+                if (meta) {
+                    var wMatch = meta.match(/premierePrivateProjectMetaData:Column\.Intrinsic\.VideoInfo[^>]*>([^<]+)/);
+                    if (wMatch) {
+                        var dims = wMatch[1].match(/(\d+)\s*x\s*(\d+)/i);
+                        if (dims) { srcW = parseInt(dims[1]); srcH = parseInt(dims[2]); }
+                    }
+                }
+            } catch(e) {}
+
+            if (!srcW || !srcH) {
+                try {
+                    var colMeta = clip.projectItem.getProjectColumnsMetadata();
+                    if (colMeta) {
+                        var vInfoMatch = colMeta.match(/(\d+)\s*x\s*(\d+)/);
+                        if (vInfoMatch) { srcW = parseInt(vInfoMatch[1]); srcH = parseInt(vInfoMatch[2]); }
+                    }
+                } catch(e) {}
+            }
+
+            if (!srcW || !srcH) {
+                try {
+                    var xmpNode = clip.projectItem;
+                    var fwKeys = ["Column.Intrinsic.MediaFrameWidth", "Column.Intrinsic.VideoWidth"];
+                    var fhKeys = ["Column.Intrinsic.MediaFrameHeight", "Column.Intrinsic.VideoHeight"];
+                    for (var fk = 0; fk < fwKeys.length; fk++) {
+                        try {
+                            var wVal = xmpNode.getProjectMetadata().match(new RegExp(fwKeys[fk] + "[^>]*>([^<]+)"));
+                            if (wVal) srcW = parseInt(wVal[1]);
+                        } catch(e) {}
+                    }
+                    for (var fk2 = 0; fk2 < fhKeys.length; fk2++) {
+                        try {
+                            var hVal = xmpNode.getProjectMetadata().match(new RegExp(fhKeys[fk2] + "[^>]*>([^<]+)"));
+                            if (hVal) srcH = parseInt(hVal[1]);
+                        } catch(e) {}
+                    }
+                } catch(e) {}
+            }
+
+            if (!srcW || srcW <= 0) srcW = seqW;
+            if (!srcH || srcH <= 0) srcH = seqH;
+
+            var scaleX = (seqW / srcW) * 100;
+            var scaleY = (seqH / srcH) * 100;
+            var targetScale = (mode === "fill") ? Math.max(scaleX, scaleY) : Math.min(scaleX, scaleY);
+
+            var scaleInfo = me._findScaleProp(clip);
+            if (scaleInfo) {
+                if (scaleInfo.prop.isTimeVarying()) scaleInfo.prop.setTimeVarying(false);
+                scaleInfo.prop.setValue(targetScale, true);
+
+                var posInfo = me._findPositionInfo(clip);
+                if (posInfo) {
+                    var curVal = posInfo.prop.getValue();
+                    var compName = posInfo.compName;
+                    var isNorm = (compName === "Align and Transform" || compName === "Transform" ||
+                                  (Math.abs(curVal[0]) < 50 && Math.abs(curVal[1]) < 50));
+                    if (isNorm) {
+                        posInfo.prop.setValue([0.5, 0.5], true);
+                    } else {
+                        posInfo.prop.setValue([seqW / 2, seqH / 2], true);
+                    }
+                }
+                count++;
+            }
+        }
+
+        if (count > 0) {
+            var modeLabel = (mode === "fill") ? "Fill" : "Fit";
+            return '{"status":"success","message":"' + modeLabel + ' applied to ' + count + ' clips","count":' + count + '}';
+        }
+        return '{"status":"error","message":"Could not find Scale property on selected clips."}';
+    } catch(e) {
+        return '{"status":"error","message":"' + e.message + '"}';
+    }
+};
+
+// =========================================================
+// APPLY DEFAULT AUDIO TRANSITION — uses executeCommand
+// Applies the user's default audio transition (typically
+// Constant Power) to the selected edit points/clips.
+// =========================================================
+$._editflow.applyDefaultAudioTransition = function() {
+    try {
+        var seq = app.project.activeSequence;
+        if (!seq) return '{"status":"error","message":"No active sequence"}';
+
+        // Command ID 1107 = "Apply Audio Transition"
+        // Command ID 85  = Fallback for some versions
+        var applied = false;
+        var cmdIds = [1107, 85];
+        for (var i = 0; i < cmdIds.length; i++) {
+            try {
+                app.executeCommand(cmdIds[i]);
+                applied = true;
+                break;
+            } catch(e) {}
+        }
+
+        if (applied) {
+            return '{"status":"success","message":"Default audio transition applied"}';
+        }
+        return '{"status":"error","message":"Could not apply audio transition. Set a default transition in Premiere preferences."}';
     } catch(e) {
         return '{"status":"error","message":"' + e.message + '"}';
     }
