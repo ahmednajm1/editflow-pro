@@ -49,8 +49,6 @@ ok "Extension files installed"
 step "Configuring permissions..."
 xattr -dr com.apple.quarantine "$EFP_DEST" 2>/dev/null || true
 chmod -R u+rX "$EFP_DEST"
-[[ -f "$EFP_DEST/bin/whisper-cli" ]] && chmod +x "$EFP_DEST/bin/whisper-cli"
-[[ -d "$EFP_DEST/bin/lib"         ]] && chmod +x "$EFP_DEST/bin/lib/"*.dylib 2>/dev/null || true
 ok "Permissions set"
 
 # ─── AI Caption Engine (standalone binaries — persistent location) ─────────────
@@ -66,50 +64,6 @@ if curl -fL --progress-bar "${EFP_AI_BASE}/whisper_runner" -o "$EFP_DATA_DIR/whi
   ok "AI transcription engine installed"
 else
   warn "AI engine download failed — open Premiere and follow the in-panel download prompt"
-fi
-
-if curl -fL --progress-bar "${EFP_AI_BASE}/caption_renderer" -o "$EFP_DATA_DIR/caption_renderer" 2>/dev/null; then
-  chmod +x "$EFP_DATA_DIR/caption_renderer"
-  xattr -d com.apple.quarantine "$EFP_DATA_DIR/caption_renderer" 2>/dev/null || true
-  ok "Caption renderer installed"
-else
-  warn "Caption renderer download failed — animated captions (MOV mode) unavailable"
-fi
-
-# whisper_runner needs whisper-cli alongside it in the same directory
-if [[ -f "$EFP_DEST/bin/whisper-cli" ]]; then
-  cp "$EFP_DEST/bin/whisper-cli" "$EFP_DATA_DIR/"
-  chmod +x "$EFP_DATA_DIR/whisper-cli"
-  xattr -d com.apple.quarantine "$EFP_DATA_DIR/whisper-cli" 2>/dev/null || true
-  if [[ -d "$EFP_DEST/bin/lib" ]]; then
-    mkdir -p "$EFP_DATA_DIR/lib"
-    cp "$EFP_DEST/bin/lib/"*.dylib "$EFP_DATA_DIR/lib/" 2>/dev/null || true
-    xattr -dr com.apple.quarantine "$EFP_DATA_DIR/lib" 2>/dev/null || true
-  fi
-  ok "whisper-cli engine ready"
-fi
-
-# ─── GGML backend plugins (shared, system-wide writable location) ──────────────
-# libggml.0.dylib hardcodes /Users/Shared/EditFlowPro/lib for plugin search.
-# Install BLAS/Metal/CPU backends + libomp + libggml-base there.
-SHARED_LIB="/Users/Shared/EditFlowPro/lib"
-mkdir -p "$SHARED_LIB"
-TMP_PLUGINS="$(mktemp /tmp/efp_plugins_XXXXXX.tar.gz)"
-if curl -fL --progress-bar "${EFP_AI_BASE}/ggml_plugins.tar.gz" -o "$TMP_PLUGINS"; then
-  tar xzf "$TMP_PLUGINS" -C "$SHARED_LIB"
-  rm -f "$TMP_PLUGINS"
-  xattr -dr com.apple.quarantine "$SHARED_LIB" 2>/dev/null || true
-  chmod -R a+rX "$SHARED_LIB"         # readable by ALL users
-  chmod a+x "$SHARED_LIB"/*.so 2>/dev/null || true  # dlopen needs +x on .so
-  ok "GGML backends installed"
-else
-  warn "GGML backend download failed — AI Captions may fail"
-fi
-
-# ─── Intel Mac: warn about whisper-cli ────────────────────────────────────────
-if [[ "$ARCH" == "x86_64" ]]; then
-  warn "Intel Mac detected — AI Captions requires whisper-cpp:"
-  warn "Run:  brew install whisper-cpp ffmpeg"
 fi
 
 # ─── Adobe PlayerDebugMode ────────────────────────────────────────────────────

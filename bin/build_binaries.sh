@@ -1,19 +1,15 @@
 #!/bin/bash
 # ─────────────────────────────────────────────────────────────────────────────
 #  EditFlow Pro — AI Caption Engine Build Script
-#  Builds two universal2 standalone binaries (Intel + Apple Silicon):
+#  Builds a universal2 standalone binary (Intel + Apple Silicon):
 #    • whisper_runner   ← from transcriber.py
-#    • caption_renderer ← from caption_renderer.py
-#
-#  Prerequisites (one-time):
-#    pip3 install pyinstaller pillow arabic-reshaper python-bidi
 #
 #  Usage:
 #    cd /path/to/EditFlowPro/bin
 #    bash build_binaries.sh
 #
 #  Output goes to:  bin/dist/
-#  Upload to GitHub Releases: whisper_runner  and  caption_renderer
+#  Upload to GitHub Releases: whisper_runner
 # ─────────────────────────────────────────────────────────────────────────────
 set -e
 
@@ -52,7 +48,6 @@ source "$VENV_DIR/bin/activate"
 step "Installing build dependencies..."
 pip install --quiet --upgrade pip
 pip install --quiet pyinstaller
-pip install --quiet pillow arabic-reshaper python-bidi
 ok "Dependencies installed"
 echo "  PyInstaller: $(pyinstaller --version)"
 
@@ -78,20 +73,9 @@ pyinstaller "${COMMON_FLAGS[@]}" \
     "$SCRIPT_DIR/transcriber.py"
 ok "whisper_runner built"
 
-# ── Build caption_renderer (from caption_renderer.py) ─────────────────────────
-step "Building caption_renderer (caption_renderer.py → standalone binary)..."
-pyinstaller "${COMMON_FLAGS[@]}" \
-    --name caption_renderer \
-    --collect-all PIL \
-    --hidden-import arabic_reshaper \
-    --hidden-import bidi \
-    --hidden-import bidi.algorithm \
-    "$SCRIPT_DIR/caption_renderer.py"
-ok "caption_renderer built"
-
 # ── Verify and report ──────────────────────────────────────────────────────────
 step "Verifying output..."
-for BIN in whisper_runner caption_renderer; do
+for BIN in whisper_runner; do
     BIN_PATH="$DIST_DIR/$BIN"
     if [[ -f "$BIN_PATH" ]]; then
         SIZE=$(du -sh "$BIN_PATH" | cut -f1)
@@ -113,7 +97,6 @@ echo "  │   Next steps:                                        │"
 echo "  │   1. Go to GitHub → editflow-pro → Releases         │"
 echo "  │   2. Create/edit release tag v16                    │"
 echo "  │   3. Upload:  dist/whisper_runner                   │"
-echo "  │              dist/caption_renderer                  │"
 echo "  │   4. No need to touch the extension ZIP             │"
 echo "  └──────────────────────────────────────────────────────┘"
 echo -e "${NC}"

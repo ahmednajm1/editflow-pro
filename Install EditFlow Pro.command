@@ -50,7 +50,6 @@ echo -e "  ${G}✓  Extension installed${NC}"
 # ── Remove quarantine ─────────────────────────────────────────────────────────
 xattr -dr com.apple.quarantine "$EFP_DEST" 2>/dev/null || true
 chmod -R u+rX "$EFP_DEST"
-[[ -f "$EFP_DEST/bin/whisper-cli" ]] && chmod +x "$EFP_DEST/bin/whisper-cli"
 
 # ── Download AI Caption Engine (persistent — survives extension updates) ───────
 echo ""
@@ -64,33 +63,6 @@ if curl -fL --progress-bar "${BASE_URL}/whisper_runner" -o "$EFP_DATA/whisper_ru
 else
   echo -e "  ${Y}⚠  AI engine download failed — download it later from inside the panel${NC}"
 fi
-
-if curl -fL --progress-bar "${BASE_URL}/caption_renderer" -o "$EFP_DATA/caption_renderer"; then
-  chmod +x "$EFP_DATA/caption_renderer"
-  xattr -d com.apple.quarantine "$EFP_DATA/caption_renderer" 2>/dev/null || true
-  echo -e "  ${G}✓  Caption renderer installed${NC}"
-else
-  echo -e "  ${Y}⚠  Caption renderer download failed — animated captions unavailable${NC}"
-fi
-
-# whisper_runner needs whisper-cli alongside it
-if [[ -f "$EFP_DEST/bin/whisper-cli" ]]; then
-  cp "$EFP_DEST/bin/whisper-cli" "$EFP_DATA/"
-  chmod +x "$EFP_DATA/whisper-cli"
-  xattr -d com.apple.quarantine "$EFP_DATA/whisper-cli" 2>/dev/null || true
-  if [[ -d "$EFP_DEST/bin/lib" ]]; then
-    # Force-remove old lib to prevent stale libggml from persisting
-    rm -rf "$EFP_DATA/lib"
-    mkdir -p "$EFP_DATA/lib"
-    cp "$EFP_DEST/bin/lib/"*.dylib "$EFP_DATA/lib/"
-    xattr -dr com.apple.quarantine "$EFP_DATA/lib" 2>/dev/null || true
-    chmod -R a+rX "$EFP_DATA/lib"
-  fi
-  echo -e "  ${G}✓  Speech engine ready${NC}"
-fi
-
-# ── NOTE: GGML backends are now compiled statically into whisper-cli ──────────
-# No separate plugin download needed. whisper-cli is self-contained.
 
 # ── Enable in Adobe Premiere ──────────────────────────────────────────────────
 echo ""
