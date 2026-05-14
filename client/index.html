@@ -347,27 +347,27 @@
         </div>
 
         <!-- 2. TRANSFORM & TOOLS (UNIFIED) -->
-        <div class="transform-section" dir="rtl" style="margin-top:12px; margin-bottom:12px;">
+        <div class="transform-section" style="margin-top:12px; margin-bottom:12px;">
             <div class="section-header">
-                <span class="section-icon">⊹</span>
+                <span class="section-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></span>
                 <div>
-                <div class="section-title">التحويل والأدوات</div>
-                <div class="section-desc">حرّك وغيّر حجم المقاطع مباشرةً على التايملاين.</div>
+                <div class="section-title" data-i18n="transform_title">Transform &amp; Tools</div>
+                <div class="section-desc" data-i18n="transform_desc">Move, scale, and adjust selected clips directly on the timeline.</div>
                 </div>
             </div>
 
             <!-- أزرار الأسهم -->
             <div class="arrow-row">
-                <button class="btn-arrow" id="reset-clip-transform" data-tooltip="Reset position to center + scale to 100%">↺</button>
-                <button class="btn-arrow" id="nudge-left" data-tooltip="Move Left">◀</button>
-                <button class="btn-arrow" id="nudge-up" data-tooltip="Move Up">▲</button>
-                <button class="btn-arrow" id="nudge-down" data-tooltip="Move Down">▼</button>
-                <button class="btn-arrow" id="nudge-right" data-tooltip="Move Right">▶</button>
+                <button class="btn-arrow" id="reset-clip-transform" data-i18n-title="transform_reset_tip" title="Reset position to center + scale to 100%">↺</button>
+                <button class="btn-arrow" id="nudge-left" data-i18n-title="transform_left_tip" title="Move Left">◀</button>
+                <button class="btn-arrow" id="nudge-up" data-i18n-title="transform_up_tip" title="Move Up">▲</button>
+                <button class="btn-arrow" id="nudge-down" data-i18n-title="transform_down_tip" title="Move Down">▼</button>
+                <button class="btn-arrow" id="nudge-right" data-i18n-title="transform_right_tip" title="Move Right">▶</button>
             </div>
 
             <!-- Move Step -->
             <div class="row-label">
-                <span class="label">مدى التحريك</span>
+                <span class="label" data-i18n="transform_step">Move Step</span>
                 <div class="btn-group" id="step-chips">
                 <button class="btn-preset step-chip" data-val="5">5</button>
                 <button class="btn-preset step-chip chip-active" data-val="10">10</button>
@@ -375,12 +375,12 @@
                 <button class="btn-preset step-chip" data-val="50">50</button>
                 </div>
                 <input type="number" class="input-small" id="nudge-step" value="10" />
-                <span class="label-unit">بكسل</span>
+                <span class="label-unit" data-i18n="transform_px">pixels</span>
             </div>
 
             <!-- Scale % -->
             <div class="row-label">
-                <span class="label">الحجم %</span>
+                <span class="label" data-i18n="transform_scl">Scale %</span>
                 <div class="btn-group" id="scale-chips">
                 <button class="btn-preset scale-chip" data-val="75">75</button>
                 <button class="btn-preset scale-chip" data-val="100">100</button>
@@ -393,14 +393,14 @@
             <!-- Scale Input + تطبيق -->
             <div class="row-input">
                 <input type="number" class="input-main" id="scale-value" value="125" />
-                <button class="btn-apply" id="apply-scale">تطبيق</button>
+                <button class="btn-apply" id="apply-scale" data-i18n="transform_set">Set</button>
             </div>
 
             <!-- Tools -->
             <div class="tools-row" id="transform-tools-chips">
-                <span class="label">أدوات</span>
-                <button class="btn-tool tool-chip" id="btn-fit-frame" data-tooltip="Scale clip to fit inside the sequence frame">⊞ Fit</button>
-                <button class="btn-tool tool-chip" id="btn-center-anchor" data-tooltip="Reset anchor point to center of frame">◎ Anchor</button>
+                <span class="label" data-i18n="transform_tools">Tools</span>
+                <button class="btn-tool tool-chip" id="btn-fit-frame" data-i18n-title="transform_fit_tip" title="Scale clip to fit inside the sequence frame">⊞ <span data-i18n="transform_fit">Fit</span></button>
+                <button class="btn-tool tool-chip" id="btn-center-anchor" data-i18n-title="transform_anchor_tip" title="Reset anchor point to center of frame">◎ <span data-i18n="transform_anchor">Anchor</span></button>
             </div>
         </div>
 
