@@ -276,25 +276,7 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     })();
 
-    // ============================================================
-    // SCALE BUTTONS
-    // ============================================================
-    var scaleBtns = document.querySelectorAll('.scale-preset');
-    for (var sb = 0; sb < scaleBtns.length; sb++) {
-        (function(btn) {
-            btn.addEventListener("click", function() {
-                var v = btn.getAttribute("data-scale") || "100";
-                console.log("[->JSX] applyScale: " + v);
-                csInterface.evalScript(
-                    '$._editflow.applyScale("' + v + '")',
-                    function(result) {
-                        console.log("[<-JSX] applyScale result:", result);
-                        handleJSXResult(result);
-                    }
-                );
-            });
-        })(scaleBtns[sb]);
-    }
+
 
 
 

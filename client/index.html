@@ -346,74 +346,61 @@
             </div>
         </div>
 
-        <!-- 2. STATIC SCALE -->
-        <div class="action-group">
-            <h3>
-                <span class="icon"><svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></span>
-                <span data-i18n="scale_title">Static Scale</span>
-            </h3>
-            <p class="description" data-i18n="scale_desc">Cut-in resize of selected clips without keyframes.</p>
-            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;" id="scale-grid">
-                <button class="scale-btn scale-preset" data-scale="115">115</button>
-                <button class="scale-btn scale-preset" data-scale="130">130</button>
-                <button class="scale-btn scale-preset" data-scale="150">150</button>
-                <button class="scale-btn scale-preset" data-scale="175">175</button>
-                <button class="scale-btn scale-preset" data-scale="200">200</button>
-                <button class="scale-btn secondary scale-preset" data-scale="100" data-reset="1">↺ 100</button>
-            </div>
-        </div>
-
-        <!-- 3. TRANSFORM & TOOLS -->
-        <div class="action-group">
-            <h3>
-                <span class="icon"><svg viewBox="0 0 24 24"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></span>
-                <span data-i18n="transform_title">Transform &amp; Tools</span>
-            </h3>
-            <p class="description" data-i18n="transform_desc">Move, scale, and adjust selected clips directly on the timeline.</p>
-
-            <!-- Nudge arrows + reset -->
-            <div class="input-row">
-                <button id="reset-clip-transform" data-i18n-title="transform_reset_tip" title="Reset position to center + scale to 100%" style="width:auto; padding:6px 10px;">↺</button>
-                <button id="nudge-left"  data-i18n-title="transform_left_tip"  title="Move Left"  style="width:auto; padding:6px 10px;">◀</button>
-                <button id="nudge-up"    data-i18n-title="transform_up_tip"    title="Move Up"    style="width:auto; padding:6px 10px;">▲</button>
-                <button id="nudge-down"  data-i18n-title="transform_down_tip"  title="Move Down"  style="width:auto; padding:6px 10px;">▼</button>
-                <button id="nudge-right" data-i18n-title="transform_right_tip" title="Move Right" style="width:auto; padding:6px 10px;">▶</button>
-            </div>
-
-            <!-- Step size presets -->
-            <div class="preset-row">
-                <span class="preset-label" data-i18n="transform_step">Move Step</span>
-                <div class="preset-chips" id="step-chips">
-                    <button class="chip step-chip chip-active" data-val="5">5</button>
-                    <button class="chip step-chip" data-val="10">10</button>
-                    <button class="chip step-chip" data-val="20">20</button>
-                    <button class="chip step-chip" data-val="50">50</button>
+        <!-- 2. TRANSFORM & TOOLS (UNIFIED) -->
+        <div class="transform-section" dir="rtl" style="margin-top:12px; margin-bottom:12px;">
+            <div class="section-header">
+                <span class="section-icon">⊹</span>
+                <div>
+                <div class="section-title">التحويل والأدوات</div>
+                <div class="section-desc">حرّك وغيّر حجم المقاطع مباشرةً على التايملاين.</div>
                 </div>
-                <input type="number" id="nudge-step" value="5" min="1" max="500" title="Step size in pixels">
-                <span class="unit-label" data-i18n="transform_px">pixels</span>
             </div>
 
-            <!-- Scale presets -->
-            <div class="preset-row">
-                <span class="preset-label" data-i18n="transform_scl">Scale %</span>
-                <div class="preset-chips" id="scale-chips">
-                    <button class="chip scale-chip" data-val="75">75</button>
-                    <button class="chip scale-chip" data-val="100">100</button>
-                    <button class="chip scale-chip" data-val="110">110</button>
-                    <button class="chip scale-chip" data-val="125">125</button>
-                    <button class="chip scale-chip" data-val="150">150</button>
-                </div>
-                <input type="number" id="scale-value" placeholder="100">
-                <button id="apply-scale" style="width:auto; padding:6px 12px;" data-i18n="transform_set">Set</button>
+            <!-- أزرار الأسهم -->
+            <div class="arrow-row">
+                <button class="btn-arrow" id="reset-clip-transform" data-tooltip="Reset position to center + scale to 100%">↺</button>
+                <button class="btn-arrow" id="nudge-left" data-tooltip="Move Left">◀</button>
+                <button class="btn-arrow" id="nudge-up" data-tooltip="Move Up">▲</button>
+                <button class="btn-arrow" id="nudge-down" data-tooltip="Move Down">▼</button>
+                <button class="btn-arrow" id="nudge-right" data-tooltip="Move Right">▶</button>
             </div>
 
-            <!-- Pro Tools: Flip, Fit, Anchor -->
-            <div class="preset-row" style="margin-top:4px;">
-                <span class="preset-label" data-i18n="transform_tools">Tools</span>
-                <div class="preset-chips" id="transform-tools-chips">
-                    <button class="chip tool-chip" id="btn-fit-frame" data-tooltip="Scale clip to fit inside the sequence frame">⊞ Fit</button>
-                    <button class="chip tool-chip" id="btn-center-anchor" data-tooltip="Reset anchor point to center of frame">◎ Anchor</button>
+            <!-- Move Step -->
+            <div class="row-label">
+                <span class="label">مدى التحريك</span>
+                <div class="btn-group" id="step-chips">
+                <button class="btn-preset step-chip" data-val="5">5</button>
+                <button class="btn-preset step-chip chip-active" data-val="10">10</button>
+                <button class="btn-preset step-chip" data-val="20">20</button>
+                <button class="btn-preset step-chip" data-val="50">50</button>
                 </div>
+                <input type="number" class="input-small" id="nudge-step" value="10" />
+                <span class="label-unit">بكسل</span>
+            </div>
+
+            <!-- Scale % -->
+            <div class="row-label">
+                <span class="label">الحجم %</span>
+                <div class="btn-group" id="scale-chips">
+                <button class="btn-preset scale-chip" data-val="75">75</button>
+                <button class="btn-preset scale-chip" data-val="100">100</button>
+                <button class="btn-preset scale-chip" data-val="110">110</button>
+                <button class="btn-preset scale-chip chip-active" data-val="125">125</button>
+                <button class="btn-preset scale-chip" data-val="150">150</button>
+                </div>
+            </div>
+
+            <!-- Scale Input + تطبيق -->
+            <div class="row-input">
+                <input type="number" class="input-main" id="scale-value" value="125" />
+                <button class="btn-apply" id="apply-scale">تطبيق</button>
+            </div>
+
+            <!-- Tools -->
+            <div class="tools-row" id="transform-tools-chips">
+                <span class="label">أدوات</span>
+                <button class="btn-tool tool-chip" id="btn-fit-frame" data-tooltip="Scale clip to fit inside the sequence frame">⊞ Fit</button>
+                <button class="btn-tool tool-chip" id="btn-center-anchor" data-tooltip="Reset anchor point to center of frame">◎ Anchor</button>
             </div>
         </div>
 
