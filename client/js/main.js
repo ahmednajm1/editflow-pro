@@ -1683,6 +1683,8 @@ function importBlob(blob) {
         return row;
     }
 
+    var WAVE_HTML = '<span class="sfx-wave"><span class="sfx-wave-bar"></span><span class="sfx-wave-bar"></span><span class="sfx-wave-bar"></span><span class="sfx-wave-bar"></span><span class="sfx-wave-bar"></span></span>';
+
     function togglePreview(sound, playBtn, row) {
         if (!sfxAudio) sfxAudio = document.getElementById("sfx-audio-preview");
         if (!sfxAudio) return;
@@ -1694,6 +1696,7 @@ function importBlob(blob) {
             playBtn.classList.remove("sfx-playing");
             playBtn.innerHTML = "▶";
             row.classList.remove("sfx-row-playing");
+            removeWave(row);
             return;
         }
 
@@ -1709,6 +1712,7 @@ function importBlob(blob) {
             playBtn.classList.add("sfx-playing");
             playBtn.innerHTML = "⏸";
             row.classList.add("sfx-row-playing");
+            addWave(row);
         }).catch(function(err) {
             console.warn("[SFX] Preview failed:", err.message);
             sfxAudio.src = filePath;
@@ -1722,7 +1726,24 @@ function importBlob(blob) {
             playBtn.classList.remove("sfx-playing");
             playBtn.innerHTML = "▶";
             row.classList.remove("sfx-row-playing");
+            removeWave(row);
         };
+    }
+
+    function addWave(row) {
+        removeWave(row);
+        var nameEl = row.querySelector(".sfx-name");
+        if (nameEl) {
+            var w = document.createElement("span");
+            w.className = "sfx-wave";
+            w.innerHTML = '<span class="sfx-wave-bar"></span><span class="sfx-wave-bar"></span><span class="sfx-wave-bar"></span><span class="sfx-wave-bar"></span><span class="sfx-wave-bar"></span>';
+            nameEl.parentNode.insertBefore(w, nameEl.nextSibling);
+        }
+    }
+
+    function removeWave(row) {
+        var existing = row.querySelector(".sfx-wave");
+        if (existing) existing.parentNode.removeChild(existing);
     }
 
     function stopAllPreviews() {
@@ -1734,7 +1755,10 @@ function importBlob(blob) {
             playBtns[i].innerHTML = "▶";
         }
         var rows = document.querySelectorAll(".sfx-row");
-        for (var j = 0; j < rows.length; j++) rows[j].classList.remove("sfx-row-playing");
+        for (var j = 0; j < rows.length; j++) {
+            rows[j].classList.remove("sfx-row-playing");
+            removeWave(rows[j]);
+        }
     }
 
     function addSFXToTimeline(sound, addBtn) {

@@ -902,25 +902,34 @@ button.secondary { color: var(--text-mute); }
   left: 10px;
   color: var(--text-mute);
   pointer-events: none;
+  opacity: 0.5;
+  transition: opacity .15s;
+}
+.sfx-search-wrap:focus-within .sfx-search-icon {
+  opacity: 1;
+  color: var(--accent);
 }
 .sfx-search {
   width: 100%;
   background: rgba(0,0,0,0.3);
   border: 1px solid var(--glass-border);
   color: var(--text);
-  border-radius: 6px;
-  padding: 7px 10px 7px 30px;
+  border-radius: 8px;
+  padding: 8px 12px 8px 32px;
   font-size: 12px;
   font-family: inherit;
-  transition: border-color .15s;
+  transition: all .2s;
 }
 .sfx-search:focus {
   border-color: var(--accent);
   outline: none;
+  background: rgba(0,0,0,0.45);
+  box-shadow: 0 0 0 3px rgba(31,143,255,0.1);
 }
 .sfx-search::placeholder {
   color: var(--text-mute);
-  opacity: 0.7;
+  opacity: 0.6;
+  letter-spacing: 0.02em;
 }
 
 /* Category chips */
@@ -969,14 +978,21 @@ button.secondary { color: var(--text-mute); }
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 7px 10px;
   border-bottom: 1px solid rgba(255,255,255,0.04);
   cursor: pointer;
-  transition: background .12s;
+  transition: all .15s;
+  position: relative;
 }
 .sfx-row:last-child { border-bottom: none; }
-.sfx-row:hover { background: rgba(255,255,255,0.06); }
-.sfx-row-playing { background: rgba(31,143,255,0.08) !important; }
+.sfx-row:hover {
+  background: rgba(255,255,255,0.06);
+  padding-left: 14px;
+}
+.sfx-row-playing {
+  background: rgba(31,143,255,0.08) !important;
+  border-left: 2px solid var(--accent);
+}
 
 /* Play button */
 .sfx-play-btn {
@@ -1062,14 +1078,19 @@ button.secondary { color: var(--text-mute); }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px 16px;
+  padding: 32px 16px;
   color: var(--text-mute);
   font-size: 12px;
-  gap: 6px;
+  gap: 8px;
 }
 .sfx-empty-icon {
-  font-size: 24px;
-  opacity: 0.4;
+  font-size: 28px;
+  opacity: 0.3;
+  animation: sfx-empty-float 3s ease-in-out infinite;
+}
+@keyframes sfx-empty-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
 }
 
 .sfx-count {
@@ -1077,4 +1098,29 @@ button.secondary { color: var(--text-mute); }
   color: var(--text-mute);
   text-align: center;
   margin-top: 6px;
+  opacity: 0.7;
+}
+
+/* Waveform mini-visualizer on playing row */
+.sfx-wave {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 14px;
+  margin-left: 2px;
+}
+.sfx-wave-bar {
+  width: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  animation: sfx-wave-anim 0.6s ease-in-out infinite alternate;
+}
+.sfx-wave-bar:nth-child(1) { height: 4px; animation-delay: 0s; }
+.sfx-wave-bar:nth-child(2) { height: 10px; animation-delay: 0.15s; }
+.sfx-wave-bar:nth-child(3) { height: 6px; animation-delay: 0.3s; }
+.sfx-wave-bar:nth-child(4) { height: 12px; animation-delay: 0.1s; }
+.sfx-wave-bar:nth-child(5) { height: 5px; animation-delay: 0.25s; }
+@keyframes sfx-wave-anim {
+  0%   { transform: scaleY(0.4); }
+  100% { transform: scaleY(1); }
 }
