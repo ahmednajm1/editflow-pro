@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "categories": [
+    { "id": "whoosh",     "name": "Whoosh",      "icon": "💨", "name_ar": "سووش" },
+    { "id": "impact",     "name": "Impact",      "icon": "💥", "name_ar": "تأثير" },
+    { "id": "riser",      "name": "Riser",       "icon": "📈", "name_ar": "تصاعد" },
+    { "id": "transition", "name": "Transition",  "icon": "🔄", "name_ar": "انتقال" },
+    { "id": "ui",         "name": "UI",          "icon": "🔔", "name_ar": "واجهة" },
+    { "id": "foley",      "name": "Foley",       "icon": "🎬", "name_ar": "فولي" }
+  ],
+  "sounds": []
+}

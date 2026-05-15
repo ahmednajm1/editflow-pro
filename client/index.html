@@ -404,6 +404,40 @@
             </div>
         </div>
 
+        <!-- 3. SFX LIBRARY — 1-Click Sound Effects -->
+        <div class="action-group sfx-group">
+            <h3>
+                <span class="icon"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></span>
+                <span data-i18n="sfx_title">SFX Library</span>
+            </h3>
+            <p class="description" data-i18n="sfx_desc">Drag-free sound effects. Preview, then add directly to your timeline at the playhead.</p>
+
+            <!-- Search + Category Filter -->
+            <div class="sfx-controls">
+                <div class="sfx-search-wrap">
+                    <svg class="sfx-search-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" id="sfx-search" class="sfx-search" data-i18n-placeholder="sfx_search_ph" placeholder="Search sounds..." />
+                </div>
+                <div class="sfx-categories" id="sfx-categories">
+                    <button class="sfx-cat-btn sfx-cat-active" data-cat="all" data-i18n="sfx_cat_all">All</button>
+                    <!-- Categories injected by JS from catalog.json -->
+                </div>
+            </div>
+
+            <!-- Sound List -->
+            <div class="sfx-list" id="sfx-list">
+                <div class="sfx-empty" id="sfx-empty">
+                    <span class="sfx-empty-icon">🔇</span>
+                    <span data-i18n="sfx_no_sounds">No sounds found</span>
+                </div>
+            </div>
+
+            <!-- Audio preview (hidden) -->
+            <audio id="sfx-audio-preview" preload="none"></audio>
+
+            <p id="sfx-status" style="font-size:11px; color:var(--text-mute); margin:6px 0 0; text-align:center;"></p>
+        </div>
+
         <!-- PASTE FROM INTERNET — standalone feature -->
         <div class="action-group paste-group">
             <h3>

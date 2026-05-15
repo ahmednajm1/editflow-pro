@@ -619,6 +619,91 @@ $._editflow = {
             try { app.executeCommand("Speed/Duration"); return '{"status":"success","message":"Speed dialog opened"}'; } catch(e) {}
             return '{"status":"error","message":"Could not open Speed dialog. Use Clip menu > Speed/Duration."}';
         } catch(e) { return '{"status":"error","message":"' + e.message + '"}'; }
+    },
+
+    // =========================================================
+    // SFX LIBRARY — Import audio and place at playhead
+    // =========================================================
+    importSFXToTimeline: function(filePath) {
+        try {
+            var project = app.project;
+            if (!project) return '{"status":"error","message":"Open a project first."}';
+
+            var seq = this.getSeq();
+            if (!seq) return '{"status":"error","message":"Open a sequence first."}';
+
+            // Verify file exists
+            var sfxFile = new File(filePath);
+            if (!sfxFile.exists) {
+                return '{"status":"error","message":"SFX file not found: ' + filePath + '"}';
+            }
+
+            // Find or create EFP_SFX bin
+            var bin = null;
+            var root = project.rootItem;
+            for (var i = 0; i < root.children.numItems; i++) {
+                var child = root.children[i];
+                if (child.name === "EFP_SFX" && child.type === 2) { bin = child; break; }
+            }
+            if (!bin) {
+                try { bin = root.createBin("EFP_SFX"); } catch(e) { bin = root; }
+            }
+
+            // Import the file
+            project.importFiles([filePath], true, bin, false);
+
+            // Find the imported item in the bin
+            var imported = null;
+            var sfxName = sfxFile.name;
+            // Search in bin first, then root
+            var searchBins = [bin, root];
+            for (var b = 0; b < searchBins.length; b++) {
+                var searchBin = searchBins[b];
+                if (!searchBin) continue;
+                for (var j = searchBin.children.numItems - 1; j >= 0; j--) {
+                    var item = searchBin.children[j];
+                    if (item && item.name && item.name === sfxName) {
+                        imported = item;
+                        break;
+                    }
+                }
+                if (imported) break;
+            }
+
+            if (!imported) {
+                return '{"status":"warning","message":"SFX imported to EFP_SFX bin. Drag it to an audio track."}';
+            }
+
+            // Get playhead position
+            var playheadTicks = seq.getPlayerPosition().ticks;
+
+            // Find the first available audio track
+            var audioTrack = null;
+            for (var t = 0; t < seq.audioTracks.numTracks; t++) {
+                audioTrack = seq.audioTracks[t];
+                break;
+            }
+
+            if (!audioTrack) {
+                return '{"status":"warning","message":"SFX imported to EFP_SFX bin. No audio tracks found — drag manually."}';
+            }
+
+            // Try to place on the audio track at playhead
+            try {
+                audioTrack.insertClip(imported, playheadTicks);
+                return '{"status":"success","message":"SFX added to timeline at playhead ✓"}';
+            } catch(e1) {
+                // Fallback: try overwriteClip
+                try {
+                    audioTrack.overwriteClip(imported, playheadTicks);
+                    return '{"status":"success","message":"SFX added to timeline at playhead ✓"}';
+                } catch(e2) {
+                    return '{"status":"warning","message":"SFX imported to EFP_SFX bin — drag to audio track. (' + e2.message + ')"}';
+                }
+            }
+        } catch(e) {
+            return '{"status":"error","message":"' + e.message + '"}';
+        }
     }
 };
 

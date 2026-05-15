@@ -122,7 +122,14 @@ var i18n = {
         setup_api_activate: "Activate Now",
         setup_api_cancel: "Cancel",
         settings_api_get: "Get Free Key ↗",
-        settings_api_steps: "1. Click 'Get Free Key' above & log in.<br>2. Click 'Create API Key' & copy it.<br>3. Paste the key in the box above."
+        settings_api_steps: "1. Click 'Get Free Key' above & log in.<br>2. Click 'Create API Key' & copy it.<br>3. Paste the key in the box above.",
+        sfx_title: "SFX Library",
+        sfx_desc: "Drag-free sound effects. Preview, then add directly to your timeline at the playhead.",
+        sfx_search_ph: "Search sounds...",
+        sfx_cat_all: "All",
+        sfx_no_sounds: "No sounds found",
+        sfx_added: "Added to timeline ✓",
+        sfx_count: "{n} sounds"
     },
     ar: {
         audio_title: "مستوى الصوت",
@@ -211,7 +218,14 @@ var i18n = {
         setup_api_activate: "تفعيل الآن",
         setup_api_cancel: "إلغاء",
         settings_api_get: "احصل على المفتاح مجاناً ↗",
-        settings_api_steps: "١. اضغط 'احصل على المفتاح مجاناً' وسجل دخولك.<br>٢. اضغط 'Create API Key' وانسخ الكود.<br>٣. ألصق الكود في المربع أعلاه."
+        settings_api_steps: "١. اضغط 'احصل على المفتاح مجاناً' وسجل دخولك.<br>٢. اضغط 'Create API Key' وانسخ الكود.<br>٣. ألصق الكود في المربع أعلاه.",
+        sfx_title: "مكتبة المؤثرات",
+        sfx_desc: "مؤثرات صوتية بضغطة زر. استمع أولاً ثم أضفها مباشرةً إلى التايملاين.",
+        sfx_search_ph: "بحث عن مؤثر...",
+        sfx_cat_all: "الكل",
+        sfx_no_sounds: "لا توجد مؤثرات",
+        sfx_added: "تمت الإضافة للتايملاين ✓",
+        sfx_count: "{n} مؤثر صوتي"
     }
 };
 
@@ -1493,4 +1507,280 @@ function importBlob(blob) {
 }
 
 
+// ============================================================
+// SFX LIBRARY — 1-Click Sound Effects
+// ============================================================
+(function() {
+    var sfxCatalog = null;
+    var sfxSounds = [];
+    var sfxCurrentCat = "all";
+    var sfxCurrentSearch = "";
+    var sfxPlayingId = null;
+    var sfxAudio = null;
 
+    function getSFXBasePath() {
+        if (typeof extensionPath !== "undefined" && extensionPath) {
+            return extensionPath + "/sfx/";
+        }
+        return "";
+    }
+
+    function loadSFXCatalog() {
+        var basePath = getSFXBasePath();
+        if (!basePath) {
+            console.log("[SFX] No extension path, cannot load catalog");
+            return;
+        }
+        var catalogFile = basePath + "catalog.json";
+        try {
+            if (typeof fsModule !== "undefined" && fsModule) {
+                if (!fsModule.existsSync(catalogFile)) {
+                    console.log("[SFX] catalog.json not found at:", catalogFile);
+                    return;
+                }
+                var data = fsModule.readFileSync(catalogFile, "utf-8");
+                sfxCatalog = JSON.parse(data);
+                sfxSounds = sfxCatalog.sounds || [];
+                console.log("[SFX] Loaded catalog:", sfxSounds.length, "sounds");
+                renderCategories();
+                renderSoundList();
+            }
+        } catch(e) {
+            console.warn("[SFX] Failed to load catalog:", e.message);
+        }
+    }
+
+    function renderCategories() {
+        var container = document.getElementById("sfx-categories");
+        if (!container || !sfxCatalog) return;
+
+        container.innerHTML = "";
+
+        var allBtn = document.createElement("button");
+        allBtn.className = "sfx-cat-btn sfx-cat-active";
+        allBtn.setAttribute("data-cat", "all");
+        allBtn.textContent = (typeof currentLang !== "undefined" && currentLang === "ar") ? "الكل" : "All";
+        allBtn.addEventListener("click", function() { selectCategory("all"); });
+        container.appendChild(allBtn);
+
+        var cats = sfxCatalog.categories || [];
+        for (var i = 0; i < cats.length; i++) {
+            var cat = cats[i];
+            var hasSound = false;
+            for (var j = 0; j < sfxSounds.length; j++) {
+                if (sfxSounds[j].category === cat.id) { hasSound = true; break; }
+            }
+            if (!hasSound) continue;
+
+            var btn = document.createElement("button");
+            btn.className = "sfx-cat-btn";
+            btn.setAttribute("data-cat", cat.id);
+            var label = cat.icon + " ";
+            if (typeof currentLang !== "undefined" && currentLang === "ar" && cat.name_ar) {
+                label += cat.name_ar;
+            } else {
+                label += cat.name;
+            }
+            btn.textContent = label;
+            (function(catId) {
+                btn.addEventListener("click", function() { selectCategory(catId); });
+            })(cat.id);
+            container.appendChild(btn);
+        }
+    }
+
+    function selectCategory(catId) {
+        sfxCurrentCat = catId;
+        var btns = document.querySelectorAll(".sfx-cat-btn");
+        for (var i = 0; i < btns.length; i++) {
+            btns[i].classList.toggle("sfx-cat-active", btns[i].getAttribute("data-cat") === catId);
+        }
+        renderSoundList();
+    }
+
+    function getFilteredSounds() {
+        var result = [];
+        var search = sfxCurrentSearch.toLowerCase();
+        for (var i = 0; i < sfxSounds.length; i++) {
+            var s = sfxSounds[i];
+            if (sfxCurrentCat !== "all" && s.category !== sfxCurrentCat) continue;
+            if (search && s.name.toLowerCase().indexOf(search) === -1) continue;
+            result.push(s);
+        }
+        return result;
+    }
+
+    function renderSoundList() {
+        var listEl = document.getElementById("sfx-list");
+        var statusEl = document.getElementById("sfx-status");
+        if (!listEl) return;
+
+        var filtered = getFilteredSounds();
+        listEl.innerHTML = "";
+
+        if (filtered.length === 0) {
+            var emptyDiv = document.createElement("div");
+            emptyDiv.className = "sfx-empty";
+            emptyDiv.innerHTML = '<span class="sfx-empty-icon">🔇</span><span>' +
+                ((typeof currentLang !== "undefined" && currentLang === "ar") ? "لا توجد مؤثرات" : "No sounds found") + '</span>';
+            listEl.appendChild(emptyDiv);
+            if (statusEl) statusEl.textContent = "";
+            return;
+        }
+
+        for (var i = 0; i < filtered.length; i++) {
+            listEl.appendChild(createSoundRow(filtered[i]));
+        }
+
+        if (statusEl) {
+            var countText = (typeof currentLang !== "undefined" && currentLang === "ar")
+                ? filtered.length + " مؤثر صوتي"
+                : filtered.length + " sounds";
+            statusEl.textContent = countText;
+        }
+    }
+
+    function createSoundRow(sound) {
+        var row = document.createElement("div");
+        row.className = "sfx-row";
+        row.setAttribute("data-sfx-id", sound.id);
+
+        var playBtn = document.createElement("button");
+        playBtn.className = "sfx-play-btn";
+        playBtn.innerHTML = "▶";
+        playBtn.title = "Preview";
+        playBtn.addEventListener("click", function(e) {
+            e.stopPropagation();
+            togglePreview(sound, playBtn, row);
+        });
+
+        var nameSpan = document.createElement("span");
+        nameSpan.className = "sfx-name";
+        nameSpan.textContent = sound.name;
+
+        var durSpan = document.createElement("span");
+        durSpan.className = "sfx-duration";
+        durSpan.textContent = sound.duration || "--";
+
+        var addBtn = document.createElement("button");
+        addBtn.className = "sfx-add-btn";
+        addBtn.innerHTML = "➕";
+        addBtn.title = "Add to timeline at playhead";
+        addBtn.addEventListener("click", function(e) {
+            e.stopPropagation();
+            addSFXToTimeline(sound, addBtn);
+        });
+
+        row.appendChild(playBtn);
+        row.appendChild(nameSpan);
+        row.appendChild(durSpan);
+        row.appendChild(addBtn);
+
+        row.addEventListener("dblclick", function() {
+            addSFXToTimeline(sound, addBtn);
+        });
+
+        return row;
+    }
+
+    function togglePreview(sound, playBtn, row) {
+        if (!sfxAudio) sfxAudio = document.getElementById("sfx-audio-preview");
+        if (!sfxAudio) return;
+
+        if (sfxPlayingId === sound.id) {
+            sfxAudio.pause();
+            sfxAudio.currentTime = 0;
+            sfxPlayingId = null;
+            playBtn.classList.remove("sfx-playing");
+            playBtn.innerHTML = "▶";
+            row.classList.remove("sfx-row-playing");
+            return;
+        }
+
+        stopAllPreviews();
+
+        var basePath = getSFXBasePath();
+        var filePath = basePath + sound.file;
+        var fileUrl = "file:///" + filePath.replace(/\\/g, "/");
+
+        sfxAudio.src = fileUrl;
+        sfxAudio.play().then(function() {
+            sfxPlayingId = sound.id;
+            playBtn.classList.add("sfx-playing");
+            playBtn.innerHTML = "⏸";
+            row.classList.add("sfx-row-playing");
+        }).catch(function(err) {
+            console.warn("[SFX] Preview failed:", err.message);
+            sfxAudio.src = filePath;
+            sfxAudio.play().catch(function(err2) {
+                console.warn("[SFX] Preview fallback failed:", err2.message);
+            });
+        });
+
+        sfxAudio.onended = function() {
+            sfxPlayingId = null;
+            playBtn.classList.remove("sfx-playing");
+            playBtn.innerHTML = "▶";
+            row.classList.remove("sfx-row-playing");
+        };
+    }
+
+    function stopAllPreviews() {
+        if (sfxAudio) { sfxAudio.pause(); sfxAudio.currentTime = 0; }
+        sfxPlayingId = null;
+        var playBtns = document.querySelectorAll(".sfx-play-btn");
+        for (var i = 0; i < playBtns.length; i++) {
+            playBtns[i].classList.remove("sfx-playing");
+            playBtns[i].innerHTML = "▶";
+        }
+        var rows = document.querySelectorAll(".sfx-row");
+        for (var j = 0; j < rows.length; j++) rows[j].classList.remove("sfx-row-playing");
+    }
+
+    function addSFXToTimeline(sound, addBtn) {
+        var basePath = getSFXBasePath();
+        var filePath = basePath + sound.file;
+        var escapedPath = filePath.replace(/\\/g, "/").replace(/"/g, '\\"');
+
+        console.log("[SFX] Adding to timeline:", escapedPath);
+
+        if (typeof csInterface !== "undefined") {
+            csInterface.evalScript(
+                '$._editflow.importSFXToTimeline("' + escapedPath + '")',
+                function(result) {
+                    console.log("[SFX] Result:", result);
+                    if (typeof handleJSXResult === "function") handleJSXResult(result);
+                    addBtn.classList.add("sfx-added");
+                    addBtn.innerHTML = "✓";
+                    setTimeout(function() {
+                        addBtn.classList.remove("sfx-added");
+                        addBtn.innerHTML = "➕";
+                    }, 1500);
+                }
+            );
+        }
+    }
+
+    function initSFXSearch() {
+        var searchInput = document.getElementById("sfx-search");
+        if (!searchInput) return;
+        searchInput.addEventListener("input", function() {
+            sfxCurrentSearch = searchInput.value;
+            renderSoundList();
+        });
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", function() {
+            initSFXSearch();
+            setTimeout(loadSFXCatalog, 500);
+        });
+    } else {
+        initSFXSearch();
+        setTimeout(loadSFXCatalog, 500);
+    }
+
+    window.reloadSFXLibrary = function() {
+        if (sfxCatalog) { renderCategories(); renderSoundList(); }
+    };
+})();

@@ -884,3 +884,197 @@ button.secondary { color: var(--text-mute); }
   transition: all .15s;
 }
 .btn-tool:hover { border-color: var(--accent); color: #fff; background: rgba(255,255,255,0.1); }
+
+/* ---------- SFX LIBRARY ---------- */
+.sfx-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.sfx-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.sfx-search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--text-mute);
+  pointer-events: none;
+}
+.sfx-search {
+  width: 100%;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 7px 10px 7px 30px;
+  font-size: 12px;
+  font-family: inherit;
+  transition: border-color .15s;
+}
+.sfx-search:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.sfx-search::placeholder {
+  color: var(--text-mute);
+  opacity: 0.7;
+}
+
+/* Category chips */
+.sfx-categories {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.sfx-cat-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--glass-border);
+  color: var(--text-mute);
+  border-radius: 12px;
+  padding: 3px 10px;
+  font-size: 10px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.sfx-cat-btn:hover {
+  border-color: var(--accent);
+  color: #fff;
+  background: rgba(255,255,255,0.08);
+}
+.sfx-cat-active {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
+}
+
+/* Sound list */
+.sfx-list {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.2);
+}
+.sfx-list::-webkit-scrollbar { width: 4px; }
+.sfx-list::-webkit-scrollbar-track { background: transparent; }
+.sfx-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+/* Individual sound row */
+.sfx-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  cursor: pointer;
+  transition: background .12s;
+}
+.sfx-row:last-child { border-bottom: none; }
+.sfx-row:hover { background: rgba(255,255,255,0.06); }
+.sfx-row-playing { background: rgba(31,143,255,0.08) !important; }
+
+/* Play button */
+.sfx-play-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  transition: all .15s;
+}
+.sfx-play-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  transform: scale(1.05);
+}
+.sfx-play-btn.sfx-playing {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  animation: sfx-pulse 1s ease-in-out infinite;
+}
+@keyframes sfx-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(31,143,255,0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(31,143,255,0); }
+}
+
+/* Sound name and duration */
+.sfx-name {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sfx-duration {
+  font-size: 10px;
+  color: var(--text-mute);
+  font-family: 'SF Mono', 'Menlo', monospace;
+  min-width: 32px;
+  text-align: right;
+}
+
+/* Add to timeline button */
+.sfx-add-btn {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255,255,255,0.05);
+  color: var(--text-mute);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  transition: all .15s;
+}
+.sfx-add-btn:hover {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+  transform: scale(1.08);
+}
+.sfx-add-btn.sfx-added {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+
+/* Empty state */
+.sfx-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  color: var(--text-mute);
+  font-size: 12px;
+  gap: 6px;
+}
+.sfx-empty-icon {
+  font-size: 24px;
+  opacity: 0.4;
+}
+
+.sfx-count {
+  font-size: 10px;
+  color: var(--text-mute);
+  text-align: center;
+  margin-top: 6px;
+}
