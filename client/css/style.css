@@ -899,7 +899,9 @@ button.secondary { color: var(--text-mute); }
 }
 .sfx-search-icon {
   position: absolute;
-  left: 10px;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--text-mute);
   pointer-events: none;
   opacity: 0.5;
@@ -915,7 +917,7 @@ button.secondary { color: var(--text-mute); }
   border: 1px solid var(--glass-border);
   color: var(--text);
   border-radius: 8px;
-  padding: 8px 12px 8px 32px;
+  padding: 8px 12px 8px 34px;
   font-size: 12px;
   font-family: inherit;
   transition: all .2s;
