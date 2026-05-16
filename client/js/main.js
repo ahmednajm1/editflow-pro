@@ -8,9 +8,9 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.1.1";
+var CURRENT_VERSION = "1.1.2";
 var csInterface = null, dsp = null;
-var fsModule = null, osModule = null, execModule = null;
+var fsModule = null, osModule = null, pathModule = null, execModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
 var operationRunning = false, statusTimer = null;
 var DEFAULT_SETTINGS = {
@@ -234,12 +234,18 @@ var i18n = {
 document.addEventListener("DOMContentLoaded", function() {
     try { fsModule = require("fs"); } catch(e) { console.warn("[EFP] No fs:", e.message); }
     try { osModule = require("os"); } catch(e) { console.warn("[EFP] No os:", e.message); }
+    try { pathModule = require("path"); } catch(e) { console.warn("[EFP] No path:", e.message); }
     try { execModule = require("child_process").exec; } catch(e) { console.warn("[EFP] No exec:", e.message); }
 
     try {
         csInterface = new CSInterface();
         extensionPath = csInterface.getSystemPath(SystemPath.EXTENSION);
-        configPath = extensionPath + "/editflow_config.json";
+        if (osModule && pathModule) {
+            var userData = pathModule.join(osModule.homedir(), "Library", "Application Support", "EditFlowPro");
+            configPath = pathModule.join(userData, "editflow_config.json");
+        } else {
+            configPath = extensionPath + "/editflow_config.json"; // fallback
+        }
         if (fsModule) { loadSettings(); findExportPreset(); }
         try { dsp = new DSPTools(); } catch(e) {}
     } catch(e) {
@@ -1373,6 +1379,12 @@ function loadSettings() {
 }
 function saveSettings() {
     try {
+        if (fsModule && pathModule) {
+            var dir = pathModule.dirname(configPath);
+            if (!fsModule.existsSync(dir)) {
+                fsModule.mkdirSync(dir, { recursive: true });
+            }
+        }
         if (fsModule) fsModule.writeFileSync(configPath, JSON.stringify(settings, null, 2), "utf8");
     } catch(e) { console.log("[saveSettings] error:", e); }
 }
