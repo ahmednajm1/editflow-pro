@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>EditFlow Pro</title>
-    <link rel="stylesheet" href="css/style.css?v=24">
+    <link rel="stylesheet" href="css/style.css?v=25">
     <script src="js/CSInterface.js"></script>
 </head>
 <body>
@@ -375,7 +375,7 @@
                 <button class="btn-preset step-chip" data-val="50">50</button>
                 </div>
                 <input type="number" class="input-small" id="nudge-step" value="10" />
-                <span class="label-unit" data-i18n="transform_px">pixels</span>
+                <span class="label-unit" data-i18n="transform_px">px</span>
             </div>
 
             <!-- Scale % -->
@@ -388,13 +388,12 @@
                 <button class="btn-preset scale-chip chip-active" data-val="125">125</button>
                 <button class="btn-preset scale-chip" data-val="150">150</button>
                 </div>
+                <input type="number" class="input-small" id="scale-value" value="125" />
+                <span class="label-unit">%</span>
             </div>
 
-            <!-- Scale Input + تطبيق -->
-            <div class="row-input">
-                <input type="number" class="input-main" id="scale-value" value="125" />
-                <button class="btn-apply" id="apply-scale" data-i18n="transform_set">Set</button>
-            </div>
+            <!-- Set Scale Button -->
+            <button class="btn-apply" id="apply-scale" data-i18n="transform_set">Set Scale</button>
 
             <!-- Tools -->
             <div class="tools-row" id="transform-tools-chips">
@@ -556,6 +555,6 @@
     </div>
 
     <script src="js/dspTools.js"></script>
-    <script src="js/main.js?v=24"></script>
+    <script src="js/main.js?v=25"></script>
 </body>
 </html>

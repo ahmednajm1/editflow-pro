@@ -4,7 +4,7 @@ import glob
 import re
 import subprocess
 
-SOURCE_DIR = os.path.expanduser("~/Downloads/جميع المؤثرات الصوتية")
+SOURCE_DIR = os.path.expanduser("~/Downloads/Split_SFX")
 SFX_DIR = os.path.expanduser("~/Downloads/Remotion/EditFlowPro/sfx")
 
 CATEGORIES = {
