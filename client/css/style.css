@@ -791,7 +791,7 @@ button.secondary { color: var(--text-mute); }
 
 .row-label {
   display: grid;
-  grid-template-columns: 60px 1fr 45px 15px;
+  grid-template-columns: 75px 1fr 45px 15px;
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
