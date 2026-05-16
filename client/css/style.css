@@ -773,9 +773,9 @@ button.secondary { color: var(--text-mute); }
 
 .arrow-row {
   display: flex;
-  gap: 6px;
-  justify-content: center;
-  margin-bottom: 12px;
+  gap: 12px;
+  justify-content: flex-start;
+  margin-bottom: 16px;
 }
 .btn-arrow {
   background: rgba(255,255,255,0.05);
