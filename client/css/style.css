@@ -47,6 +47,47 @@
   --fs-xs:   10px;
 }
 
+/* ====================================
+   SPLASH SCREEN
+==================================== */
+#splash-screen {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg);
+  z-index: 99999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 0.5s ease-out;
+  /* Add subtle texture to the splash background */
+  background-image: 
+      radial-gradient(circle at 15% 50%, rgba(26,140,255,0.03), transparent 25%),
+      radial-gradient(circle at 85% 30%, rgba(26,140,255,0.03), transparent 25%);
+}
+.splash-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: splashPulse 1.5s infinite ease-in-out;
+}
+.splash-icon {
+  font-size: 38px;
+  color: var(--accent);
+  filter: drop-shadow(0 0 12px rgba(26,140,255,0.4));
+}
+.splash-text {
+  font-size: 26px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.05;
+  letter-spacing: -0.5px;
+}
+@keyframes splashPulse {
+  0% { opacity: 0.8; transform: scale(0.97); }
+  50% { opacity: 1; transform: scale(1.03); }
+  100% { opacity: 0.8; transform: scale(0.97); }
+}
+
 * { box-sizing: border-box; }
 
 html, body {

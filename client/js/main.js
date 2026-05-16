@@ -244,6 +244,17 @@ document.addEventListener("DOMContentLoaded", function() {
         console.log("[CRITICAL] CSInterface init failed:", e.message);
     }
 
+    function hideSplashScreen() {
+        var splash = document.getElementById("splash-screen");
+        if (splash) {
+            // Keep it visible for at least 600ms for a premium feel
+            setTimeout(function() {
+                splash.style.opacity = "0";
+                setTimeout(function() { splash.style.display = "none"; }, 500);
+            }, 600);
+        }
+    }
+
     // Step 5: Verify JSX is loaded
     csInterface.evalScript('typeof $._editflow_loaded', function(result) {
         console.log("[JSX] _editflow_loaded = " + result);
@@ -259,10 +270,12 @@ document.addEventListener("DOMContentLoaded", function() {
                     } else {
                         showStatus("JSX load failed!", "red");
                     }
+                    hideSplashScreen();
                 });
             });
         } else {
             showStatus("EditFlow Pro ready.", "green");
+            hideSplashScreen();
         }
     });
 
