@@ -1,12 +1,364 @@
 {
   "version": 1,
   "categories": [
-    { "id": "whoosh",     "name": "Whoosh",      "icon": "💨", "name_ar": "سووش" },
-    { "id": "impact",     "name": "Impact",      "icon": "💥", "name_ar": "تأثير" },
-    { "id": "riser",      "name": "Riser",       "icon": "📈", "name_ar": "تصاعد" },
-    { "id": "transition", "name": "Transition",  "icon": "🔄", "name_ar": "انتقال" },
-    { "id": "ui",         "name": "UI",          "icon": "🔔", "name_ar": "واجهة" },
-    { "id": "foley",      "name": "Foley",       "icon": "🎬", "name_ar": "فولي" }
+    {
+      "id": "whoosh",
+      "name": "Whoosh",
+      "icon": "💨",
+      "name_ar": "سووش"
+    },
+    {
+      "id": "impact",
+      "name": "Impact",
+      "icon": "💥",
+      "name_ar": "تأثير"
+    },
+    {
+      "id": "riser",
+      "name": "Riser",
+      "icon": "📈",
+      "name_ar": "تصاعد"
+    },
+    {
+      "id": "transition",
+      "name": "Transition",
+      "icon": "🔄",
+      "name_ar": "انتقال"
+    },
+    {
+      "id": "ui",
+      "name": "UI",
+      "icon": "🔔",
+      "name_ar": "واجهة"
+    },
+    {
+      "id": "foley",
+      "name": "Foley",
+      "icon": "🎬",
+      "name_ar": "فولي"
+    },
+    {
+      "id": "cinematic",
+      "name": "Cinematic",
+      "icon": "🎥",
+      "name_ar": "سينمائي"
+    }
   ],
-  "sounds": []
+  "sounds": [
+    {
+      "id": "communications_camera_slr_canon_a1_35mm_shutter_release_1_1000th_motor_power_winder_single_.mp3",
+      "name": "Communications Camera Slr Canon A1 35Mm Shutter Release 1 1000Th Motor Power Winder Single ",
+      "category": "whoosh",
+      "file": "Whoosh/communications_camera_slr_canon_a1_35mm_shutter_release_1_1000th_motor_power_winder_single_.mp3",
+      "duration": "0:07"
+    },
+    {
+      "id": "communications_phonograph_vinyl_music_rewind_01_.mp3",
+      "name": "Communications Phonograph Vinyl Music Rewind 01 ",
+      "category": "whoosh",
+      "file": "Whoosh/communications_phonograph_vinyl_music_rewind_01_.mp3",
+      "duration": "0:02"
+    },
+    {
+      "id": "swooshes_swish_fast_clothy_.mp3",
+      "name": "Swooshes Swish Fast Clothy ",
+      "category": "whoosh",
+      "file": "Whoosh/swooshes_swish_fast_clothy_.mp3",
+      "duration": "0:03"
+    },
+    {
+      "id": "swooshes_whoosh_airy_soft_wind_breeze_.mp3",
+      "name": "Swooshes Whoosh Airy Soft Wind Breeze ",
+      "category": "whoosh",
+      "file": "Whoosh/swooshes_whoosh_airy_soft_wind_breeze_.mp3",
+      "duration": "0:06"
+    },
+    {
+      "id": "swooshes_whoosh_airy_wind_deep_01_.mp3",
+      "name": "Swooshes Whoosh Airy Wind Deep 01 ",
+      "category": "whoosh",
+      "file": "Whoosh/swooshes_whoosh_airy_wind_deep_01_.mp3",
+      "duration": "0:12"
+    },
+    {
+      "id": "swooshes_whoosh_classic_long_clean_.mp3",
+      "name": "Swooshes Whoosh Classic Long Clean ",
+      "category": "whoosh",
+      "file": "Whoosh/swooshes_whoosh_classic_long_clean_.mp3",
+      "duration": "0:10"
+    },
+    {
+      "id": "swooshes_whoosh_in_out_pass_by_clean_fire_.mp3",
+      "name": "Swooshes Whoosh In Out Pass By Clean Fire ",
+      "category": "whoosh",
+      "file": "Whoosh/swooshes_whoosh_in_out_pass_by_clean_fire_.mp3",
+      "duration": "0:06"
+    },
+    {
+      "id": "swooshes_whoosh_morphy_movement_fire_flames_01_.mp3",
+      "name": "Swooshes Whoosh Morphy Movement Fire Flames 01 ",
+      "category": "whoosh",
+      "file": "Whoosh/swooshes_whoosh_morphy_movement_fire_flames_01_.mp3",
+      "duration": "0:16"
+    },
+    {
+      "id": "swooshes_whoosh_organic_stone_texture_short_.mp3",
+      "name": "Swooshes Whoosh Organic Stone Texture Short ",
+      "category": "whoosh",
+      "file": "Whoosh/swooshes_whoosh_organic_stone_texture_short_.mp3",
+      "duration": "0:02"
+    },
+    {
+      "id": "swooshes_whoosh_organic_wind_big_throw_long_.mp3",
+      "name": "Swooshes Whoosh Organic Wind Big Throw Long ",
+      "category": "whoosh",
+      "file": "Whoosh/swooshes_whoosh_organic_wind_big_throw_long_.mp3",
+      "duration": "0:12"
+    },
+    {
+      "id": "swooshes_whoosh_organic_wind_big_throw_normal_.mp3",
+      "name": "Swooshes Whoosh Organic Wind Big Throw Normal ",
+      "category": "whoosh",
+      "file": "Whoosh/swooshes_whoosh_organic_wind_big_throw_normal_.mp3",
+      "duration": "0:10"
+    },
+    {
+      "id": "swooshes_whoosh_organic_wind_hard_normal_03_.mp3",
+      "name": "Swooshes Whoosh Organic Wind Hard Normal 03 ",
+      "category": "whoosh",
+      "file": "Whoosh/swooshes_whoosh_organic_wind_hard_normal_03_.mp3",
+      "duration": "0:05"
+    },
+    {
+      "id": "swooshes_whoosh_organic_wind_soft_long_01_1.mp3",
+      "name": "Swooshes Whoosh Organic Wind Soft Long 01 1",
+      "category": "whoosh",
+      "file": "Whoosh/swooshes_whoosh_organic_wind_soft_long_01_1.mp3",
+      "duration": "0:18"
+    },
+    {
+      "id": "swooshes_whoosh_synthetic_flare_fast_airy_01_.mp3",
+      "name": "Swooshes Whoosh Synthetic Flare Fast Airy 01 ",
+      "category": "whoosh",
+      "file": "Whoosh/swooshes_whoosh_synthetic_flare_fast_airy_01_.mp3",
+      "duration": "0:06"
+    },
+    {
+      "id": "swooshes_whoosh_technical_sharp_fast_.mp3",
+      "name": "Swooshes Whoosh Technical Sharp Fast ",
+      "category": "whoosh",
+      "file": "Whoosh/swooshes_whoosh_technical_sharp_fast_.mp3",
+      "duration": "0:09"
+    },
+    {
+      "id": "swooshes_whoosh_wind_crisp_cinematic_03_.mp3",
+      "name": "Swooshes Whoosh Wind Crisp Cinematic 03 ",
+      "category": "whoosh",
+      "file": "Whoosh/swooshes_whoosh_wind_crisp_cinematic_03_.mp3",
+      "duration": "0:05"
+    },
+    {
+      "id": "cartoon_impact_bonk_hit_weak_.mp3",
+      "name": "Cartoon Impact Bonk Hit Weak ",
+      "category": "impact",
+      "file": "Impact/cartoon_impact_bonk_hit_weak_.mp3",
+      "duration": "0:03"
+    },
+    {
+      "id": "cartoon_impact_slip_fall_banana_peel_.mp3",
+      "name": "Cartoon Impact Slip Fall Banana Peel ",
+      "category": "impact",
+      "file": "Impact/cartoon_impact_slip_fall_banana_peel_.mp3",
+      "duration": "0:01"
+    },
+    {
+      "id": "designed_impact_hit_big_powerful_cinematic_mysterious_01_.mp3",
+      "name": "Designed Impact Hit Big Powerful Cinematic Mysterious 01 ",
+      "category": "impact",
+      "file": "Impact/designed_impact_hit_big_powerful_cinematic_mysterious_01_.mp3",
+      "duration": "0:14"
+    },
+    {
+      "id": "designed_impact_hit_big_powerful_cinematic_mysterious_02_.mp3",
+      "name": "Designed Impact Hit Big Powerful Cinematic Mysterious 02 ",
+      "category": "impact",
+      "file": "Impact/designed_impact_hit_big_powerful_cinematic_mysterious_02_.mp3",
+      "duration": "0:16"
+    },
+    {
+      "id": "designed_impact_hit_big_powerful_cinematic_shock_.mp3",
+      "name": "Designed Impact Hit Big Powerful Cinematic Shock ",
+      "category": "impact",
+      "file": "Impact/designed_impact_hit_big_powerful_cinematic_shock_.mp3",
+      "duration": "0:25"
+    },
+    {
+      "id": "designed_impact_hit_big_powerful_metallic_rattle_cinematic_mysterious_.mp3",
+      "name": "Designed Impact Hit Big Powerful Metallic Rattle Cinematic Mysterious ",
+      "category": "impact",
+      "file": "Impact/designed_impact_hit_big_powerful_metallic_rattle_cinematic_mysterious_.mp3",
+      "duration": "0:12"
+    },
+    {
+      "id": "designed_stinger_brassy_big_shock_hit_.mp3",
+      "name": "Designed Stinger Brassy Big Shock Hit ",
+      "category": "impact",
+      "file": "Impact/designed_stinger_brassy_big_shock_hit_.mp3",
+      "duration": "0:07"
+    },
+    {
+      "id": "designed_stinger_heavy_impact_clean_hit_long_tail_.mp3",
+      "name": "Designed Stinger Heavy Impact Clean Hit Long Tail ",
+      "category": "impact",
+      "file": "Impact/designed_stinger_heavy_impact_clean_hit_long_tail_.mp3",
+      "duration": "0:15"
+    },
+    {
+      "id": "designed_stinger_impact_dark_cinematic_aggressive_hit_.mp3",
+      "name": "Designed Stinger Impact Dark Cinematic Aggressive Hit ",
+      "category": "impact",
+      "file": "Impact/designed_stinger_impact_dark_cinematic_aggressive_hit_.mp3",
+      "duration": "0:09"
+    },
+    {
+      "id": "designed_stinger_impact_hit_powerful_tonal_.mp3",
+      "name": "Designed Stinger Impact Hit Powerful Tonal ",
+      "category": "impact",
+      "file": "Impact/designed_stinger_impact_hit_powerful_tonal_.mp3",
+      "duration": "0:09"
+    },
+    {
+      "id": "designed_synthetic_bass_hit_sub_synth_single_note_with_variatons_pulse_wave_f1_01_.mp3",
+      "name": "Designed Synthetic Bass Hit Sub Synth Single Note With Variatons Pulse Wave F1 01 ",
+      "category": "impact",
+      "file": "Impact/designed_synthetic_bass_hit_sub_synth_single_note_with_variatons_pulse_wave_f1_01_.mp3",
+      "duration": "0:12"
+    },
+    {
+      "id": "crowds_reaction_medium_gasps_surprised_.mp3",
+      "name": "Crowds Reaction Medium Gasps Surprised ",
+      "category": "riser",
+      "file": "Riser/crowds_reaction_medium_gasps_surprised_.mp3",
+      "duration": "0:10"
+    },
+    {
+      "id": "guns_mechanism_shotgun_cock_reload_lock_n_load_1.mp3",
+      "name": "Guns Mechanism Shotgun Cock Reload Lock N Load 1",
+      "category": "transition",
+      "file": "Transition/guns_mechanism_shotgun_cock_reload_lock_n_load_1.mp3",
+      "duration": "0:05"
+    },
+    {
+      "id": "horns_celebration_birthday_pipe_blow_toy_isolated_long_.mp3",
+      "name": "Horns Celebration Birthday Pipe Blow Toy Isolated Long ",
+      "category": "transition",
+      "file": "Transition/horns_celebration_birthday_pipe_blow_toy_isolated_long_.mp3",
+      "duration": "0:19"
+    },
+    {
+      "id": "musical_brass_tuba_sloppy_fail_.mp3",
+      "name": "Musical Brass Tuba Sloppy Fail ",
+      "category": "transition",
+      "file": "Transition/musical_brass_tuba_sloppy_fail_.mp3",
+      "duration": "0:02"
+    },
+    {
+      "id": "alarms_buzzer_wrong_answer_incorrect_error_01_.mp3",
+      "name": "Alarms Buzzer Wrong Answer Incorrect Error 01 ",
+      "category": "ui",
+      "file": "UI/alarms_buzzer_wrong_answer_incorrect_error_01_.mp3",
+      "duration": "0:05"
+    },
+    {
+      "id": "bells_misc_boxing_bell_ding_hit_gritty_slight_distortion_begin_fight_02_.mp3",
+      "name": "Bells Misc Boxing Bell Ding Hit Gritty Slight Distortion Begin Fight 02 ",
+      "category": "ui",
+      "file": "UI/bells_misc_boxing_bell_ding_hit_gritty_slight_distortion_begin_fight_02_.mp3",
+      "duration": "0:12"
+    },
+    {
+      "id": "bells_misc_undertaker_bell_gong_dark_.mp3",
+      "name": "Bells Misc Undertaker Bell Gong Dark ",
+      "category": "ui",
+      "file": "UI/bells_misc_undertaker_bell_gong_dark_.mp3",
+      "duration": "0:05"
+    },
+    {
+      "id": "cartoon_pop_ascending_x4_.mp3",
+      "name": "Cartoon Pop Ascending X4 ",
+      "category": "ui",
+      "file": "UI/cartoon_pop_ascending_x4_.mp3",
+      "duration": "0:00"
+    },
+    {
+      "id": "communications_camera_paparazzi_group_taking_photos_shutter_clicks_slr_cameras_loop_.mp3",
+      "name": "Communications Camera Paparazzi Group Taking Photos Shutter Clicks Slr Cameras Loop ",
+      "category": "ui",
+      "file": "UI/communications_camera_paparazzi_group_taking_photos_shutter_clicks_slr_cameras_loop_.mp3",
+      "duration": "1:01"
+    },
+    {
+      "id": "cartoon_musical_stupid_making_fun_of_descending_.mp3",
+      "name": "Cartoon Musical Stupid Making Fun Of Descending ",
+      "category": "foley",
+      "file": "Foley/cartoon_musical_stupid_making_fun_of_descending_.mp3",
+      "duration": "0:03"
+    },
+    {
+      "id": "cartoon_vocal_quack_short_goofy_funny_.mp3",
+      "name": "Cartoon Vocal Quack Short Goofy Funny ",
+      "category": "foley",
+      "file": "Foley/cartoon_vocal_quack_short_goofy_funny_.mp3",
+      "duration": "0:00"
+    },
+    {
+      "id": "cartoon_whistle_bomb_whistle_falling_tonal_.mp3",
+      "name": "Cartoon Whistle Bomb Whistle Falling Tonal ",
+      "category": "foley",
+      "file": "Foley/cartoon_whistle_bomb_whistle_falling_tonal_.mp3",
+      "duration": "0:04"
+    },
+    {
+      "id": "cartoon_whistle_falling_tone_.mp3",
+      "name": "Cartoon Whistle Falling Tone ",
+      "category": "foley",
+      "file": "Foley/cartoon_whistle_falling_tone_.mp3",
+      "duration": "0:08"
+    },
+    {
+      "id": "communications_cellphone_nokia_m_vibrate_message_.mp3",
+      "name": "Communications Cellphone Nokia M Vibrate Message ",
+      "category": "foley",
+      "file": "Foley/communications_cellphone_nokia_m_vibrate_message_.mp3",
+      "duration": "0:02"
+    },
+    {
+      "id": "cartoon_musical_heavenly_glissando_choir_.mp3",
+      "name": "Cartoon Musical Heavenly Glissando Choir ",
+      "category": "cinematic",
+      "file": "Cinematic/cartoon_musical_heavenly_glissando_choir_.mp3",
+      "duration": "0:16"
+    },
+    {
+      "id": "designed_bass_dive_distorted_.mp3",
+      "name": "Designed Bass Dive Distorted ",
+      "category": "cinematic",
+      "file": "Cinematic/designed_bass_dive_distorted_.mp3",
+      "duration": "0:02"
+    },
+    {
+      "id": "designed_stinger_sus_brass_sticks_.mp3",
+      "name": "Designed Stinger Sus Brass Sticks ",
+      "category": "cinematic",
+      "file": "Cinematic/designed_stinger_sus_brass_sticks_.mp3",
+      "duration": "0:06"
+    },
+    {
+      "id": "musical_stinger_dun_dun_dunn_orchestral_stinger_suspense_sudden_.mp3",
+      "name": "Musical Stinger Dun Dun Dunn Orchestral Stinger Suspense Sudden ",
+      "category": "cinematic",
+      "file": "Cinematic/musical_stinger_dun_dun_dunn_orchestral_stinger_suspense_sudden_.mp3",
+      "duration": "0:04"
+    }
+  ]
 }

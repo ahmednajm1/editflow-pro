@@ -933,33 +933,44 @@ button.secondary { color: var(--text-mute); }
   letter-spacing: 0.02em;
 }
 
-/* Category chips */
+/* Category chips (Premium Horizontal Scroll) */
 .sfx-categories {
   display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px; /* Space for scrollbar if visible */
+  margin-bottom: 8px;
+  /* Hide scrollbar for a cleaner look */
+  scrollbar-width: none; 
+  -ms-overflow-style: none;
+}
+.sfx-categories::-webkit-scrollbar {
+  display: none;
 }
 .sfx-cat-btn {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--glass-border);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
   color: var(--text-mute);
-  border-radius: 12px;
-  padding: 3px 10px;
-  font-size: 10px;
+  border-radius: 16px;
+  padding: 4px 14px;
+  font-size: 11px;
+  font-weight: 500;
   font-family: inherit;
   cursor: pointer;
-  transition: all .15s;
+  transition: all .2s cubic-bezier(0.2, 0, 0, 1);
   white-space: nowrap;
+  flex-shrink: 0; /* Prevent shrinking */
 }
 .sfx-cat-btn:hover {
-  border-color: var(--accent);
-  color: #fff;
-  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.2);
+  color: var(--text);
+  background: rgba(255,255,255,0.06);
 }
 .sfx-cat-active {
   background: var(--accent) !important;
   border-color: var(--accent) !important;
   color: #fff !important;
+  box-shadow: 0 2px 8px rgba(31,143,255,0.25);
 }
 
 /* Sound list */

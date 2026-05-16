@@ -1575,11 +1575,11 @@ function importBlob(blob) {
             var btn = document.createElement("button");
             btn.className = "sfx-cat-btn";
             btn.setAttribute("data-cat", cat.id);
-            var label = cat.icon + " ";
+            var label = "";
             if (typeof currentLang !== "undefined" && currentLang === "ar" && cat.name_ar) {
-                label += cat.name_ar;
+                label = cat.name_ar;
             } else {
-                label += cat.name;
+                label = cat.name;
             }
             btn.textContent = label;
             (function(catId) {

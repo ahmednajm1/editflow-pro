@@ -7,6 +7,7 @@
 # ──────────────────────────────────────────────────────────────────────────
 
 set -e
+export PYTHONIOENCODING=utf8
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CATALOG="$SCRIPT_DIR/catalog.json"
 
@@ -103,7 +104,7 @@ catalog = {
     'categories': cats,
     'sounds': sounds
 }
-with open('$CATALOG', 'w') as f:
+with open('$CATALOG', 'w', encoding='utf-8') as f:
     json.dump(catalog, f, indent=2, ensure_ascii=False)
 print(f'✅ Catalog rebuilt: {len(sounds)} sounds in {len(cats)} categories')
 "
