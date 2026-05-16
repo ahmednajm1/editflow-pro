@@ -8,6 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
+var CURRENT_VERSION = "1.0.0";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, execModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -278,6 +279,47 @@ document.addEventListener("DOMContentLoaded", function() {
             hideSplashScreen();
         }
     });
+
+    // Step 6: Check for Updates
+    checkForUpdates();
+
+    // ============================================================
+    // UPDATE CHECKER
+    // ============================================================
+    function checkForUpdates() {
+        var remoteUrl = "https://raw.githubusercontent.com/ahmednajm1/editflow-pro/main/version.json?t=" + new Date().getTime();
+        fetch(remoteUrl)
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                if (data && data.version && data.version !== CURRENT_VERSION) {
+                    showUpdateBanner(data.version, data.url);
+                }
+            })
+            .catch(function(err) { console.log("[EFP] Update check failed:", err); });
+    }
+
+    function showUpdateBanner(newVer, downloadUrl) {
+        var banner = document.getElementById("update-banner");
+        var msg = document.getElementById("update-text-msg");
+        var btnNow = document.getElementById("btn-update-now");
+        var btnDismiss = document.getElementById("btn-update-dismiss");
+        
+        if (!banner || !msg) return;
+        
+        msg.innerHTML = currentLang === "ar" ? "تحديث جديد متاح (" + newVer + ")" : "Update " + newVer + " Available!";
+        btnNow.innerHTML = currentLang === "ar" ? "تنزيل" : "Download";
+        
+        banner.classList.add("visible");
+        
+        btnNow.onclick = function() {
+            csInterface.openURLInDefaultBrowser(downloadUrl);
+            banner.classList.remove("visible");
+        };
+        
+        btnDismiss.onclick = function() {
+            banner.classList.remove("visible");
+        };
+    }
 
 
 

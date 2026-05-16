@@ -1185,3 +1185,42 @@ button.secondary { color: var(--text-mute); }
   0%   { transform: scaleY(0.4); }
   100% { transform: scaleY(1); }
 }
+
+/* ====================================
+   UPDATE BANNER
+==================================== */
+.update-banner {
+  position: fixed;
+  bottom: 20px; left: 15px; right: 15px;
+  background: rgba(30, 136, 229, 0.15);
+  border: 1px solid rgba(30, 136, 229, 0.4);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 9000;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+  transform: translateY(150px);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.update-banner.visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.update-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.update-icon { font-size: 14px; }
+.update-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
