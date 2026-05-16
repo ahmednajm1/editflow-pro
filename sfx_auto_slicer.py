@@ -3,7 +3,7 @@ import glob
 import subprocess
 import re
 
-SOURCE_DIR = os.path.expanduser("~/Downloads/جميع المؤثرات الصوتية")
+SOURCE_DIR = os.path.expanduser("~/Downloads/sound effect")
 OUTPUT_DIR = os.path.expanduser("~/Downloads/Split_SFX")
 
 def get_silence_points(filepath):
