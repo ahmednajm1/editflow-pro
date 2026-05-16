@@ -127,6 +127,30 @@ $._editflow = {
         return '{"project":' + (!!app.project) + ',"sequence":' + (!!seq) + ',"sequenceName":"' + (seq ? seq.name : "none") + '","selectionCount":' + selCount + ',"qe":' + qeOK + ',"version":"' + app.version + '"}';
     },
 
+    nudgeAudioLevel: function(stepStr) {
+        try {
+            var step = parseFloat(stepStr);
+            if (isNaN(step)) return '{"status":"error","message":"Invalid step"}';
+            var sel = this.getSel();
+            if (!sel) return '{"status":"error","message":"Select an audio clip first"}';
+            
+            var changed = 0;
+            for (var i = 0; i < sel.length; i++) {
+                var clip = sel[i];
+                var comp = this.findComponent(clip, this.VOLUME_NAMES);
+                if (comp) {
+                    var prop = this.findProperty(comp, this.LEVEL_NAMES);
+                    if (prop) {
+                        var val = prop.getValue();
+                        prop.setValue(val + step, 1);
+                        changed++;
+                    }
+                }
+            }
+            return '{"status":"success","message":"Modified ' + changed + ' clips"}';
+        } catch(e) { return '{"status":"error","message":"' + e.message + '"}'; }
+    },
+
     debugClip: function() {
         var sel = this.getSel();
         if (!sel) return '{"status":"error","message":"Select a clip first"}';
@@ -206,6 +230,32 @@ $._editflow = {
     // =========================================================
     // STATIC SCALE
     // =========================================================
+    setClipTransformValues: function(scaleStr) {
+        try {
+            var scl = parseFloat(scaleStr);
+            if (isNaN(scl)) return '{"status":"error","message":"Invalid parameters"}';
+
+            var sel = this.getSel();
+            if (!sel) return '{"status":"error","message":"Select a clip"}';
+            
+            var changed = 0;
+            for (var i = 0; i < sel.length; i++) {
+                var clip = sel[i];
+                if (clip.mediaType === "Audio") continue;
+                
+                var comp = this.findComponent(clip, this.MOTION_NAMES);
+                if (!comp) continue;
+
+                var sclProp = this.findProperty(comp, this.SCALE_NAMES);
+                if (sclProp) {
+                    sclProp.setValue(scl, 1);
+                    changed++;
+                }
+            }
+            return '{"status":"success","message":"Scaled ' + changed + ' clips"}';
+        } catch(e) { return '{"status":"error","message":"' + e.message + '"}'; }
+    },
+
     applyScale: function(scaleStr) {
         var scaleVal = parseFloat(scaleStr) || 115;
         var seq = this.getSeq();

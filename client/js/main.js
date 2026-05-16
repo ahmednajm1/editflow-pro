@@ -236,6 +236,26 @@ document.addEventListener("DOMContentLoaded", function() {
 
     try {
         csInterface = new CSInterface();
+        
+        // Global Undo wrapper: intercept evalScript and inject beginUndoGroup for mutating functions
+        var originalEval = csInterface.evalScript;
+        csInterface.evalScript = function(script, callback) {
+            var isMutating = script.indexOf("$._editflow.") > -1 && 
+                             script.indexOf("get") === -1 && 
+                             script.indexOf("find") === -1 &&
+                             script.indexOf("debug") === -1 &&
+                             script.indexOf("check") === -1;
+            
+            if (isMutating) {
+                var match = script.match(/\$\._editflow\.([a-zA-Z0-9_]+)\(/);
+                var actionName = match ? match[1] : "Action";
+                var friendlyName = actionName.replace(/([A-Z])/g, ' $1').trim();
+                friendlyName = friendlyName.charAt(0).toUpperCase() + friendlyName.slice(1);
+                script = 'app.beginUndoGroup("EditFlow: ' + friendlyName + '"); var _ef_res = null; try { _ef_res = ' + script + '; } catch(e) {} app.endUndoGroup(); _ef_res;';
+            }
+            originalEval.call(this, script, callback);
+        };
+
         extensionPath = csInterface.getSystemPath(SystemPath.EXTENSION);
         configPath = extensionPath + "/editflow_config.json";
         if (fsModule) { loadSettings(); findExportPreset(); }
