@@ -1133,6 +1133,37 @@ button.secondary { color: var(--text-mute); }
   color: #fff;
 }
 
+/* Favorite button */
+.sfx-fav-btn {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-mute);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all .2s;
+  opacity: 0.4;
+}
+.sfx-row:hover .sfx-fav-btn {
+  opacity: 0.8;
+}
+.sfx-fav-btn:hover {
+  transform: scale(1.15);
+  color: var(--warning);
+  opacity: 1 !important;
+}
+.sfx-fav-btn.active {
+  color: var(--warning);
+  opacity: 1;
+  text-shadow: 0 0 8px rgba(255, 183, 77, 0.5);
+}
+
 /* Empty state */
 .sfx-empty {
   display: flex;

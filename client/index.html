@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>EditFlow Pro</title>
-    <link rel="stylesheet" href="css/style.css?v=32">
+    <link rel="stylesheet" href="css/style.css?v=33">
     <script src="js/CSInterface.js"></script>
 </head>
 <body>
@@ -11,8 +11,7 @@
     <!-- SPLASH SCREEN -->
     <div id="splash-screen">
         <div class="splash-logo">
-            <span class="splash-icon">⚡</span>
-            <span class="splash-text">EditFlow<br>Pro</span>
+            <img src="img/splash_logo.png" alt="EditFlow Pro" style="max-width: 280px; height: auto;">
         </div>
     </div>
 
@@ -223,31 +222,28 @@
     <div id="welcome-modal" class="modal-overlay hidden">
         <div class="modal-content welcome-content">
             <div class="welcome-glow"></div>
-            <div class="welcome-logo">
-                <svg viewBox="0 0 64 64" width="56" height="56" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="8" y="14" width="48" height="36" rx="6"/>
-                    <path d="M26 26 l12 6 -12 6 z" fill="currentColor"/>
-                    <line x1="14" y1="20" x2="14" y2="22"/>
-                    <line x1="50" y1="20" x2="50" y2="22"/>
-                    <line x1="14" y1="42" x2="14" y2="44"/>
-                    <line x1="50" y1="42" x2="50" y2="44"/>
-                </svg>
+            <div class="welcome-logo" style="background: none; box-shadow: none;">
+                <img src="img/welcome_logo.png" alt="EditFlow Pro" style="width: 72px; height: 72px; filter: drop-shadow(0 4px 12px rgba(26,140,255,0.3));">
             </div>
             <h2 class="welcome-title">EditFlow <span class="welcome-pro">Pro</span></h2>
-            <p class="welcome-tagline" data-i18n="welcome_tagline">One-click editing for Premiere Pro</p>
+            <p class="welcome-tagline" data-i18n="welcome_tagline">The Ultimate Premiere Pro Toolkit</p>
 
             <div class="welcome-features">
                 <div class="welcome-feature">
-                    <span class="welcome-feature-icon">🎚</span>
-                    <span data-i18n="welcome_f1">Smart audio · Static scale · Transform</span>
+                    <span class="welcome-feature-icon">🎙️</span>
+                    <span>AI Transcription & Translation with 99% accuracy via Groq</span>
                 </div>
                 <div class="welcome-feature">
-                    <span class="welcome-feature-icon">🎬</span>
-                    <span data-i18n="welcome_f2">AI captions in 15+ languages with animated styles</span>
+                    <span class="welcome-feature-icon">✨</span>
+                    <span>Dynamic Subtitles with professional animations (Pop, Typewriter)</span>
                 </div>
                 <div class="welcome-feature">
-                    <span class="welcome-feature-icon">🚀</span>
-                    <span data-i18n="welcome_f3">Fast export presets · One-tap paste from web</span>
+                    <span class="welcome-feature-icon">🎧</span>
+                    <span>140+ Cinematic SFX ready to inject into your timeline</span>
+                </div>
+                <div class="welcome-feature">
+                    <span class="welcome-feature-icon">🎛️</span>
+                    <span>Smart Transform, Native Undo, & Global Audio Leveling</span>
                 </div>
             </div>
 
@@ -577,6 +573,6 @@
     </div>
 
     <script src="js/dspTools.js"></script>
-    <script src="js/main.js?v=32"></script>
+    <script src="js/main.js?v=33"></script>
 </body>
 </html>

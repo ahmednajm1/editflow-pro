@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.0.0";
+var CURRENT_VERSION = "1.1.0";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, execModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -34,7 +34,8 @@ var DEFAULT_SETTINGS = {
     bitrate: 10,
     exportPath: "",
     filenamePattern: "sequence",
-    groqApiKey: ""
+    groqApiKey: "",
+    favoriteSfx: []
 };
 var settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 var currentLang = "en";
@@ -1662,6 +1663,16 @@ function importBlob(blob) {
             if (search && s.name.toLowerCase().indexOf(search) === -1) continue;
             result.push(s);
         }
+        
+        // SORTING: Favorites first
+        result.sort(function(a, b) {
+            var favs = settings.favoriteSfx || [];
+            var aFav = favs.indexOf(a.id) > -1 ? 1 : 0;
+            var bFav = favs.indexOf(b.id) > -1 ? 1 : 0;
+            if (aFav !== bFav) return bFav - aFav; // 1 comes before 0
+            return a.name.localeCompare(b.name);
+        });
+        
         return result;
     }
 
@@ -1709,6 +1720,25 @@ function importBlob(blob) {
             togglePreview(sound, playBtn, row);
         });
 
+        var favBtn = document.createElement("button");
+        var isFav = (settings.favoriteSfx || []).indexOf(sound.id) > -1;
+        favBtn.className = "sfx-fav-btn" + (isFav ? " active" : "");
+        favBtn.innerHTML = isFav ? "★" : "☆";
+        favBtn.title = "Toggle Favorite";
+        favBtn.addEventListener("click", function(e) {
+            e.stopPropagation();
+            var favList = settings.favoriteSfx || [];
+            var idx = favList.indexOf(sound.id);
+            if (idx > -1) {
+                favList.splice(idx, 1);
+            } else {
+                favList.push(sound.id);
+            }
+            settings.favoriteSfx = favList;
+            if (typeof saveSettings === "function") saveSettings();
+            renderSoundList();
+        });
+
         var nameSpan = document.createElement("span");
         nameSpan.className = "sfx-name";
         nameSpan.textContent = sound.name;
@@ -1727,6 +1757,7 @@ function importBlob(blob) {
         });
 
         row.appendChild(playBtn);
+        row.appendChild(favBtn);
         row.appendChild(nameSpan);
         row.appendChild(durSpan);
         row.appendChild(addBtn);

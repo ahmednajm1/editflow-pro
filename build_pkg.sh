@@ -1,0 +1,58 @@
+#!/bin/bash
+set -e
+cd "$(dirname "$0")"
+
+echo "Building EditFlow Pro Installer..."
+
+# Clean up
+rm -rf build_installer
+mkdir -p build_installer/root
+mkdir -p build_installer/scripts
+
+# Copy extension files
+cp -R client build_installer/root/
+cp -R jsx build_installer/root/
+cp -R sfx build_installer/root/
+cp -R CSXS build_installer/root/
+cp -R bin build_installer/root/ || true
+cp *.py build_installer/root/ || true
+cp .debug build_installer/root/ || true
+cp package.json build_installer/root/ || true
+cp README.md build_installer/root/ || true
+
+# Remove unwanted files
+find build_installer/root -name ".DS_Store" -delete
+
+# Create postinstall script to enable PlayerDebugMode
+cat << 'EOF' > build_installer/scripts/postinstall
+#!/bin/bash
+echo "Enabling PlayerDebugMode for all Premiere Pro versions..."
+
+# Define all possible CSXS versions
+VERSIONS=(9 10 11 12 13 14 15 16)
+
+# Global preferences
+for v in "${VERSIONS[@]}"; do
+    defaults write /Library/Preferences/com.adobe.CSXS.$v PlayerDebugMode 1 || true
+done
+
+# Current User preferences
+USER=$(stat -f "%Su" /dev/console)
+for v in "${VERSIONS[@]}"; do
+    su - "$USER" -c "defaults write com.adobe.CSXS.$v PlayerDebugMode 1" || true
+done
+
+exit 0
+EOF
+chmod +x build_installer/scripts/postinstall
+
+# Build the PKG
+pkgbuild --root build_installer/root \
+         --identifier com.najmmedia.editflowpro \
+         --version 17.0 \
+         --scripts build_installer/scripts \
+         --install-location "/Library/Application Support/Adobe/CEP/extensions/EditFlowPro" \
+         "EditFlow Pro Installer.pkg"
+
+rm -rf build_installer
+echo "Done! Created EditFlow Pro Installer.pkg"
