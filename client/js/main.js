@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.1.0";
+var CURRENT_VERSION = "1.1.1";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, execModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -1362,6 +1362,7 @@ function loadSettings() {
             if (typeof d.bitrate === "number") settings.bitrate = d.bitrate;
             if (typeof d.exportPath === "string") settings.exportPath = d.exportPath;
             if (typeof d.groqApiKey === "string") settings.groqApiKey = d.groqApiKey;
+            if (Array.isArray(d.favoriteSfx)) settings.favoriteSfx = d.favoriteSfx;
         }
     } catch(e) { console.log("[loadSettings] error:", e); }
     if (settings.language && typeof applyLanguage === "function") {
@@ -1729,14 +1730,30 @@ function importBlob(blob) {
             e.stopPropagation();
             var favList = settings.favoriteSfx || [];
             var idx = favList.indexOf(sound.id);
+            var isAdding = false;
             if (idx > -1) {
                 favList.splice(idx, 1);
             } else {
                 favList.push(sound.id);
+                isAdding = true;
             }
             settings.favoriteSfx = favList;
             if (typeof saveSettings === "function") saveSettings();
-            renderSoundList();
+
+            if (isAdding) {
+                var floatTxt = document.createElement("div");
+                floatTxt.className = "sfx-fav-float";
+                floatTxt.textContent = "★";
+                favBtn.appendChild(floatTxt);
+                setTimeout(function() {
+                    if (floatTxt.parentNode) floatTxt.parentNode.removeChild(floatTxt);
+                    renderSoundList();
+                }, 600);
+                favBtn.classList.add("active");
+                favBtn.innerHTML = "★";
+            } else {
+                renderSoundList();
+            }
         });
 
         var nameSpan = document.createElement("span");
