@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>EditFlow Pro</title>
-    <link rel="stylesheet" href="css/style.css?v=36">
+    <link rel="stylesheet" href="css/style.css?v=37">
     <script src="js/CSInterface.js"></script>
 </head>
 <body>
@@ -235,15 +235,15 @@
                 </div>
                 <div class="welcome-feature">
                     <span class="welcome-feature-icon">✨</span>
-                    <span>Dynamic Subtitles with professional animations (Pop, Typewriter)</span>
+                    <span>Dynamic AI Subtitles with<br>instant professional animations</span>
                 </div>
                 <div class="welcome-feature">
                     <span class="welcome-feature-icon">🎧</span>
-                    <span>140+ Cinematic SFX ready to inject into your timeline</span>
+                    <span>240+ Cinematic SFX ready to inject into your timeline</span>
                 </div>
                 <div class="welcome-feature">
                     <span class="welcome-feature-icon">🎛️</span>
-                    <span>Smart Transform, Native Undo, & Global Audio Leveling</span>
+                    <span>Smart Transform, Web Image Paste, & One-Click Frame Capture</span>
                 </div>
             </div>
 
@@ -454,6 +454,9 @@
                 <svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:middle; margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 <span data-i18n="paste_btn">Paste Image from Internet</span>
             </button>
+            <button id="btn-capture-frame" class="secondary" data-tooltip="Capture the current frame at the playhead and copy it to your clipboard. Paste anywhere instantly." style="margin-top:8px;" data-i18n="export_capture">
+                📷 Capture Frame
+            </button>
             <p id="paste-status" style="font-size:11px; color:var(--text-mute); margin:6px 0 0; text-align:center;"></p>
         </div>
 
@@ -536,9 +539,6 @@
             <button id="btn-export-selected" data-tooltip="Export only the currently selected clip respecting its in/out range markers." data-i18n="export_selected">
                 Export Selected Clip
             </button>
-            <button id="btn-capture-frame" class="secondary" data-tooltip="Capture the current frame at the playhead and copy it to your clipboard. Paste anywhere instantly." style="margin-top:8px;" data-i18n="export_capture">
-                📷 Capture Frame
-            </button>
         </div>
 
         <!-- PROGRESS -->
@@ -573,6 +573,6 @@
     </div>
 
     <script src="js/dspTools.js"></script>
-    <script src="js/main.js?v=36"></script>
+    <script src="js/main.js?v=37"></script>
 </body>
 </html>
