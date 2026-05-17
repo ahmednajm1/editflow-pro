@@ -152,6 +152,7 @@ html, body {
   -webkit-backdrop-filter: blur(8px);
 }
 .settings-gear:hover { 
+  opacity: 1; 
   background: rgba(255,255,255,0.15);
   border-color: rgba(255,255,255,0.4); 
   transform: translateY(-1px);
@@ -163,6 +164,56 @@ html, body {
   width: 18px; height: 18px;
   stroke: currentColor; fill: none;
   stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
+.header-dropdown-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-right: 8px;
+}
+#btn-help-toggle:hover {
+  transform: none; /* Override gear rotation for help icon */
+}
+.header-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 10px;
+  background: rgba(20, 20, 22, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  min-width: 170px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all 0.2s ease;
+  z-index: 999;
+}
+.header-dropdown.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.header-dropdown a {
+  color: var(--text);
+  text-decoration: none;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.header-dropdown a:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* ---------- PANEL CONTENT ---------- */

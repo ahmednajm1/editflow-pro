@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.1.3";
+var CURRENT_VERSION = "1.1.4";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -1078,6 +1078,36 @@ document.addEventListener("DOMContentLoaded", function() {
     safeBind("btn-paste-clipboard", function() { pasteFromClipboard(); });
 
     // SETTINGS
+    var helpBtn = document.getElementById("btn-help-toggle");
+    var helpDrop = document.getElementById("help-dropdown");
+    if (helpBtn && helpDrop) {
+        helpBtn.addEventListener("click", function(e) {
+            e.stopPropagation();
+            helpDrop.classList.toggle("show");
+        });
+        document.addEventListener("click", function(e) {
+            if (!helpDrop.contains(e.target) && e.target !== helpBtn) {
+                helpDrop.classList.remove("show");
+            }
+        });
+        
+        var tutBtn = document.getElementById("btn-help-tutorials");
+        if(tutBtn) tutBtn.addEventListener("click", function(e) {
+            e.preventDefault();
+            helpDrop.classList.remove("show");
+            if(window.csInterface) window.csInterface.openURLInDefaultBrowser("https://www.najmedia.com/editflow/");
+        });
+        
+        var contactBtn = document.getElementById("btn-help-contact");
+        if(contactBtn) contactBtn.addEventListener("click", function(e) {
+            e.preventDefault();
+            helpDrop.classList.remove("show");
+            document.getElementById("settings-overlay").classList.remove("hidden");
+            var aboutTab = document.querySelector(".settings-tab[data-tab='about']");
+            if(aboutTab) setTimeout(function(){ aboutTab.click(); }, 100);
+        });
+    }
+
     safeBind("btn-settings", function() {
         populateSettingsForm();
         document.getElementById("settings-overlay").classList.remove("hidden");
