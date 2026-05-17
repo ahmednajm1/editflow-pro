@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.1.4";
+var CURRENT_VERSION = "1.1.5";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -261,7 +261,11 @@ document.addEventListener("DOMContentLoaded", function() {
                 setTimeout(function() { splash.style.display = "none"; }, 500);
             }, 600);
         }
+        }
     }
+
+    var vBadge = document.getElementById("version-badge");
+    if (vBadge) vBadge.innerHTML = "v" + CURRENT_VERSION;
 
     // Step 5: Verify JSX is loaded
     csInterface.evalScript('typeof $._editflow_loaded', function(result) {
