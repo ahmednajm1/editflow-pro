@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.1.6";
+var CURRENT_VERSION = "1.1.7";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -1089,7 +1089,7 @@ document.addEventListener("DOMContentLoaded", function() {
             helpDrop.classList.toggle("show");
         });
         document.addEventListener("click", function(e) {
-            if (!helpDrop.contains(e.target) && e.target !== helpBtn) {
+            if (helpDrop.classList.contains("show") && !helpDrop.contains(e.target) && e.target !== helpBtn) {
                 helpDrop.classList.remove("show");
             }
         });
