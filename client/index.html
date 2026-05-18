@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>EditFlow Pro</title>
-    <link rel="stylesheet" href="css/style.css?v=41">
+    <link rel="stylesheet" href="css/style.css?v=42">
     <script src="js/CSInterface.js"></script>
 </head>
 <body>
@@ -504,21 +504,16 @@
                     <option value="hi">Hindi</option>
                     <option value="ur">Urdu</option>
                 </select>
-                <span style="font-size:10px; color:var(--text-mute); width:42px;" data-i18n="cap_accuracy">Accuracy</span>
-                <select id="cap-model" style="flex:1;" data-tooltip="Speed vs Accuracy balance.">
-                    <option value="small">Standard Speed</option>
-                    <option value="large" selected>Maximum Accuracy (Pro)</option>
-                </select>
-            </div>
-
-            <!-- STYLE -->
-            <div class="input-row">
+                
                 <span style="font-size:10px; color:var(--text-mute); width:42px;" data-i18n="cap_style">Style</span>
                 <select id="cap-style" style="flex:1;" data-tooltip="How text is segmented on screen.">
                     <option value="word">Word-by-word</option>
                     <option value="phrase" selected>Short phrases</option>
                     <option value="line">Full lines</option>
                 </select>
+                
+                <!-- Hidden Accuracy input to keep JS from breaking -->
+                <input type="hidden" id="cap-model" value="large">
             </div>
 
             <button id="btn-generate-captions" data-tooltip="Generate captions and place them on the timeline." style="margin-top:8px;" data-i18n="cap_generate">
@@ -590,6 +585,6 @@
     </div>
 
     <script src="js/dspTools.js"></script>
-    <script src="js/main.js?v=41"></script>
+    <script src="js/main.js?v=42"></script>
 </body>
 </html>
