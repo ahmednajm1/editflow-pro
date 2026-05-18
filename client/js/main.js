@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.1.5";
+var CURRENT_VERSION = "1.1.6";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -260,7 +260,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 splash.style.opacity = "0";
                 setTimeout(function() { splash.style.display = "none"; }, 500);
             }, 600);
-        }
         }
     }
 
