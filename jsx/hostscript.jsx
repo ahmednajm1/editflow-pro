@@ -704,7 +704,7 @@ $._editflow = {
 
             // Find the imported item in the bin
             var imported = null;
-            var sfxName = sfxFile.name;
+            var sfxName = decodeURI(sfxFile.name);
             // Search in bin first, then root
             var searchBins = [bin, root];
             for (var b = 0; b < searchBins.length; b++) {

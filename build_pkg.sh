@@ -22,6 +22,7 @@ cp README.md build_installer/root/ || true
 
 # Remove unwanted files
 find build_installer/root -name ".DS_Store" -delete
+rm -rf build_installer/root/bin/.build_*
 
 # Create postinstall script to enable PlayerDebugMode
 cat << 'EOF' > build_installer/scripts/postinstall
