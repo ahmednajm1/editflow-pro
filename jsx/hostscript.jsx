@@ -683,7 +683,7 @@ $._editflow = {
             if (!seq) return '{"status":"error","message":"Open a sequence first."}';
 
             // Verify file exists
-            var sfxFile = new File(filePath);
+            var sfxFile = new File(encodeURI(filePath));
             if (!sfxFile.exists) {
                 return '{"status":"error","message":"SFX file not found: ' + filePath + '"}';
             }
@@ -700,7 +700,7 @@ $._editflow = {
             }
 
             // Import the file
-            project.importFiles([filePath], true, bin, false);
+            project.importFiles([sfxFile.fsName], true, bin, false);
 
             // Find the imported item in the bin
             var imported = null;

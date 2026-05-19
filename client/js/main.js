@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.2.2";
+var CURRENT_VERSION = "1.2.3";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -628,47 +628,7 @@ document.addEventListener("DOMContentLoaded", function() {
     // Shows a professional download prompt when the AI engine binary is missing.
     // Injected dynamically so the HTML stays clean.
     function showCaptionDownloadBanner() {
-        var existing = document.getElementById('cap-download-banner');
-        if (existing) { existing.style.display = 'block'; return; }
-        var banner = document.createElement('div');
-        banner.id = 'cap-download-banner';
-        banner.style.cssText = [
-            'background:rgba(31,143,255,0.10)',
-            'border:1px solid rgba(31,143,255,0.35)',
-            'border-radius:8px',
-            'padding:14px 16px',
-            'margin:8px 0 4px',
-            'text-align:center'
-        ].join(';');
-        banner.innerHTML =
-            '<p style="font-size:13px;font-weight:600;color:#1F8FFF;margin:0 0 5px 0;">' +
-                '⬇️ AI Engine not installed' +
-            '</p>' +
-            '<p style="font-size:11px;color:var(--text-mute);margin:0 0 10px 0;line-height:1.6;">' +
-                'The AI caption engine requires a one-time download.<br>' +
-                'It’s a ~25 MB standalone binary — no Python or pip needed.' +
-            '</p>' +
-            '<a id="cap-dl-btn" href="#" style="' +
-                'display:inline-block;background:#1F8FFF;color:#fff;' +
-                'border-radius:6px;padding:7px 20px;font-size:12px;' +
-                'font-weight:600;text-decoration:none;cursor:pointer;' +
-            '">Download AI Engine →</a>' +
-            '<p style="font-size:10px;color:var(--text-mute);margin:8px 0 0 0;">' +
-                'Works offline after the first download' +
-            '</p>';
-        var statusEl = document.getElementById('cap-status');
-        if (statusEl && statusEl.parentNode) {
-            statusEl.parentNode.insertBefore(banner, statusEl);
-        }
-        var dlBtn = document.getElementById('cap-dl-btn');
-        if (dlBtn) {
-            dlBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                csInterface.openURLInDefaultBrowser(
-                    'https://github.com/ahmednajm1/editflow-pro/releases/latest'
-                );
-            });
-        }
+        showStatus("AI Engine binary not found in installation. Please reinstall EditFlow Pro.", "red");
     }
 
     safeBind("btn-generate-captions", function() {
@@ -695,8 +655,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 hideProgress(); setStatus(""); showStatus("Select an audio/video clip first.", "red"); return;
             }
 
-            var EFP_BIN_DIR = osModule.homedir() + "/Library/Application Support/EditFlowPro";
-            var transcriberBin = EFP_BIN_DIR + "/whisper_runner";
+            var transcriberBin = extensionPath + "/bin/dist/whisper_runner";
             if (!fsModule.existsSync(transcriberBin)) {
                 hideProgress(); setStatus(""); showCaptionDownloadBanner(); return;
             }
