@@ -13,6 +13,8 @@ var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
 var operationRunning = false, statusTimer = null;
+var activeCaptionProcess = null;
+var EFP_BIN_DIR = "";
 var DEFAULT_SETTINGS = {
     language: "en",
     audioStep: 1,
@@ -243,11 +245,30 @@ document.addEventListener("DOMContentLoaded", function() {
         if (osModule && pathModule) {
             var userData = pathModule.join(osModule.homedir(), "Library", "Application Support", "EditFlowPro");
             configPath = pathModule.join(userData, "editflow_config.json");
+            EFP_BIN_DIR = pathModule.join(userData, "tools");
         } else {
             configPath = extensionPath + "/editflow_config.json"; // fallback
+            EFP_BIN_DIR = extensionPath + "/bin";
         }
         if (fsModule) { loadSettings(); findExportPreset(); }
         try { dsp = new DSPTools(); } catch(e) {}
+
+        // Bind progress cancel button
+        safeBind("btn-progress-cancel", function() {
+            if (activeCaptionProcess) {
+                try {
+                    activeCaptionProcess.kill('SIGTERM');
+                    console.log("[Cancel] Sent SIGTERM to activeCaptionProcess");
+                } catch(e) {
+                    console.warn("[Cancel] Error killing process:", e.message);
+                }
+                activeCaptionProcess = null;
+            }
+            hideProgress();
+            var statusLine = document.getElementById("cap-status");
+            if (statusLine) statusLine.textContent = "Captioning cancelled.";
+            showStatus("Captioning cancelled by user.", "orange");
+        });
     } catch(e) {
         console.log("[CRITICAL] CSInterface init failed:", e.message);
     }
@@ -646,7 +667,7 @@ document.addEventListener("DOMContentLoaded", function() {
         function shq(s) { return '"' + String(s).replace(/(["\\$`])/g, "\\$1") + '"'; }
         var opts = { maxBuffer: 16 * 1024 * 1024, timeout: 30 * 60 * 1000 };
 
-        showProgress("Finding audio...", 3);
+        showProgress("Finding audio...", 3, true);
         setStatus("Reading selection…");
 
         csInterface.evalScript('$._editflow.getAudioMedia()', function(raw) {
@@ -705,12 +726,18 @@ document.addEventListener("DOMContentLoaded", function() {
                 }
                 var modelSize = ({tiny:75, base:140, small:460, medium:1500, large:3000})[model] || 460;
                 var trimNote = (cDur > 0.1) ? (" · " + cDur.toFixed(1) + "s") : "";
-                showProgress("Analyzing speech (" + model + ")…", 15);
+                showProgress("Analyzing speech (" + model + ")…", 15, true);
                 setStatus("AI speech recognition" + trimNote + " · model = " + modelSize + " MB on first run");
                 console.log("[Captions] running:", cmd);
 
-                execModule(cmd, opts, function(err, stdout, stderr) {
+                activeCaptionProcess = execModule(cmd, opts, function(err, stdout, stderr) {
+                activeCaptionProcess = null;
                 if (err) {
+                    if (err.killed || err.signal === 'SIGTERM') {
+                        hideProgress(); setStatus("Captioning cancelled.");
+                        showStatus("Captioning cancelled by user.", "orange");
+                        return;
+                    }
                     hideProgress(); setStatus("");
                     console.log("[Captions] err:", err.message, "\nstdout:", stdout, "\nstderr:", stderr);
                     // whisper_runner writes JSON to stdout even on failure — parse it first
@@ -752,7 +779,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 var firstTlStart = clips[0].timelineStart || 0;
                 var totalDur = 0;
                 console.log("[Captions] Multi-clip mode: " + clips.length + " clips selected");
-                showProgress("Extracting audio from " + clips.length + " clips…", 8);
+                showProgress("Extracting audio from " + clips.length + " clips…", 8, true);
                 setStatus("Combining " + clips.length + " clips for transcription…");
 
                 // Build ffmpeg concat filter: extract the used portion from each clip
@@ -778,8 +805,16 @@ document.addEventListener("DOMContentLoaded", function() {
                     // Extract to WAV to avoid MP3 padding/drift when concatenating
                     extractCmd += " -vn -ac 1 -ar 16000 -c:a pcm_s16le " + shq(partFile);
 
-                    execModule(extractCmd, opts, function(err2) {
-                        if (err2) extractError = err2;
+                    activeCaptionProcess = execModule(extractCmd, opts, function(err2) {
+                        activeCaptionProcess = null;
+                        if (err2) {
+                            if (err2.killed || err2.signal === 'SIGTERM') {
+                                hideProgress(); setStatus("Captioning cancelled.");
+                                showStatus("Captioning cancelled by user.", "orange");
+                                return;
+                            }
+                            extractError = err2;
+                        }
                         pending--;
                         if (pending === 0) {
                             if (extractError) {
@@ -799,12 +834,18 @@ document.addEventListener("DOMContentLoaded", function() {
                                 " -f concat -safe 0 -i " + shq(concatList) +
                                 " -c copy " + shq(combinedFile);
 
-                            execModule(concatCmd, opts, function(err3) {
+                            activeCaptionProcess = execModule(concatCmd, opts, function(err3) {
+                                activeCaptionProcess = null;
                                 // Cleanup part files
                                 partFiles.forEach(function(f) { try { fsModule.unlinkSync(f); } catch(e){} });
                                 try { fsModule.unlinkSync(concatList); } catch(e){}
 
                                 if (err3) {
+                                    if (err3.killed || err3.signal === 'SIGTERM') {
+                                        hideProgress(); setStatus("Captioning cancelled.");
+                                        showStatus("Captioning cancelled by user.", "orange");
+                                        return;
+                                    }
                                     hideProgress(); setStatus("");
                                     showStatus("Audio concat failed: " + (err3.message || "").slice(0,100), "red");
                                     return;
@@ -1289,10 +1330,11 @@ var _progressStartTime = 0;
 var _progressTargetPct = 0;
 var _progressCurrentPct = 0;
 
-function showProgress(msg, pct) {
+function showProgress(msg, pct, showCancel) {
     var container = document.getElementById("progress-container");
     var textEl = document.getElementById("progress-text");
     var fillEl = document.getElementById("progress-fill");
+    var cancelBtn = document.getElementById("btn-progress-cancel");
     container.classList.remove("hidden");
     fillEl.classList.remove("done");
     textEl.innerText = msg;
@@ -1300,6 +1342,14 @@ function showProgress(msg, pct) {
     fillEl.style.width = _progressTargetPct + "%";
     _progressCurrentPct = _progressTargetPct;
     operationRunning = true;
+
+    if (cancelBtn) {
+        if (showCancel) {
+            cancelBtn.classList.remove("hidden");
+        } else {
+            cancelBtn.classList.add("hidden");
+        }
+    }
 
     // Start elapsed timer if this is the "Analyzing" step (where the wait happens)
     if (pct <= 15 && pct > 0) {
@@ -1327,8 +1377,10 @@ function hideProgress() {
     if (_progressTimer) { clearInterval(_progressTimer); _progressTimer = null; }
     var container = document.getElementById("progress-container");
     var fillEl = document.getElementById("progress-fill");
+    var cancelBtn = document.getElementById("btn-progress-cancel");
     fillEl.style.width = "100%";
     fillEl.classList.add("done");
+    if (cancelBtn) cancelBtn.classList.add("hidden");
     // Let the 100% animation play, then hide
     setTimeout(function() {
         container.classList.add("hidden");

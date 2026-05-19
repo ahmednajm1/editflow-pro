@@ -1319,3 +1319,23 @@ button.secondary { color: var(--text-mute); }
   font-weight: 600;
   color: #fff;
 }
+
+#btn-progress-cancel {
+  background: transparent;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: var(--r);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+#btn-progress-cancel:hover {
+  background: var(--danger);
+  color: #ffffff;
+}
+#btn-progress-cancel.hidden {
+  display: none !important;
+}

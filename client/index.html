@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>EditFlow Pro</title>
-    <link rel="stylesheet" href="css/style.css?v=48">
+    <link rel="stylesheet" href="css/style.css?v=49">
     <script src="js/CSInterface.js"></script>
 </head>
 <body>
@@ -570,7 +570,10 @@
             <div class="progress-bar-bg">
                 <div class="progress-bar-fill" id="progress-fill"></div>
             </div>
-            <p id="progress-text">Working...</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                <p id="progress-text" style="margin: 0; flex: 1; padding-right: 8px;">Working...</p>
+                <button id="btn-progress-cancel" class="hidden" data-i18n="btn_cancel">Cancel</button>
+            </div>
         </div>
 
         <!-- STATUS BAR -->
@@ -597,6 +600,6 @@
     </div>
 
     <script src="js/dspTools.js"></script>
-    <script src="js/main.js?v=48"></script>
+    <script src="js/main.js?v=49"></script>
 </body>
 </html>
