@@ -405,7 +405,12 @@ document.addEventListener("DOMContentLoaded", function() {
 
             // Step 2: Unzip
             msg.innerHTML = currentLang === "ar" ? "جاري تثبيت الملفات... 🛠️" : "Installing files... 🛠️";
-            var unzipCmd = 'unzip -o "' + tempZipPath + '" -d "' + extensionPath + '"';
+            var unzipCmd;
+            if (osModule && osModule.platform() === "win32") {
+                unzipCmd = 'powershell -Command "Expand-Archive -LiteralPath \'' + tempZipPath + '\' -DestinationPath \'' + extensionPath + '\' -Force"';
+            } else {
+                unzipCmd = 'unzip -o "' + tempZipPath + '" -d "' + extensionPath + '"';
+            }
             console.log("[HotUpdate] Extracting:", unzipCmd);
 
             execModule(unzipCmd, function(unzipErr, unzipStdout, unzipStderr) {
