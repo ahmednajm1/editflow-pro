@@ -775,6 +775,28 @@ document.addEventListener("DOMContentLoaded", function() {
 
             var cmdPrefix = "";
             var hasTranscriber = false;
+            
+            function findPythonOnWindows() {
+                if (!fsModule || !osModule) return "python";
+                var userHome = osModule.homedir();
+                var programFiles = process.env["ProgramFiles"] || "C:\\Program Files";
+                var localAppData = process.env["LocalAppData"] || (userHome + "\\AppData\\Local");
+                var paths = [];
+                var versions = ["Python313", "Python312", "Python311", "Python310", "Python39", "Python38"];
+                for (var i = 0; i < versions.length; i++) {
+                    paths.push(localAppData + "\\Programs\\Python\\" + versions[i] + "\\python.exe");
+                }
+                for (var i = 0; i < versions.length; i++) {
+                    paths.push(programFiles + "\\Python\\" + versions[i] + "\\python.exe");
+                }
+                for (var i = 0; i < paths.length; i++) {
+                    if (fsModule.existsSync(paths[i])) {
+                        return shq(paths[i]);
+                    }
+                }
+                return "python";
+            }
+
             if (osModule && osModule.platform() === "win32") {
                 var winExe = extensionPath + "/bin/dist/whisper_runner.exe";
                 if (fsModule.existsSync(winExe)) {
@@ -782,7 +804,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     cmdPrefix = shq(winExe);
                 } else if (fsModule.existsSync(extensionPath + "/bin/transcriber.py")) {
                     hasTranscriber = true;
-                    cmdPrefix = "python " + shq(extensionPath + "/bin/transcriber.py");
+                    cmdPrefix = findPythonOnWindows() + " " + shq(extensionPath + "/bin/transcriber.py");
                 }
             } else {
                 var macBin = extensionPath + "/bin/dist/whisper_runner";
@@ -1650,12 +1672,24 @@ function readSettingsForm() {
 }
 function findExportPreset() {
     if (!fsModule) return;
-    // Try direct known paths first (fast)
-    var knownPaths = [
-        "/Applications/Adobe Media Encoder 2026/Adobe Media Encoder 2026.app/Contents/MediaIO/systempresets/4E49434B_48323634/00 - Match Source - High bitrate.epr",
-        "/Applications/Adobe Media Encoder 2025/Adobe Media Encoder 2025.app/Contents/MediaIO/systempresets/4E49434B_48323634/00 - Match Source - High bitrate.epr",
-        "/Applications/Adobe Media Encoder 2024/Adobe Media Encoder 2024.app/Contents/MediaIO/systempresets/4E49434B_48323634/00 - Match Source - High bitrate.epr"
-    ];
+    var knownPaths = [];
+    var isWin = (osModule && osModule.platform() === "win32");
+    
+    if (isWin) {
+        var programFiles = process.env["ProgramFiles"] || "C:\\Program Files";
+        var years = ["2027", "2026", "2025", "2024", "2023"];
+        for (var i = 0; i < years.length; i++) {
+            knownPaths.push(programFiles + "\\Adobe\\Adobe Media Encoder " + years[i] + "\\MediaIO\\systempresets\\4E49434B_48323634\\00 - Match Source - High bitrate.epr");
+            knownPaths.push(programFiles + "\\Adobe\\Adobe Premiere Pro " + years[i] + "\\MediaIO\\systempresets\\4E49434B_48323634\\00 - Match Source - High bitrate.epr");
+        }
+    } else {
+        knownPaths = [
+            "/Applications/Adobe Media Encoder 2026/Adobe Media Encoder 2026.app/Contents/MediaIO/systempresets/4E49434B_48323634/00 - Match Source - High bitrate.epr",
+            "/Applications/Adobe Media Encoder 2025/Adobe Media Encoder 2025.app/Contents/MediaIO/systempresets/4E49434B_48323634/00 - Match Source - High bitrate.epr",
+            "/Applications/Adobe Media Encoder 2024/Adobe Media Encoder 2024.app/Contents/MediaIO/systempresets/4E49434B_48323634/00 - Match Source - High bitrate.epr"
+        ];
+    }
+    
     for (var i = 0; i < knownPaths.length; i++) {
         try {
             if (fsModule.existsSync(knownPaths[i])) {
@@ -1665,14 +1699,25 @@ function findExportPreset() {
             }
         } catch(e) {}
     }
-    // Fallback: search with find
+    
+    // Fallback: search with command
     if (!execModule) return;
-    execModule('find /Applications -name "*.epr" -path "*Match*Source*High*" 2>/dev/null | head -1', function(e, o) {
-        if (o && o.trim()) {
-            foundPresetPath = o.trim();
-            console.log("[EFP] Preset found (find): " + foundPresetPath);
-        }
-    });
+    if (isWin) {
+        var winCmd = 'powershell -Command "Get-ChildItem -Path \'' + (process.env["ProgramFiles"] || 'C:\\Program Files') + '\\Adobe\' -Filter \'00 - Match Source - High bitrate.epr\' -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -First 1"';
+        execModule(winCmd, function(e, o) {
+            if (o && o.trim()) {
+                foundPresetPath = o.trim();
+                console.log("[EFP] Preset found (PowerShell find): " + foundPresetPath);
+            }
+        });
+    } else {
+        execModule('find /Applications -name "*.epr" -path "*Match*Source*High*" 2>/dev/null | head -1', function(e, o) {
+            if (o && o.trim()) {
+                foundPresetPath = o.trim();
+                console.log("[EFP] Preset found (find): " + foundPresetPath);
+            }
+        });
+    }
 }
 function checkFirstLaunch() {
     try {
