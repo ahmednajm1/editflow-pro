@@ -52,6 +52,7 @@ client/append_settings_css.js
 client/brand_preview.html
 *.dmg
 *.pkg
+*.exe
 
 # ZXP build
 ZXPSignCmd
