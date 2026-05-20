@@ -1105,67 +1105,9 @@ document.addEventListener("DOMContentLoaded", function() {
             return;
         }
         
-        var pngPreset = findPngPreset();
+        showProgress("Reading playhead...", 20);
+        console.log('[CAPTURE] Reading playhead frame info...');
         
-        // If we have the PNG preset, use NATIVE TIMELINE RENDER (100% accurate, captures zooms/effects)
-        if (pngPreset) {
-            console.log('[CAPTURE] Using Native MediaDirect...');
-            showProgress("Rendering frame...", 30);
-            
-            var safeTempDir = osModule.tmpdir().replace(/\\/g, "/");
-            var safePreset = pngPreset.replace(/\\/g, "/");
-            
-            csInterface.evalScript('$._editflow.exportNativeFrame("' + safePreset + '", "' + safeTempDir + '")', function(res) {
-                try {
-                    var r = JSON.parse(res);
-                    if (r.status !== "success" || r.method !== "media_direct") {
-                        showProgress("", 0); hideProgress();
-                        handleJSXResult(res);
-                        return;
-                    }
-                    
-                    showProgress("Saving to clipboard...", 60);
-                    var baseName = r.baseName;
-                    var tempDir = r.tempDir;
-                    var checks = 0;
-                    var expectedFile = null;
-                    
-                    var interval = setInterval(function() {
-                        checks++;
-                        // Search for the file in the temp directory (Premiere appends dynamic zeroes like '0.png' or '00000.png')
-                        try {
-                            var files = fsModule.readdirSync(tempDir);
-                            for (var i = 0; i < files.length; i++) {
-                                if (files[i].indexOf(baseName) === 0 && files[i].indexOf('.png') > -1) {
-                                    expectedFile = tempDir + "/" + files[i];
-                                    break;
-                                }
-                            }
-                        } catch(e) {}
-
-                        if (expectedFile && fsModule.existsSync(expectedFile)) {
-                            clearInterval(interval);
-                            // Restore In/Out points immediately
-                            csInterface.evalScript('$._editflow.restoreInOut("' + r.oldIn + '", "' + r.oldOut + '")');
-                            copyFrameToClipboard(expectedFile, 'PNG');
-                        } else if (checks > 40) { // 10 seconds timeout
-                            clearInterval(interval);
-                            csInterface.evalScript('$._editflow.restoreInOut("' + r.oldIn + '", "' + r.oldOut + '")');
-                            showProgress("", 0); hideProgress();
-                            showStatus("Capture timeout.", "red");
-                        }
-                    }, 250);
-                } catch(e) {
-                    showProgress("", 0); hideProgress();
-                    handleJSXResult(res);
-                }
-            });
-            return;
-        }
-
-        // FALLBACK: ffmpeg Extraction (fast, but no timeline effects/zooms)
-        console.log('[CAPTURE] Starting fast ffmpeg capture...');
-        showProgress("Reading playhead...", 30);
         csInterface.evalScript('$._editflow.getPlayheadFrameInfo()', function(result) {
             console.log('[CAPTURE] Info:', result);
             try {
@@ -1176,12 +1118,68 @@ document.addEventListener("DOMContentLoaded", function() {
                     return;
                 }
                 
-                // If Premiere handled the export natively (via exportFramePNG in v24.0+)
+                // OPTION A: Premiere 24.0+ Native instant exportFramePNG
                 if (r.method === "native" && r.path) {
                     copyFrameToClipboard(r.path, 'PNG');
                     return;
                 }
+                
+                // OPTION B: Fallback to exportAsMediaDirect (Media Encoder) if PNG preset is found
+                var pngPreset = findPngPreset();
+                if (pngPreset) {
+                    console.log('[CAPTURE] Falling back to Native MediaDirect...');
+                    showProgress("Rendering frame...", 40);
+                    
+                    var safeTempDir = osModule.tmpdir().replace(/\\/g, "/");
+                    var safePreset = pngPreset.replace(/\\/g, "/");
+                    
+                    csInterface.evalScript('$._editflow.exportNativeFrame("' + safePreset + '", "' + safeTempDir + '")', function(res) {
+                        try {
+                            var nr = JSON.parse(res);
+                            if (nr.status !== "success" || nr.method !== "media_direct") {
+                                showProgress("", 0); hideProgress();
+                                handleJSXResult(res);
+                                return;
+                            }
+                            
+                            showProgress("Saving to clipboard...", 70);
+                            var baseName = nr.baseName;
+                            var tempDir = nr.tempDir;
+                            var checks = 0;
+                            var expectedFile = null;
+                            
+                            var interval = setInterval(function() {
+                                checks++;
+                                try {
+                                    var files = fsModule.readdirSync(tempDir);
+                                    for (var i = 0; i < files.length; i++) {
+                                        if (files[i].indexOf(baseName) === 0 && files[i].indexOf('.png') > -1) {
+                                            expectedFile = tempDir + "/" + files[i];
+                                            break;
+                                        }
+                                    }
+                                } catch(e) {}
 
+                                if (expectedFile && fsModule.existsSync(expectedFile)) {
+                                    clearInterval(interval);
+                                    csInterface.evalScript('$._editflow.restoreInOut("' + nr.oldIn + '", "' + nr.oldOut + '")');
+                                    copyFrameToClipboard(expectedFile, 'PNG');
+                                } else if (checks > 40) { // 10 seconds timeout
+                                    clearInterval(interval);
+                                    csInterface.evalScript('$._editflow.restoreInOut("' + nr.oldIn + '", "' + nr.oldOut + '")');
+                                    showProgress("", 0); hideProgress();
+                                    showStatus("Capture timeout.", "red");
+                                }
+                            }, 250);
+                        } catch(e) {
+                            showProgress("", 0); hideProgress();
+                            handleJSXResult(res);
+                        }
+                    });
+                    return;
+                }
+
+                // OPTION C: Fallback to FFmpeg extraction
                 if (!r.mediaPath) {
                     showProgress("", 0); hideProgress();
                     showStatus("No media path found.", "red");
