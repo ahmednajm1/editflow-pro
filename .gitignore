@@ -61,3 +61,7 @@ editflow_cert.p12
 # Obfuscation
 *.obf.js
 obfuscator.config.json
+
+# Local Uploads & Zips
+najmedia_uploads/
+EditFlowPro.zip

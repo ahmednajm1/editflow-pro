@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.2.5";
+var CURRENT_VERSION = "1.2.4";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -318,7 +318,7 @@ document.addEventListener("DOMContentLoaded", function() {
     // UPDATE CHECKER
     // ============================================================
     function checkForUpdates() {
-        var remoteUrl = "https://raw.githubusercontent.com/ahmednajm1/editflow-pro/main/version.json?t=" + new Date().getTime();
+        var remoteUrl = "https://www.najmedia.com/editflow/version.json?t=" + new Date().getTime();
         fetch(remoteUrl)
             .then(function(response) { return response.json(); })
             .then(function(data) {
