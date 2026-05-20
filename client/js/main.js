@@ -323,13 +323,13 @@ document.addEventListener("DOMContentLoaded", function() {
             .then(function(response) { return response.json(); })
             .then(function(data) {
                 if (data && data.version && data.version !== CURRENT_VERSION) {
-                    showUpdateBanner(data.version, data.url);
+                    showUpdateBanner(data.version, data.url, data.hot_update_url);
                 }
             })
             .catch(function(err) { console.log("[EFP] Update check failed:", err); });
     }
 
-    function showUpdateBanner(newVer, downloadUrl) {
+    function showUpdateBanner(newVer, downloadUrl, hotUpdateUrl) {
         var banner = document.getElementById("update-banner");
         var msg = document.getElementById("update-text-msg");
         var btnNow = document.getElementById("btn-update-now");
@@ -338,18 +338,110 @@ document.addEventListener("DOMContentLoaded", function() {
         if (!banner || !msg) return;
         
         msg.innerHTML = currentLang === "ar" ? "تحديث جديد متاح (" + newVer + ")" : "Update " + newVer + " Available!";
-        btnNow.innerHTML = currentLang === "ar" ? "تنزيل" : "Download";
+        
+        if (hotUpdateUrl) {
+            btnNow.innerHTML = currentLang === "ar" ? "تحديث فوري ⚡" : "Update Instantly ⚡";
+        } else {
+            btnNow.innerHTML = currentLang === "ar" ? "تنزيل" : "Download";
+        }
         
         banner.classList.add("visible");
         
         btnNow.onclick = function() {
-            csInterface.openURLInDefaultBrowser(downloadUrl);
-            banner.classList.remove("visible");
+            if (hotUpdateUrl) {
+                startHotUpdate(hotUpdateUrl, downloadUrl, newVer);
+            } else {
+                csInterface.openURLInDefaultBrowser(downloadUrl);
+                banner.classList.remove("visible");
+            }
         };
         
         btnDismiss.onclick = function() {
             banner.classList.remove("visible");
         };
+    }
+
+    function startHotUpdate(hotUpdateUrl, downloadUrl, newVer) {
+        var banner = document.getElementById("update-banner");
+        var msg = document.getElementById("update-text-msg");
+        var btnNow = document.getElementById("btn-update-now");
+        var btnDismiss = document.getElementById("btn-update-dismiss");
+
+        if (!banner || !msg || !btnNow) return;
+
+        // Disable UI
+        btnNow.disabled = true;
+        btnNow.style.opacity = "0.5";
+        btnNow.style.pointerEvents = "none";
+        if (btnDismiss) btnDismiss.style.display = "none";
+
+        msg.innerHTML = currentLang === "ar" ? "جاري تحميل التحديث... ⏳" : "Downloading update... ⏳";
+        btnNow.innerHTML = "...";
+
+        if (!execModule || !fsModule || !osModule || !extensionPath) {
+            console.error("[HotUpdate] Required Node modules missing.");
+            showHotUpdateError();
+            return;
+        }
+
+        var tempZipPath = pathModule.join(osModule.tmpdir(), "efp_update_" + Date.now() + ".zip");
+        
+        // Step 1: Download using curl
+        var downloadCmd = 'curl -L -f -s -o "' + tempZipPath + '" "' + hotUpdateUrl + '"';
+        console.log("[HotUpdate] Downloading:", downloadCmd);
+
+        execModule(downloadCmd, function(err, stdout, stderr) {
+            if (err) {
+                console.error("[HotUpdate] Download failed:", err.message, stderr);
+                showHotUpdateError();
+                return;
+            }
+
+            if (!fsModule.existsSync(tempZipPath) || fsModule.statSync(tempZipPath).size < 100) {
+                console.error("[HotUpdate] Downloaded file is empty or missing.");
+                showHotUpdateError();
+                return;
+            }
+
+            // Step 2: Unzip
+            msg.innerHTML = currentLang === "ar" ? "جاري تثبيت الملفات... 🛠️" : "Installing files... 🛠️";
+            var unzipCmd = 'unzip -o "' + tempZipPath + '" -d "' + extensionPath + '"';
+            console.log("[HotUpdate] Extracting:", unzipCmd);
+
+            execModule(unzipCmd, function(unzipErr, unzipStdout, unzipStderr) {
+                // Clean up the temp zip
+                try { fsModule.unlinkSync(tempZipPath); } catch(e) {}
+
+                if (unzipErr) {
+                    console.error("[HotUpdate] Extraction failed:", unzipErr.message, unzipStderr);
+                    if (unzipStderr.indexOf("Permission denied") !== -1 || unzipErr.message.indexOf("Permission denied") !== -1) {
+                        msg.innerHTML = currentLang === "ar" ? "فشل التحديث بسبب الصلاحيات. يرجى التثبيت بالـ PKG." : "Failed due to permissions. Reinstall via PKG.";
+                    } else {
+                        showHotUpdateError();
+                    }
+                    return;
+                }
+
+                // Step 3: Success! Reload page
+                msg.innerHTML = currentLang === "ar" ? "اكتمل التحديث بنجاح! جاري التنشيط... 🎉" : "Update complete! Activating... 🎉";
+                setTimeout(function() {
+                    location.reload();
+                }, 1500);
+            });
+        });
+
+        function showHotUpdateError() {
+            msg.innerHTML = currentLang === "ar" ? "فشل التحديث التلقائي! يرجى تحميله يدوياً." : "Auto-update failed! Please install manually.";
+            btnNow.disabled = false;
+            btnNow.style.opacity = "1";
+            btnNow.style.pointerEvents = "auto";
+            if (btnDismiss) btnDismiss.style.display = "block";
+            btnNow.innerHTML = currentLang === "ar" ? "تنزيل الـ PKG" : "Download PKG";
+            btnNow.onclick = function() {
+                csInterface.openURLInDefaultBrowser(downloadUrl);
+                banner.classList.remove("visible");
+            };
+        }
     }
 
 

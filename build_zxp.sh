@@ -1,47 +1,111 @@
 #!/bin/bash
+# ============================================================
 # ZXP Build Script for EditFlow Pro
-# Requires Adobe ZXPSignCmd to be installed and available in PATH or same directory.
+# Builds a ZXP package independently — does NOT affect PKG.
+# Requires: ./ZXPSignCmd (included in project root)
+# ============================================================
 
 PLUGIN_NAME="EditFlowPro"
-VERSION="1.1.0"
-OUTPUT_FILE="${PLUGIN_NAME}_v${VERSION}.zxp"
-CERT_FILE="certificate.p12"
-CERT_PASS="editflow123"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ZXPSIGN="$SCRIPT_DIR/ZXPSignCmd"
 
-echo "==================================="
-echo "  Packaging $PLUGIN_NAME v$VERSION  "
-echo "==================================="
-
-# 1. Check for ZXPSignCmd
-if ! command -v ZXPSignCmd &> /dev/null
-then
-    echo "[ERROR] ZXPSignCmd could not be found."
-    echo "Please download it from https://github.com/Adobe-CEP/CEP-Resources"
-    exit 1
+# Auto-read version from version.json
+VERSION=$(python3 -c "import json; print(json.load(open('$SCRIPT_DIR/version.json'))['version'])" 2>/dev/null)
+if [ -z "$VERSION" ]; then
+    VERSION="1.0.0"
+    echo "[WARN] Could not read version.json, defaulting to $VERSION"
 fi
 
-# 2. Automatically generate a self-signed certificate if not present
+OUTPUT_FILE="$SCRIPT_DIR/EditFlow.Pro.v${VERSION}.zxp"
+CERT_FILE="$SCRIPT_DIR/editflow_cert.p12"
+CERT_PASS="editflow_zxp_2024"
+
+# Temp dir to build a clean copy (excludes build artifacts & ZXPSignCmd itself)
+BUILD_DIR="$SCRIPT_DIR/.zxp_build_tmp"
+
+echo "==================================================="
+echo "  EditFlow Pro ZXP Builder"
+echo "  Version : $VERSION"
+echo "  Output  : $OUTPUT_FILE"
+echo "==================================================="
+
+# 1. Check ZXPSignCmd
+if [ ! -f "$ZXPSIGN" ]; then
+    echo "[ERROR] ZXPSignCmd not found at: $ZXPSIGN"
+    exit 1
+fi
+chmod +x "$ZXPSIGN"
+
+# 2. Generate self-signed cert if not present
 if [ ! -f "$CERT_FILE" ]; then
-    echo "[INFO] Certificate not found. Generating $CERT_FILE..."
-    ZXPSignCmd -selfSignedCert US NY "$PLUGIN_NAME" "$PLUGIN_NAME" "$CERT_PASS" "$CERT_FILE"
+    echo "[INFO] Generating self-signed certificate..."
+    "$ZXPSIGN" -selfSignedCert US CA "EditFlowPro" "EditFlow Pro" "$CERT_PASS" "$CERT_FILE"
     if [ $? -ne 0 ]; then
         echo "[ERROR] Failed to generate certificate."
         exit 1
     fi
+    echo "[OK] Certificate created: $CERT_FILE"
 fi
 
-# 3. Clean previous builds
+# 3. Build clean temp copy (exclude dev-only files)
+echo "[INFO] Preparing clean build directory..."
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
+
+rsync -a "$SCRIPT_DIR/" "$BUILD_DIR/" \
+    --exclude=".git" \
+    --exclude=".gitignore" \
+    --exclude=".DS_Store" \
+    --exclude="*.sh" \
+    --exclude="*.pkg" \
+    --exclude="*.zxp" \
+    --exclude="*.py" \
+    --exclude="*.p12" \
+    --exclude="*.md" \
+    --exclude="*.txt" \
+    --exclude="*.bat" \
+    --exclude="ZXPSignCmd" \
+    --exclude=".zxp_build_tmp" \
+    --exclude=".build_venv" \
+    --exclude=".build_venv_x86" \
+    --exclude=".build_work" \
+    --exclude=".build_spec" \
+    --exclude="bin/.build_*" \
+    --exclude="node_modules" \
+    --exclude="ADOBE_EXCHANGE_AUDIT.md" \
+    --exclude="USER_GUIDE.md" \
+    --exclude="INSTALL.md" \
+    --exclude="HOW TO INSTALL.txt" \
+    --exclude="Install EditFlow Pro.bat" \
+    --exclude="Install EditFlow Pro.command" \
+    --exclude="install.sh"
+
+# 4. Remove old ZXP if exists
 if [ -f "$OUTPUT_FILE" ]; then
-    echo "[INFO] Removing old build..."
+    echo "[INFO] Removing old ZXP build..."
     rm "$OUTPUT_FILE"
 fi
 
-# 4. Package ZXP
-echo "[INFO] Signing and building ZXP format..."
-ZXPSignCmd -sign . "$OUTPUT_FILE" "$CERT_FILE" "$CERT_PASS" -tsa https://timestamp.geotrust.com/tsa
+# 5. Sign and package ZXP
+echo "[INFO] Signing and packaging ZXP..."
+"$ZXPSIGN" -sign "$BUILD_DIR" "$OUTPUT_FILE" "$CERT_FILE" "$CERT_PASS"
 
-if [ $? -eq 0 ]; then
-    echo "[SUCCESS] Build Complete: $OUTPUT_FILE"
+STATUS=$?
+
+# 6. Cleanup
+rm -rf "$BUILD_DIR"
+
+if [ $STATUS -eq 0 ]; then
+    SIZE=$(du -sh "$OUTPUT_FILE" | cut -f1)
+    echo ""
+    echo "==================================================="
+    echo "  ✅ ZXP Build Complete!"
+    echo "  File : $(basename $OUTPUT_FILE)"
+    echo "  Size : $SIZE"
+    echo "  Install via: ZXP Installer (zxpinstaller.com)"
+    echo "==================================================="
 else
-    echo "[ERROR] Build Failed."
+    echo ""
+    echo "[ERROR] ZXP Build Failed (exit: $STATUS)"
+    exit 1
 fi

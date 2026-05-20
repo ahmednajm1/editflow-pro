@@ -879,9 +879,26 @@ button.secondary { color: var(--text-mute); }
 }
 .btn-arrow:hover { background: rgba(255,255,255,0.1); border-color: var(--accent); color: #fff; }
 
+.btn-reset-small {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  border-radius: 6px;
+  width: 24px; height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all .15s;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+.btn-reset-small:hover { background: rgba(255,255,255,0.1); border-color: var(--accent); color: #fff; }
+
 .row-label {
   display: grid;
-  grid-template-columns: 70px 1fr 65px;
+  grid-template-columns: 65px 1fr 75px;
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;

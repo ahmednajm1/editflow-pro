@@ -24,7 +24,20 @@ cp README.md build_installer/root/ || true
 find build_installer/root -name ".DS_Store" -delete
 rm -rf build_installer/root/bin/.build_*
 
-# Create postinstall script to enable PlayerDebugMode
+# ── Obfuscate main.js (protection layer) ──────────────────────────
+OBFUSCATOR="/Users/ahmed/.gemini/antigravity/scratch/node_modules/.bin/javascript-obfuscator"
+OBF_CONFIG="$(dirname "$0")/obfuscator.config.json"
+MAIN_JS="build_installer/root/client/js/main.js"
+
+if [ -f "$OBFUSCATOR" ] && [ -f "$OBF_CONFIG" ] && [ -f "$MAIN_JS" ]; then
+    echo "🔒 Obfuscating main.js..."
+    "$OBFUSCATOR" "$MAIN_JS" --output "$MAIN_JS" --config "$OBF_CONFIG"
+    echo "✅ Code protection applied"
+else
+    echo "⚠️  Skipping obfuscation (obfuscator or config not found)"
+fi
+
+# Create postinstall script to enable PlayerDebugMode & set directory permissions
 cat << 'EOF' > build_installer/scripts/postinstall
 #!/bin/bash
 echo "Enabling PlayerDebugMode for all Premiere Pro versions..."
@@ -43,9 +56,24 @@ for v in "${VERSIONS[@]}"; do
     su - "$USER" -c "defaults write com.adobe.CSXS.$v PlayerDebugMode 1" || true
 done
 
+# Set permissions for self-updates
+TARGET_DIR="/Library/Application Support/Adobe/CEP/extensions/EditFlowPro"
+echo "Setting write permissions for self-updates at: $TARGET_DIR"
+if [ -d "$TARGET_DIR" ]; then
+    if [ -n "$USER" ] && [ "$USER" != "root" ]; then
+        chown -R "$USER:staff" "$TARGET_DIR" || true
+    fi
+    chmod -R 777 "$TARGET_DIR" || true
+fi
+
 exit 0
 EOF
 chmod +x build_installer/scripts/postinstall
+
+# Create EditFlowPro.zip for Hot-Updates
+echo "📦 Packaging EditFlowPro.zip for Hot-Updates..."
+rm -f EditFlowPro.zip
+(cd build_installer/root && zip -q -r ../../EditFlowPro.zip .)
 
 # Build the PKG
 pkgbuild --root build_installer/root \
@@ -56,4 +84,4 @@ pkgbuild --root build_installer/root \
          "EditFlow Pro Installer.pkg"
 
 rm -rf build_installer
-echo "Done! Created EditFlow Pro Installer.pkg"
+echo "Done! Created EditFlow Pro Installer.pkg and EditFlowPro.zip"

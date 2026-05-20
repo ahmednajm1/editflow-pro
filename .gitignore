@@ -52,3 +52,12 @@ client/append_settings_css.js
 client/brand_preview.html
 *.dmg
 *.pkg
+
+# ZXP build
+ZXPSignCmd
+editflow_cert.p12
+.zxp_build_tmp/
+
+# Obfuscation
+*.obf.js
+obfuscator.config.json
