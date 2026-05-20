@@ -6,7 +6,12 @@ No local model. Works on any machine with internet.
 """
 import sys, os, json, argparse, subprocess, shutil, math
 
-TOOLS_DIR = os.path.expanduser("~/Library/Application Support/EditFlowPro/tools")
+import platform
+if platform.system() == "Windows":
+    TOOLS_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "EditFlowPro", "tools")
+else:
+    TOOLS_DIR = os.path.expanduser("~/Library/Application Support/EditFlowPro/tools")
+
 if getattr(sys, 'frozen', False):
     _SCRIPT_DIR = os.path.dirname(os.path.realpath(sys.executable))
 else:
@@ -24,24 +29,45 @@ def log(msg):
 
 # ── ffmpeg ────────────────────────────────────────────────────────────────────
 def find_ffmpeg():
-    for p in [_BUNDLED_FFMPEG,
-              os.path.join(TOOLS_DIR, "ffmpeg"),
-              shutil.which("ffmpeg") or "",
-              "/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"]:
-        if p and os.path.isfile(p) and os.access(p, os.X_OK):
-            return p
+    is_win = (platform.system() == "Windows")
+    ext = ".exe" if is_win else ""
+    
+    # Check bundled paths and environment
+    bundled = _BUNDLED_FFMPEG + ext
+    tools_path = os.path.join(TOOLS_DIR, "ffmpeg" + ext)
+    
+    paths = [
+        bundled,
+        tools_path,
+        shutil.which("ffmpeg") or ""
+    ]
+    if not is_win:
+        paths += ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"]
+        
+    for p in paths:
+        if p and os.path.isfile(p):
+            if is_win or os.access(p, os.X_OK):
+                return p
     return None
 
 
 def download_ffmpeg():
-    import urllib.request, zipfile, platform
+    import urllib.request, zipfile
+    is_win = (platform.system() == "Windows")
+    ext = ".exe" if is_win else ""
     arch = platform.machine()
-    sources = {
-        "arm64":  [("https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-arm64", "bin")],
-        "x86_64": [("https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-x64",  "bin")],
-    }.get(arch, [])
+    
+    if is_win:
+        sources = [("https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-win32-x64", "bin")]
+    else:
+        sources = {
+            "arm64":  [("https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-arm64", "bin")],
+            "x86_64": [("https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-x64",  "bin")],
+        }.get(arch, [])
+        
     os.makedirs(TOOLS_DIR, exist_ok=True)
-    out = os.path.join(TOOLS_DIR, "ffmpeg")
+    out = os.path.join(TOOLS_DIR, "ffmpeg" + ext)
+    
     for url, fmt in sources:
         try:
             log("Downloading ffmpeg...")
@@ -55,8 +81,10 @@ def download_ffmpeg():
                         if os.path.basename(m) == "ffmpeg":
                             with z.open(m) as s, open(out, "wb") as d: d.write(s.read())
                 os.unlink(tmp)
-            os.chmod(out, 0o755)
-            subprocess.run(["xattr", "-d", "com.apple.quarantine", out], stderr=subprocess.DEVNULL)
+            
+            if not is_win:
+                os.chmod(out, 0o755)
+                subprocess.run(["xattr", "-d", "com.apple.quarantine", out], stderr=subprocess.DEVNULL)
             return out
         except Exception as e:
             log("ffmpeg download failed: " + str(e))

@@ -773,8 +773,25 @@ document.addEventListener("DOMContentLoaded", function() {
                 hideProgress(); setStatus(""); showStatus("Select an audio/video clip first.", "red"); return;
             }
 
-            var transcriberBin = extensionPath + "/bin/dist/whisper_runner";
-            if (!fsModule.existsSync(transcriberBin)) {
+            var cmdPrefix = "";
+            var hasTranscriber = false;
+            if (osModule && osModule.platform() === "win32") {
+                var winExe = extensionPath + "/bin/dist/whisper_runner.exe";
+                if (fsModule.existsSync(winExe)) {
+                    hasTranscriber = true;
+                    cmdPrefix = shq(winExe);
+                } else if (fsModule.existsSync(extensionPath + "/bin/transcriber.py")) {
+                    hasTranscriber = true;
+                    cmdPrefix = "python " + shq(extensionPath + "/bin/transcriber.py");
+                }
+            } else {
+                var macBin = extensionPath + "/bin/dist/whisper_runner";
+                if (fsModule.existsSync(macBin)) {
+                    hasTranscriber = true;
+                    cmdPrefix = shq(macBin);
+                }
+            }
+            if (!hasTranscriber) {
                 hideProgress(); setStatus(""); showCaptionDownloadBanner(); return;
             }
             var outBase = osModule.tmpdir() + "/efp_caps_" + Date.now();
@@ -815,7 +832,7 @@ document.addEventListener("DOMContentLoaded", function() {
             // Variables used by dispatch logic below
 
             function runTranscriber(mPath, tlStart, cIn, cOut, cDur) {
-                var cmd = shq(transcriberBin) + " " + shq(mPath) + " " + shq(outBase) +
+                var cmd = cmdPrefix + " " + shq(mPath) + " " + shq(outBase) +
                           " --lang " + shq(lang) + " --model " + shq(model) +
                           " --api-key " + shq(apiKey);
                 if (cDur > 0.1 && cOut > cIn) {
