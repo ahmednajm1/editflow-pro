@@ -1056,15 +1056,43 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     // Helper: Find built-in PNG Preset for native capture
+    function getFFmpegPath() {
+        if (!fsModule || !osModule) return "ffmpeg";
+        var isWin = (osModule.platform() === "win32");
+        var ext = isWin ? ".exe" : "";
+        var bundled = extensionPath + "/bin/ffmpeg" + ext;
+        if (fsModule.existsSync(bundled)) return bundled;
+        var toolsDir;
+        if (isWin) {
+            toolsDir = osModule.homedir() + "\\AppData\\Roaming\\EditFlowPro\\tools";
+        } else {
+            toolsDir = osModule.homedir() + "/Library/Application Support/EditFlowPro/tools";
+        }
+        var toolsPath = toolsDir + (isWin ? "\\" : "/") + "ffmpeg" + ext;
+        if (fsModule.existsSync(toolsPath)) return toolsPath;
+        return "ffmpeg";
+    }
+
     var foundPngPreset = null;
     function findPngPreset() {
         if (!fsModule || foundPngPreset) return foundPngPreset;
-        var paths = [
-            "/Applications/Adobe Premiere Pro 2026/Adobe Premiere Pro 2026.app/Contents/MediaIO/systempresets/3F3F3F3F_504E4720/PNG Sequence (Match Source).epr",
-            "/Applications/Adobe Premiere Pro 2025/Adobe Premiere Pro 2025.app/Contents/MediaIO/systempresets/3F3F3F3F_504E4720/PNG Sequence (Match Source).epr",
-            "/Applications/Adobe Premiere Pro 2024/Adobe Premiere Pro 2024.app/Contents/MediaIO/systempresets/3F3F3F3F_504E4720/PNG Sequence (Match Source).epr",
-            "/Applications/Adobe Premiere Pro (Beta)/Adobe Premiere Pro (Beta).app/Contents/MediaIO/systempresets/3F3F3F3F_504E4720/PNG Sequence (Match Source).epr"
-        ];
+        var paths = [];
+        var isWin = (osModule && osModule.platform() === "win32");
+        if (isWin) {
+            var programFiles = process.env["ProgramFiles"] || "C:\\Program Files";
+            var years = ["2027", "2026", "2025", "2024", "2023"];
+            for (var i = 0; i < years.length; i++) {
+                paths.push(programFiles + "\\Adobe\\Adobe Premiere Pro " + years[i] + "\\MediaIO\\systempresets\\3F3F3F3F_504E4720\\PNG Sequence (Match Source).epr");
+            }
+            paths.push(programFiles + "\\Adobe\\Adobe Premiere Pro (Beta)\\MediaIO\\systempresets\\3F3F3F3F_504E4720\\PNG Sequence (Match Source).epr");
+        } else {
+            paths = [
+                "/Applications/Adobe Premiere Pro 2026/Adobe Premiere Pro 2026.app/Contents/MediaIO/systempresets/3F3F3F3F_504E4720/PNG Sequence (Match Source).epr",
+                "/Applications/Adobe Premiere Pro 2025/Adobe Premiere Pro 2025.app/Contents/MediaIO/systempresets/3F3F3F3F_504E4720/PNG Sequence (Match Source).epr",
+                "/Applications/Adobe Premiere Pro 2024/Adobe Premiere Pro 2024.app/Contents/MediaIO/systempresets/3F3F3F3F_504E4720/PNG Sequence (Match Source).epr",
+                "/Applications/Adobe Premiere Pro (Beta)/Adobe Premiere Pro (Beta).app/Contents/MediaIO/systempresets/3F3F3F3F_504E4720/PNG Sequence (Match Source).epr"
+            ];
+        }
         for (var i = 0; i < paths.length; i++) {
             if (fsModule.existsSync(paths[i])) { foundPngPreset = paths[i]; return paths[i]; }
         }
@@ -1163,18 +1191,21 @@ document.addEventListener("DOMContentLoaded", function() {
                 var pngPath = osModule.tmpdir() + '/editflow_frame_' + Date.now() + '.png';
                 showProgress("Extracting frame...", 60);
 
-                // Escape media path for shell
-                var safeMedia = r.mediaPath.replace(/'/g, "'\\''");
-                var safePng = pngPath.replace(/'/g, "'\\''");
-
-                // ffmpeg: Exact frame extraction (accurate seek by placing -ss AFTER -i)
-                var binPath = extensionPath + "/bin";
-                var cmd = "export PATH=\"" + binPath + ":/opt/homebrew/bin:/usr/local/bin:$PATH\" && " +
-                    "ffmpeg -y" +
-                    " -i '" + safeMedia + "'" +
-                    " -ss " + r.sourceTime.toFixed(6) +
-                    " -map 0:v:0 -vframes 1 -q:v 2" +
-                    " '" + safePng + "'";
+                var ffmpegBin = getFFmpegPath();
+                var cmd;
+                if (osModule && osModule.platform() === "win32") {
+                    cmd = '"' + ffmpegBin + '" -y -i "' + r.mediaPath + '" -ss ' + r.sourceTime.toFixed(6) + ' -map 0:v:0 -vframes 1 -q:v 2 "' + pngPath + '"';
+                } else {
+                    var safeMedia = r.mediaPath.replace(/'/g, "'\\''");
+                    var safePng = pngPath.replace(/'/g, "'\\''");
+                    var binPath = extensionPath + "/bin";
+                    cmd = "export PATH=\"" + binPath + ":/opt/homebrew/bin:/usr/local/bin:$PATH\" && " +
+                        "ffmpeg -y" +
+                        " -i '" + safeMedia + "'" +
+                        " -ss " + r.sourceTime.toFixed(6) +
+                        " -map 0:v:0 -vframes 1 -q:v 2" +
+                        " '" + safePng + "'";
+                }
 
                 execModule(cmd, function(ffErr, ffOut, ffStderr) {
                     if (!fsModule.existsSync(pngPath)) {
