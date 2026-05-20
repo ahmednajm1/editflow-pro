@@ -949,27 +949,6 @@
       "duration": "0:01"
     },
     {
-      "id": "Alarms Buzzer Wrong 2.mp3",
-      "name": "Alarms Buzzer Wrong 2",
-      "category": "ui",
-      "file": "UI/Alarms Buzzer Wrong 2.mp3",
-      "duration": "0:00"
-    },
-    {
-      "id": "Alarms Buzzer Wrong 3.mp3",
-      "name": "Alarms Buzzer Wrong 3",
-      "category": "ui",
-      "file": "UI/Alarms Buzzer Wrong 3.mp3",
-      "duration": "0:01"
-    },
-    {
-      "id": "Alarms Buzzer Wrong.mp3",
-      "name": "Alarms Buzzer Wrong",
-      "category": "ui",
-      "file": "UI/Alarms Buzzer Wrong.mp3",
-      "duration": "0:01"
-    },
-    {
       "id": "Bells Misc Boxing 2.mp3",
       "name": "Bells Misc Boxing 2",
       "category": "ui",
