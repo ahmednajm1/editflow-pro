@@ -749,6 +749,195 @@ document.addEventListener("DOMContentLoaded", function() {
         showStatus("AI Engine binary not found in installation. Please reinstall EditFlow Pro.", "red");
     }
 
+    // ── Built-in JS Transcriber (no Python needed) ──────────────────────────
+    // Replicates transcriber.py logic using Node.js built-in modules.
+    // Used as fallback on Windows when Python is unavailable.
+    function jsTranscribe(mPath, outBase, lang, apiKey, cIn, cOut, progressCb, callback) {
+        var https = require("https");
+        var url   = require("url");
+
+        var ffmpegBin = getFFmpegPath();
+        var mp3Path = outBase + ".mp3";
+        var isWin = (osModule && osModule.platform() === "win32");
+
+        // Step 1: Extract audio to MP3
+        progressCb("Extracting audio…", 10);
+        var extractCmd;
+        if (isWin) {
+            extractCmd = '"' + ffmpegBin + '" -y -hide_banner -loglevel error -i "' + mPath + '"';
+            if (cIn > 0) extractCmd += ' -ss ' + cIn.toFixed(3);
+            if (cOut > cIn && cOut > 0) extractCmd += ' -to ' + cOut.toFixed(3);
+            extractCmd += ' -ac 1 -ar 16000 -b:a 64k "' + mp3Path + '"';
+        } else {
+            var safeMPath = mPath.replace(/'/g, "'\\''");
+            var safeMp3 = mp3Path.replace(/'/g, "'\\''");
+            extractCmd = "'" + ffmpegBin + "' -y -hide_banner -loglevel error -i '" + safeMPath + "'";
+            if (cIn > 0) extractCmd += " -ss " + cIn.toFixed(3);
+            if (cOut > cIn && cOut > 0) extractCmd += " -to " + cOut.toFixed(3);
+            extractCmd += " -ac 1 -ar 16000 -b:a 64k '" + safeMp3 + "'";
+        }
+
+        console.log("[jsTranscribe] extract cmd:", extractCmd);
+        execModule(extractCmd, { maxBuffer: 16 * 1024 * 1024, timeout: 120000 }, function(err) {
+            if (err) {
+                callback({ status: "error", message: "Audio extraction failed: " + (err.message || "").slice(0, 100) });
+                return;
+            }
+            if (!fsModule.existsSync(mp3Path)) {
+                callback({ status: "error", message: "Audio extraction produced no output." });
+                return;
+            }
+
+            // Step 2: Send to Groq API
+            progressCb("Sending to AI…", 30);
+            var fileData = fsModule.readFileSync(mp3Path);
+            var boundary = "efp" + Date.now() + Math.random().toString(36).substr(2);
+
+            var fields = {
+                model: "whisper-large-v3",
+                response_format: "verbose_json",
+                temperature: "0"
+            };
+            if (lang && lang !== "auto") fields.language = lang;
+
+            var bodyParts = [];
+            for (var key in fields) {
+                bodyParts.push("--" + boundary + "\r\nContent-Disposition: form-data; name=\"" + key + "\"\r\n\r\n" + fields[key] + "\r\n");
+            }
+            // timestamp granularities
+            bodyParts.push("--" + boundary + '\r\nContent-Disposition: form-data; name="timestamp_granularities[]"\r\n\r\nword\r\n');
+            bodyParts.push("--" + boundary + '\r\nContent-Disposition: form-data; name="timestamp_granularities[]"\r\n\r\nsegment\r\n');
+
+            // file field
+            var fileHeader = "--" + boundary + '\r\nContent-Disposition: form-data; name="file"; filename="audio.mp3"\r\nContent-Type: audio/mpeg\r\n\r\n';
+            var fileFooter = "\r\n--" + boundary + "--\r\n";
+
+            var headerBuf = Buffer.from(fileHeader, "utf8");
+            var footerBuf = Buffer.from(fileFooter, "utf8");
+            var fieldsBuf = Buffer.from(bodyParts.join(""), "utf8");
+            var fullBody = Buffer.concat([fieldsBuf, headerBuf, fileData, footerBuf]);
+
+            // Cleanup mp3
+            try { fsModule.unlinkSync(mp3Path); } catch(e) {}
+
+            var reqOpts = {
+                hostname: "api.groq.com",
+                port: 443,
+                path: "/openai/v1/audio/transcriptions",
+                method: "POST",
+                headers: {
+                    "Authorization": "Bearer " + apiKey,
+                    "Content-Type": "multipart/form-data; boundary=" + boundary,
+                    "Content-Length": fullBody.length,
+                    "User-Agent": "EditFlowPro/1.0"
+                }
+            };
+
+            console.log("[jsTranscribe] Calling Groq API, body size:", fullBody.length);
+            progressCb("AI analyzing speech…", 50);
+
+            var req = https.request(reqOpts, function(res) {
+                var chunks = [];
+                res.on("data", function(d) { chunks.push(d); });
+                res.on("end", function() {
+                    var body = Buffer.concat(chunks).toString("utf8");
+                    console.log("[jsTranscribe] Groq status:", res.statusCode);
+
+                    if (res.statusCode !== 200) {
+                        callback({ status: "error", message: "Groq API " + res.statusCode + ": " + body.slice(0, 200) });
+                        return;
+                    }
+
+                    try {
+                        var groqResult = JSON.parse(body);
+                    } catch(e) {
+                        callback({ status: "error", message: "Invalid Groq response" });
+                        return;
+                    }
+
+                    // Step 3: Build EFP JSON + SRT
+                    progressCb("Building captions…", 70);
+                    var resultLang = groqResult.language || "unknown";
+                    var resultDur = groqResult.duration || 0;
+                    var words = groqResult.words || [];
+                    var segments = groqResult.segments || [];
+                    var segs = [];
+
+                    for (var si = 0; si < segments.length; si++) {
+                        var g = segments[si];
+                        var gs = g.start || 0, ge = g.end || 0;
+                        var wList = [];
+                        for (var wi = 0; wi < words.length; wi++) {
+                            var w = words[wi];
+                            if (w.start >= gs && w.start <= ge) {
+                                var wText = (w.word || "").trim();
+                                var wParts = wText.split(/\s+/);
+                                if (wParts.length <= 1) {
+                                    wList.push({ start: Math.round(w.start * 1000) / 1000, end: Math.round(w.end * 1000) / 1000, text: wText });
+                                } else {
+                                    var subDur = (w.end - w.start) / wParts.length;
+                                    for (var pi = 0; pi < wParts.length; pi++) {
+                                        wList.push({
+                                            start: Math.round((w.start + pi * subDur) * 1000) / 1000,
+                                            end:   Math.round((w.start + (pi + 1) * subDur) * 1000) / 1000,
+                                            text:  wParts[pi]
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        // Clamp stretched words (max 3s)
+                        for (var ci = 0; ci < wList.length; ci++) {
+                            if (wList[ci].end - wList[ci].start > 3.0) {
+                                wList[ci].end = Math.round((wList[ci].start + 3.0) * 1000) / 1000;
+                            }
+                        }
+                        segs.push({ start: Math.round(gs * 1000) / 1000, end: Math.round(ge * 1000) / 1000, text: (g.text || "").trim(), words: wList });
+                    }
+
+                    // Write EFP JSON
+                    var efpData = { language: resultLang, duration: Math.round(resultDur * 1000) / 1000, segments: segs };
+                    var jsonPath = outBase + ".efp.json";
+                    fsModule.writeFileSync(jsonPath, JSON.stringify(efpData, null, 2), "utf8");
+
+                    // Write SRT
+                    function ts(t) {
+                        var h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = Math.floor(t % 60), ms = Math.floor(t * 1000 % 1000);
+                        return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s + "," + (ms < 100 ? (ms < 10 ? "00" : "0") : "") + ms;
+                    }
+                    var srtLines = [];
+                    for (var i = 0; i < segs.length; i++) {
+                        srtLines.push(String(i + 1), ts(segs[i].start) + " --> " + ts(segs[i].end), segs[i].text, "");
+                    }
+                    var srtPath = outBase + ".srt";
+                    fsModule.writeFileSync(srtPath, srtLines.join("\n"), "utf8");
+
+                    var totalWords = 0;
+                    for (var j = 0; j < segs.length; j++) totalWords += (segs[j].words || []).length;
+
+                    callback({
+                        status: "success",
+                        segments: segs.length,
+                        words: totalWords,
+                        language: resultLang,
+                        duration: resultDur,
+                        json: jsonPath,
+                        srt: srtPath
+                    });
+                });
+            });
+            req.on("error", function(e) {
+                callback({ status: "error", message: "Network error: " + e.message });
+            });
+            req.setTimeout(180000, function() {
+                req.destroy();
+                callback({ status: "error", message: "Groq API timeout (3 min)" });
+            });
+            req.write(fullBody);
+            req.end();
+        });
+    }
+
     safeBind("btn-generate-captions", function() {
         if (!fsModule || !execModule || !osModule) {
             showStatus("Node modules unavailable.", "red"); return;
@@ -775,6 +964,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
             var cmdPrefix = "";
             var hasTranscriber = false;
+            var useJsTranscriber = false;
             
             function findPythonOnWindows() {
                 if (!fsModule || !osModule) return "python";
@@ -794,7 +984,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         return shq(paths[i]);
                     }
                 }
-                return "python";
+                return null;
             }
 
             if (osModule && osModule.platform() === "win32") {
@@ -802,9 +992,17 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (fsModule.existsSync(winExe)) {
                     hasTranscriber = true;
                     cmdPrefix = shq(winExe);
-                } else if (fsModule.existsSync(extensionPath + "/bin/transcriber.py")) {
-                    hasTranscriber = true;
-                    cmdPrefix = findPythonOnWindows() + " " + shq(extensionPath + "/bin/transcriber.py");
+                } else {
+                    var pythonPath = findPythonOnWindows();
+                    if (pythonPath && fsModule.existsSync(extensionPath + "/bin/transcriber.py")) {
+                        hasTranscriber = true;
+                        cmdPrefix = pythonPath + " " + shq(extensionPath + "/bin/transcriber.py");
+                    } else {
+                        // No Python, no EXE — use built-in JS transcriber
+                        hasTranscriber = true;
+                        useJsTranscriber = true;
+                        console.log("[Captions] Using built-in JS transcriber (no Python needed)");
+                    }
                 }
             } else {
                 var macBin = extensionPath + "/bin/dist/whisper_runner";
@@ -854,6 +1052,31 @@ document.addEventListener("DOMContentLoaded", function() {
             // Variables used by dispatch logic below
 
             function runTranscriber(mPath, tlStart, cIn, cOut, cDur) {
+                // ── Built-in JS transcriber (Windows, no Python) ──
+                if (useJsTranscriber) {
+                    var trimNote = (cDur > 0.1) ? (" · " + cDur.toFixed(1) + "s") : "";
+                    showProgress("Analyzing speech…", 15, true);
+                    setStatus("AI speech recognition" + trimNote + " · cloud engine");
+                    console.log("[Captions] Using built-in JS transcriber");
+
+                    jsTranscribe(mPath, outBase, lang, apiKey, cIn, cOut,
+                        function(msg, pct) { showProgress(msg, pct, true); },
+                        function(summary) {
+                            if (summary.status !== "success") {
+                                hideProgress(); setStatus("");
+                                showStatus("Caption error: " + (summary.message || "unknown").slice(0, 120), "red");
+                                return;
+                            }
+                            setStatus("Detected " + summary.language + " · " + summary.words + " words · " + summary.segments + " segments");
+                            console.log("[Captions] placing synced editable captions");
+                            showProgress("Syncing captions to timeline…", 75);
+                            setStatus("Building timeline-synced captions…");
+                            fallbackSRT(summary, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", tlStart, setStatus);
+                        }
+                    );
+                    return;
+                }
+
                 var cmd = cmdPrefix + " " + shq(mPath) + " " + shq(outBase) +
                           " --lang " + shq(lang) + " --model " + shq(model) +
                           " --api-key " + shq(apiKey);
