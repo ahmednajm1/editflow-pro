@@ -754,14 +754,80 @@ document.addEventListener("DOMContentLoaded", function() {
     // Used as fallback on Windows when Python is unavailable.
     function jsTranscribe(mPath, outBase, lang, apiKey, cIn, cOut, progressCb, callback) {
         var https = require("https");
-        var url   = require("url");
+        var http  = require("http");
 
-        var ffmpegBin = getFFmpegPath();
         var mp3Path = outBase + ".mp3";
         var isWin = (osModule && osModule.platform() === "win32");
 
-        // Step 1: Extract audio to MP3
-        progressCb("Extracting audio…", 10);
+        // ── Ensure ffmpeg is available ──
+        function ensureFFmpeg(cb) {
+            var ffmpegBin = getFFmpegPath();
+            // If getFFmpegPath returned a real path (not bare "ffmpeg"), we're good
+            if (ffmpegBin !== "ffmpeg" && fsModule.existsSync(ffmpegBin)) {
+                return cb(null, ffmpegBin);
+            }
+            // On macOS, ffmpeg is usually in PATH via homebrew
+            if (!isWin) return cb(null, "ffmpeg");
+            
+            // Windows: Download ffmpeg automatically
+            progressCb("Downloading ffmpeg (one-time)…", 5);
+            console.log("[jsTranscribe] ffmpeg not found, downloading...");
+            
+            var toolsDir = (process.env["APPDATA"] || (osModule.homedir() + "\\AppData\\Roaming")) + "\\EditFlowPro\\tools";
+            var outPath = toolsDir + "\\ffmpeg.exe";
+            
+            // Create directory
+            try { fsModule.mkdirSync(toolsDir, { recursive: true }); } catch(e) {}
+            
+            var downloadUrl = "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-win32-x64";
+            
+            function followRedirects(reqUrl, maxRedirects) {
+                if (maxRedirects <= 0) return cb("Too many redirects");
+                var parsed = require("url").parse(reqUrl);
+                var mod = parsed.protocol === "https:" ? https : http;
+                
+                mod.get(reqUrl, function(res) {
+                    if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                        followRedirects(res.headers.location, maxRedirects - 1);
+                        return;
+                    }
+                    if (res.statusCode !== 200) {
+                        return cb("Download failed: HTTP " + res.statusCode);
+                    }
+                    
+                    var fileStream = fsModule.createWriteStream(outPath);
+                    var downloaded = 0;
+                    var total = parseInt(res.headers["content-length"] || "0", 10);
+                    
+                    res.on("data", function(chunk) {
+                        downloaded += chunk.length;
+                        if (total > 0) {
+                            var pct = Math.round(downloaded / total * 100);
+                            progressCb("Downloading ffmpeg… " + pct + "%", 5 + Math.round(pct * 0.05));
+                        }
+                    });
+                    
+                    res.pipe(fileStream);
+                    fileStream.on("finish", function() {
+                        fileStream.close();
+                        console.log("[jsTranscribe] ffmpeg downloaded to:", outPath);
+                        cb(null, outPath);
+                    });
+                    fileStream.on("error", function(e) { cb("Write error: " + e.message); });
+                }).on("error", function(e) { cb("Network error: " + e.message); });
+            }
+            
+            followRedirects(downloadUrl, 10);
+        }
+
+        ensureFFmpeg(function(err, ffmpegBin) {
+            if (err) {
+                callback({ status: "error", message: "ffmpeg setup failed: " + err });
+                return;
+            }
+
+            // Step 1: Extract audio to MP3
+            progressCb("Extracting audio…", 10);
         var extractCmd;
         if (isWin) {
             extractCmd = '"' + ffmpegBin + '" -y -hide_banner -loglevel error -i "' + mPath + '"';
@@ -936,6 +1002,7 @@ document.addEventListener("DOMContentLoaded", function() {
             req.write(fullBody);
             req.end();
         });
+        }); // end ensureFFmpeg
     }
 
     safeBind("btn-generate-captions", function() {
