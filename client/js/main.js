@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.7";
+var CURRENT_VERSION = "1.3.8";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -237,7 +237,22 @@ document.addEventListener("DOMContentLoaded", function() {
     try { fsModule = require("fs"); } catch(e) { console.warn("[EFP] No fs:", e.message); }
     try { osModule = require("os"); } catch(e) { console.warn("[EFP] No os:", e.message); }
     try { pathModule = require("path"); } catch(e) { console.warn("[EFP] No path:", e.message); }
-    try { execModule = require("child_process").exec; } catch(e) { console.warn("[EFP] No exec:", e.message); }
+    try {
+        var rawExec = require("child_process").exec;
+        execModule = function(cmd, opts, callback) {
+            if (typeof opts === 'function') {
+                callback = opts;
+                opts = undefined;
+            }
+            var isWin = (osModule && osModule.platform() === "win32");
+            var finalCmd = cmd;
+            if (isWin) {
+                finalCmd = '"' + cmd + '"';
+            }
+            console.log("[EFP exec] Windows: " + isWin + ", Command:", finalCmd);
+            return rawExec(finalCmd, opts, callback);
+        };
+    } catch(e) { console.warn("[EFP] No exec:", e.message); }
 
     try {
         csInterface = new CSInterface();

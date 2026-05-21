@@ -2757,7 +2757,10 @@ $._editflow.getPlayheadFrameInfo = function() {
 
             for (var c = 0; c < track.clips.numItems; c++) {
                 var clip = track.clips[c];
-                if (time.ticks >= clip.start.ticks && time.ticks < clip.end.ticks) {
+                var pTicks = Number(time.ticks);
+                var cStartTicks = Number(clip.start.ticks);
+                var cEndTicks = Number(clip.end.ticks);
+                if (pTicks >= cStartTicks && pTicks < cEndTicks) {
                     var mediaPath = "";
                     try { mediaPath = clip.projectItem.getMediaPath(); } catch(e) {}
                     if (!mediaPath) continue;
@@ -2770,6 +2773,13 @@ $._editflow.getPlayheadFrameInfo = function() {
                     try { endSec = clip.end.seconds; } catch(e) {}
                     try { playheadSec = time.seconds; } catch(e) {}
                     
+                    var me = $._editflow;
+                    if (!clipInSec && clip.inPoint && clip.inPoint.ticks) clipInSec = me.ticksToSec(clip.inPoint.ticks);
+                    if (!clipOutSec && clip.outPoint && clip.outPoint.ticks) clipOutSec = me.ticksToSec(clip.outPoint.ticks);
+                    if (!startSec && clip.start && clip.start.ticks) startSec = me.ticksToSec(clip.start.ticks);
+                    if (!endSec && clip.end && clip.end.ticks) endSec = me.ticksToSec(clip.end.ticks);
+                    if (!playheadSec && time && time.ticks) playheadSec = me.ticksToSec(time.ticks);
+
                     var timelineDur = endSec - startSec;
                     var sourceDur = clipOutSec - clipInSec;
                     var speedRatio = timelineDur > 0 ? (sourceDur / timelineDur) : 1.0;
