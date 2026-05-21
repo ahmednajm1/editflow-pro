@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.16";
+var CURRENT_VERSION = "1.3.17";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -2255,6 +2255,19 @@ function readSettingsForm() {
     }
     if (typeof window.__refreshAuto === "function") window.__refreshAuto();
 }
+function getClipboardDir() {
+    if (!fsModule || !osModule || !pathModule) return "";
+    var home = osModule.homedir();
+    var clipboardDir = pathModule.join(home, "Documents", "EditFlowPro_Clipboard");
+    try {
+        if (!fsModule.existsSync(clipboardDir)) {
+            fsModule.mkdirSync(clipboardDir, { recursive: true });
+        }
+        return clipboardDir;
+    } catch(e) {
+        return getSafeTempDir();
+    }
+}
 function getSafeTempDir() {
     if (!fsModule || !osModule || !pathModule) return "";
     var isWin = (osModule.platform() === "win32");
@@ -2398,7 +2411,14 @@ function pasteFromClipboard() {
     var isWin = (osModule && osModule.platform() === "win32");
     
     var safeTemp = getSafeTempDir();
-    var tmp = pathModule.join(safeTemp, "efp_paste.png");
+    var tmp;
+    if (isWin) {
+        tmp = pathModule.join(safeTemp, "efp_paste.png");
+    } else {
+        var clipboardDir = getClipboardDir();
+        var uniqueName = "efp_paste_" + Date.now() + ".png";
+        tmp = pathModule.join(clipboardDir, uniqueName);
+    }
     
     if (isWin) {
         var winPath = tmp.replace(/\//g, "\\");
@@ -2501,7 +2521,7 @@ function pasteFromClipboard() {
             csInterface.evalScript('$._editflow.importClipboardImage("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '")', function(res) {
                 if (ps) ps.innerText = "Done!";
                 handleJSXResult(res);
-                try { fsModule.unlinkSync(tmp); } catch(e2) {}
+                // On macOS, do not delete the file since it is linked project media
             });
         });
     }
@@ -2524,12 +2544,19 @@ function cancelPaste() {
     showStatus("Paste cancelled.", "orange");
 }
 function importBlob(blob) {
-    if (!fsModule) return;
+    if (!fsModule || !osModule || !pathModule) return;
     var reader = new FileReader();
     reader.onload = function(e) {
         var bufClass = (typeof Buffer !== "undefined" ? Buffer : require("buffer").Buffer);
         var buf = bufClass.from(new Uint8Array(e.target.result));
-        var tmp = osModule.tmpdir() + "/efp_paste_" + Date.now() + ".png";
+        var isWin = (osModule.platform() === "win32");
+        var tmp;
+        if (isWin) {
+            tmp = osModule.tmpdir() + "/efp_paste_" + Date.now() + ".png";
+        } else {
+            var clipboardDir = getClipboardDir();
+            tmp = pathModule.join(clipboardDir, "efp_paste_" + Date.now() + ".png");
+        }
         fsModule.writeFileSync(tmp, buf);
         csInterface.evalScript('$._editflow.importClipboardImage("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '")', function(res) {
             handleJSXResult(res);
