@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.10";
+var CURRENT_VERSION = "1.3.11";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -823,8 +823,8 @@ document.addEventListener("DOMContentLoaded", function() {
         var browseBtn = document.getElementById("btn-export-browse");
         if (browseBtn) {
             browseBtn.addEventListener("click", function() {
-                csInterface.evalScript('Folder.selectDialog("Select Export Folder").fsName', function(result) {
-                    if (result && result !== "null" && result !== "undefined" && result !== "EvalScript error.") {
+                csInterface.evalScript('(function() { var f = Folder.selectDialog("Select Export Folder"); return f ? f.fsName : ""; })()', function(result) {
+                    if (result && result !== "null" && result !== "undefined" && result !== "EvalScript error." && result !== "") {
                         document.getElementById("export-path").value = result;
                         console.log("[Export] Save path set: " + result);
                     }
@@ -1384,54 +1384,108 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }
 
-        // Cleanup old temp presets (older than 10 mins) to keep temp folder clean
-        try {
-            var tempDir = getSafeTempDir();
-            var files = fsModule.readdirSync(tempDir);
-            var now = Date.now();
-            files.forEach(function(file) {
-                if (file.indexOf("efp_") === 0 && file.indexOf(".epr") !== -1) {
-                    var filePath = pathModule.join(tempDir, file);
-                    var stat = fsModule.statSync(filePath);
-                    if (now - stat.mtimeMs > 600000) { // 10 minutes
-                        try { fsModule.unlinkSync(filePath); } catch(err) {}
+        function runExport(selectedPath) {
+            // Cleanup old temp presets (older than 10 mins) to keep temp folder clean
+            try {
+                var tempDir = getSafeTempDir();
+                var files = fsModule.readdirSync(tempDir);
+                var now = Date.now();
+                files.forEach(function(file) {
+                    if (file.indexOf("efp_") === 0 && file.indexOf(".epr") !== -1) {
+                        var filePath = pathModule.join(tempDir, file);
+                        var stat = fsModule.statSync(filePath);
+                        if (now - stat.mtimeMs > 600000) { // 10 minutes
+                            try { fsModule.unlinkSync(filePath); } catch(err) {}
+                        }
                     }
-                }
-            });
-        } catch(err) {}
-        
-        console.log("[Export] File: " + (fileName || "(auto)") + " | Path: " + (savePath || "(default)"));
-        showProgress("Preparing...", 10);
-        modifyPresetBitrate(function(tmp, br) {
-            showProgress("Exporting (" + br + " Mbps)...", 40);
-            var fnEsc = fileName.replace(/\\/g,"\\\\").replace(/"/g,'\\"');
-            var fpEsc = savePath.replace(/\\/g,"\\\\").replace(/"/g,'\\"');
-            console.log("[Export] Bitrate: " + br + " Mbps");
-            csInterface.evalScript('$._editflow.exportCustom("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '", "' + fnEsc + '", "' + fpEsc + '")', function(res) {
-                console.log("[<-JSX] exportCustom:", res);
-                // Delete the temp preset after a delay (e.g. 5 minutes) to give AME/Premiere ample time to read it
-                setTimeout(function() {
-                    try { fsModule.unlinkSync(tmp); } catch(e) {}
-                }, 300000);
-                
-                var r = safeParse(res);
-                if (r && r.status === "success") {
-                    showProgress("Done!", 100); 
-                    setTimeout(hideProgress, 2000);
-                    if (r.filePath) {
-                        showStatus("✅ Exported: " + r.filePath, "green");
+                });
+            } catch(err) {}
+            
+            console.log("[Export] File: " + (fileName || "(auto)") + " | Path: " + selectedPath);
+            showProgress("Preparing...", 10);
+            modifyPresetBitrate(function(tmp, br) {
+                showProgress("Exporting (" + br + " Mbps)...", 40);
+                var fnEsc = fileName.replace(/\\/g,"\\\\").replace(/"/g,'\\"');
+                var fpEsc = selectedPath.replace(/\\/g,"\\\\").replace(/"/g,'\\"');
+                console.log("[Export] Bitrate: " + br + " Mbps");
+                csInterface.evalScript('$._editflow.exportCustom("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '", "' + fnEsc + '", "' + fpEsc + '")', function(res) {
+                    console.log("[<-JSX] exportCustom:", res);
+                    // Delete the temp preset after a delay (e.g. 5 minutes) to give AME/Premiere ample time to read it
+                    setTimeout(function() {
+                        try { fsModule.unlinkSync(tmp); } catch(e) {}
+                    }, 300000);
+                    
+                    var r = safeParse(res);
+                    if (r && r.status === "success") {
+                        if (r.queued) {
+                            showProgress("Done!", 100); 
+                            setTimeout(hideProgress, 2000);
+                            showStatus("✅ Export queued in Adobe Media Encoder", "green");
+                        } else {
+                            showStatus("⏳ Exporting in background...", "blue");
+                            pollExportFile(r.filePath, Date.now(), 600000); // 10 mins
+                        }
                     } else {
-                        showStatus(r.message || "Export complete!", "green");
+                        showProgress("Export failed", 0);
+                        setTimeout(hideProgress, 1000);
+                        var errMsg = (r && r.message) ? r.message : "Export failed.";
+                        showStatus(errMsg, "red");
                     }
+                });
+            });
+        }
+
+        if (savePath === "") {
+            csInterface.evalScript('(function() { var f = Folder.selectDialog("Select Export Folder"); return f ? f.fsName : ""; })()', function(result) {
+                if (result && result !== "null" && result !== "undefined" && result !== "EvalScript error." && result !== "") {
+                    document.getElementById("export-path").value = result;
+                    console.log("[Export] Save path set on empty: " + result);
+                    settings.exportPath = result;
+                    saveSettings();
+                    runExport(result);
                 } else {
-                    showProgress("Export failed", 0);
-                    setTimeout(hideProgress, 1000);
-                    var errMsg = (r && r.message) ? r.message : "Export failed.";
-                    showStatus(errMsg, "red");
+                    showStatus("Export cancelled. Select a folder first.", "orange");
                 }
             });
-        });
+        } else {
+            runExport(savePath);
+        }
     });
+
+    function pollExportFile(filePath, startTime, maxDurationMs) {
+        showProgress("Exporting (Direct)...", 45);
+        var intervalMs = 2000;
+        var checkFile = setInterval(function() {
+            var elapsed = Date.now() - startTime;
+            if (elapsed > maxDurationMs) {
+                clearInterval(checkFile);
+                showProgress("Export timed out", 0);
+                setTimeout(hideProgress, 2000);
+                showStatus("Export timed out. Please check if the file was created.", "red");
+                return;
+            }
+            if (fsModule && fsModule.existsSync(filePath)) {
+                try {
+                    var stats = fsModule.statSync(filePath);
+                    if (stats.size > 0) {
+                        clearInterval(checkFile);
+                        setTimeout(function() {
+                            showProgress("Done!", 100);
+                            setTimeout(hideProgress, 2000);
+                            var fn = pathModule.basename(filePath);
+                            showStatus("✅ Exported: " + fn, "green");
+                        }, 2000);
+                    }
+                } catch(e) {}
+            } else {
+                var elapsedSecs = Math.floor(elapsed / 1000);
+                var mins = Math.floor(elapsedSecs / 60);
+                var secs = elapsedSecs % 60;
+                var timeStr = mins > 0 ? mins + "m " + secs + "s" : secs + "s";
+                showProgress("Exporting (Direct)... " + timeStr, 45);
+            }
+        }, intervalMs);
+    }
 
     function getSafeTempDir() {
         if (!fsModule || !osModule || !pathModule) return "";
@@ -1996,6 +2050,7 @@ var _progressTimer = null;
 var _progressStartTime = 0;
 var _progressTargetPct = 0;
 var _progressCurrentPct = 0;
+var _progressMessage = "";
 
 function showProgress(msg, pct, showCancel) {
     var container = document.getElementById("progress-container");
@@ -2004,6 +2059,7 @@ function showProgress(msg, pct, showCancel) {
     var cancelBtn = document.getElementById("btn-progress-cancel");
     container.classList.remove("hidden");
     fillEl.classList.remove("done");
+    _progressMessage = msg;
     textEl.innerText = msg;
     _progressTargetPct = pct || 0;
     fillEl.style.width = _progressTargetPct + "%";
@@ -2035,8 +2091,13 @@ function showProgress(msg, pct, showCancel) {
                 fillEl.style.width = Math.min(_progressCurrentPct, 70) + "%";
             }
 
-            textEl.innerText = msg + "  ⏱ " + timeStr;
+            textEl.innerText = _progressMessage + "  ⏱ " + timeStr;
         }, 1000);
+    } else {
+        if (_progressTimer) {
+            clearInterval(_progressTimer);
+            _progressTimer = null;
+        }
     }
 }
 
@@ -2281,24 +2342,38 @@ function modifyPresetBitrate(cb) {
 
 // ── CLIPBOARD ────────────────────────────────────────────────
 function pasteFromClipboard() {
-    if (!execModule || !fsModule || !osModule || !pathModule) { showStatus("NodeJS required.", "red"); return; }
+    if (!execFileModule || !fsModule || !osModule || !pathModule) { showStatus("NodeJS required.", "red"); return; }
     var ps = document.getElementById("paste-status"); if (ps) ps.innerText = "Reading...";
     var isWin = (osModule && osModule.platform() === "win32");
     
+    var safeTemp = getSafeTempDir();
+    var tmp = pathModule.join(safeTemp, "efp_paste.png");
+    
     if (isWin) {
-        var safeTemp = getSafeTempDir();
-        var tmp = pathModule.join(safeTemp, "efp_paste.png");
         var winPath = tmp.replace(/\//g, "\\");
         var tempPs1 = pathModule.join(safeTemp, "efp_paste_script.ps1");
         var scriptContent = [
             'Add-Type -AssemblyName System.Windows.Forms',
             'Add-Type -AssemblyName System.Drawing',
             '$outputPath = "' + winPath.replace(/"/g, '`"') + '"',
+            '$data = [System.Windows.Forms.Clipboard]::GetDataObject()',
+            'if ($data -ne $null -and $data.GetDataPresent("PNG")) {',
+            '    $stream = $data.GetData("PNG")',
+            '    if ($stream -ne $null) {',
+            '        $bytes = New-Object Byte[] $stream.Length',
+            '        $stream.Read($bytes, 0, $stream.Length) | Out-Null',
+            '        [System.IO.File]::WriteAllBytes($outputPath, $bytes)',
+            '        $stream.Dispose()',
+            '        exit 0',
+            '    }',
+            '}',
             'if ([System.Windows.Forms.Clipboard]::ContainsImage()) {',
             '    $img = [System.Windows.Forms.Clipboard]::GetImage()',
-            '    $img.Save($outputPath, [System.Drawing.Imaging.ImageFormat]::Png)',
-            '    $img.Dispose()',
-            '    exit 0',
+            '    if ($img -ne $null) {',
+            '        $img.Save($outputPath, [System.Drawing.Imaging.ImageFormat]::Png)',
+            '        $img.Dispose()',
+            '        exit 0',
+            '    }',
             '} elseif ([System.Windows.Forms.Clipboard]::ContainsFileDropList()) {',
             '    $files = [System.Windows.Forms.Clipboard]::GetFileDropList()',
             '    if ($files.Count -gt 0) {',
@@ -2314,9 +2389,9 @@ function pasteFromClipboard() {
 
         try {
             fsModule.writeFileSync(tempPs1, scriptContent, 'utf8');
-            var psCmd = 'powershell -NoProfile -STA -ExecutionPolicy Bypass -File "' + tempPs1 + '"';
-            console.log("[pasteFromClipboard] Running:", psCmd);
-            execModule(psCmd, { timeout: 15000 }, function(e) {
+            var args = ['-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', tempPs1];
+            console.log("[pasteFromClipboard] Running powershell with script:", tempPs1);
+            execFileModule('powershell.exe', args, { timeout: 15000 }, function(e) {
                 try { fsModule.unlinkSync(tempPs1); } catch(err) {}
                 if (e || !fsModule.existsSync(tmp)) {
                     console.error("[pasteFromClipboard] PowerShell error or output file missing.", e);
@@ -2337,11 +2412,32 @@ function pasteFromClipboard() {
             showStatus("Failed to access temporary directory.", "red");
         }
     } else {
-        // ── macOS: unchanged ──
-        var sc = "osascript -e 'try' -e 'set d to the clipboard as \u00abclass PNGf\u00bb' -e 'set f to open for access POSIX file \"" + tmp + "\" with write permission' -e 'write d to f' -e 'close access f' -e 'return \"ok\"' -e 'on error' -e 'return \"no\"' -e 'end try'";
-        execModule(sc, function(e, o) {
-            if (e || o.trim() === "no") { if (ps) ps.innerText = "No image."; return; }
-            if (!fsModule.existsSync(tmp)) { if (ps) ps.innerText = "Failed."; return; }
+        // ── macOS: AppleScript ──
+        var args = [
+            '-e', 'try',
+            '-e', 'set d to the clipboard as \u00abclass PNGf\u00bb',
+            '-e', 'set f to open for access POSIX file "' + tmp + '" with write permission',
+            '-e', 'write d to f',
+            '-e', 'close access f',
+            '-e', 'return "ok"',
+            '-e', 'on error',
+            '-e', 'return "no"',
+            '-e', 'end try'
+        ];
+        console.log("[pasteFromClipboard] Running osascript for clipboard");
+        execFileModule('osascript', args, function(e, o) {
+            var out = o ? o.trim() : "";
+            if (e || out === "no") {
+                console.error("[pasteFromClipboard] osascript error or returned 'no':", e, out);
+                if (ps) ps.innerText = "No image.";
+                showStatus("No image in clipboard. Copy an image first.", "red");
+                return;
+            }
+            if (!fsModule.existsSync(tmp)) {
+                if (ps) ps.innerText = "Failed.";
+                showStatus("Failed to write clipboard image file.", "red");
+                return;
+            }
             if (ps) ps.innerText = "Importing...";
             csInterface.evalScript('$._editflow.importClipboardImage("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '")', function(res) {
                 if (ps) ps.innerText = "Done!";
@@ -2355,7 +2451,8 @@ function importBlob(blob) {
     if (!fsModule) return;
     var reader = new FileReader();
     reader.onload = function(e) {
-        var buf = Buffer.from(new Uint8Array(e.target.result));
+        var bufClass = (typeof Buffer !== "undefined" ? Buffer : require("buffer").Buffer);
+        var buf = bufClass.from(new Uint8Array(e.target.result));
         var tmp = osModule.tmpdir() + "/efp_paste_" + Date.now() + ".png";
         fsModule.writeFileSync(tmp, buf);
         csInterface.evalScript('$._editflow.importClipboardImage("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '")', function(res) {

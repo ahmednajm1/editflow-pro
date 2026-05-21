@@ -1887,86 +1887,77 @@ $._editflow.debugQEClip = function() {
 
 // Custom export with user-defined filename and path
 $._editflow.exportCustom = function(presetPath, fileName, folderPath) {
-    var seq = this.getSeq();
-    if (!seq) return '{"status":"error","message":"Open a project."}';
-    var folder;
-    if (folderPath && folderPath !== "") {
-        folder = new Folder(folderPath);
-    } else {
-        folder = new Folder(Folder.desktop.fsName + "/EditFlowPro_Exports");
-    }
-    if (!folder.exists) folder.create();
-    if (!folder.exists) {
-        return '{"status":"error","message":"Cannot create export folder: ' + folder.fsName + '"}';
-    }
-    var name = (fileName && fileName !== "") ? fileName : seq.name;
-    // Sanitize filename
-    name = name.replace(/[^a-zA-Z0-9_\-\. ]/g, "_");
-    if (name.indexOf(".mp4") === -1) name += ".mp4";
-    
-    // Normalise output path using File object to ensure correct platform slashes
-    var out = new File(folder.fsName + "/" + name);
-    var d = 1;
-    while (out.exists) {
-        out = new File(folder.fsName + "/" + name.replace(".mp4", "_v" + d + ".mp4"));
-        d++;
-    }
-    var outPath = out.fsName;
-    var normPresetPath = new File(presetPath).fsName;
-    
-    if (!new File(normPresetPath).exists) {
-        return '{"status":"error","message":"Preset file not found: ' + normPresetPath + '"}';
-    }
-
-    // Set sequence in/out points if a clip is currently selected
-    var sel = null;
-    try { sel = seq.getSelection(); } catch(e) {}
-    if (sel && sel.length > 0) {
-        try {
-            seq.setInPoint(sel[0].start.ticks);
-            seq.setOutPoint(sel[0].end.ticks);
-        } catch(e) {}
-    }
-    
-    // ── Route through Adobe Media Encoder (AME) if available ──
-    var queuedInAME = false;
-    if (app.encoder) {
-        try {
-            app.encoder.launchEncoder();
-            // encodeSequence parameters: sequence, outputPath, presetPath, workAreaType, removeUponCompletion
-            // workAreaType: 1 = ENCODE_IN_TO_OUT (respects In/Out markers set above)
-            // removeUponCompletion: 0 (keeps it in AME queue so user sees it)
-            var success = app.encoder.encodeSequence(seq, outPath, normPresetPath, 1, 0);
-            if (success) {
-                app.encoder.startBatch();
-                queuedInAME = true;
-            }
-        } catch(err) {
-            // fallback to direct if AME fails
-        }
-    }
-
-    if (queuedInAME) {
-        return '{"status":"success","message":"Export queued in Adobe Media Encoder","filePath":"' + outPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"}';
-    }
-    
-    // ── Fallback: Direct background render (original behavior) ──
     try {
-        seq.exportAsMediaDirect(outPath, normPresetPath, 1);
+        var seq = this.getSeq();
+        if (!seq) return '{"status":"error","message":"Open a project."}';
+        var folder;
+        if (folderPath && folderPath !== "") {
+            folder = new Folder(folderPath);
+        } else {
+            folder = new Folder(Folder.desktop.fsName + "/EditFlowPro_Exports");
+        }
+        if (!folder.exists) folder.create();
+        if (!folder.exists) {
+            return '{"status":"error","message":"Cannot create export folder: ' + folder.fsName + '"}';
+        }
+        var name = (fileName && fileName !== "") ? fileName : seq.name;
+        // Sanitize filename
+        name = name.replace(/[^a-zA-Z0-9_\-\. ]/g, "_");
+        if (name.indexOf(".mp4") === -1) name += ".mp4";
         
-        // Wait/poll for the file to exist (Media Direct export is synchronous in JSX but let's poll to be 100% sure on slow Windows systems)
-        var maxWait = 120; // 30 seconds (120 * 250ms)
-        var waited = 0;
-        while (waited < maxWait) {
-            if (new File(outPath).exists) break;
-            $.sleep(250);
-            waited++;
+        // Normalise output path using File object to ensure correct platform slashes
+        var out = new File(folder.fsName + "/" + name);
+        var d = 1;
+        while (out.exists) {
+            out = new File(folder.fsName + "/" + name.replace(".mp4", "_v" + d + ".mp4"));
+            d++;
         }
-        if (!new File(outPath).exists) {
-            return '{"status":"error","message":"Export timed out. File not found at: ' + outPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"}';
+        var outPath = out.fsName;
+        var normPresetPath = new File(presetPath).fsName;
+        
+        if (!new File(normPresetPath).exists) {
+            return '{"status":"error","message":"Preset file not found: ' + normPresetPath + '"}';
         }
-        return '{"status":"success","message":"Exported ' + out.name + '","filePath":"' + outPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"}';
-    } catch(e) { return '{"status":"error","message":"' + e.message + '"}'; }
+
+        // Set sequence in/out points if a clip is currently selected
+        var workAreaType = 0; // 0 = ENCODE_ENTIRE_SEQUENCE
+        var sel = null;
+        try { sel = seq.getSelection(); } catch(e) {}
+        if (sel && sel.length > 0) {
+            try {
+                seq.setInPoint(sel[0].start.ticks);
+                seq.setOutPoint(sel[0].end.ticks);
+                workAreaType = 1; // 1 = ENCODE_IN_TO_OUT
+            } catch(e) {}
+        }
+        
+        // ── Route through Adobe Media Encoder (AME) if available ──
+        var queuedInAME = false;
+        if (app.encoder) {
+            try {
+                app.encoder.launchEncoder();
+                // encodeSequence parameters: sequence, outputPath, presetPath, workAreaType, removeUponCompletion
+                var success = app.encoder.encodeSequence(seq, outPath, normPresetPath, workAreaType, 0);
+                if (success) {
+                    app.encoder.startBatch();
+                    queuedInAME = true;
+                }
+            } catch(err) {
+                // fallback to direct if AME fails
+            }
+        }
+
+        if (queuedInAME) {
+            return '{"status":"success","queued":true,"message":"Export queued in Adobe Media Encoder","filePath":"' + outPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"}';
+        }
+        
+        // ── Fallback: Direct background render (runs asynchronously or synchronously depending on platform) ──
+        seq.exportAsMediaDirect(outPath, normPresetPath, workAreaType);
+        
+        return '{"status":"success","queued":false,"message":"Export started directly","filePath":"' + outPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"}';
+    } catch(e) {
+        return '{"status":"error","message":"' + e.message + '"}';
+    }
 };
 
 // =========================================================
