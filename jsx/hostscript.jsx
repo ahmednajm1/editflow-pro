@@ -1896,16 +1896,43 @@ $._editflow.exportCustom = function(presetPath, fileName, folderPath) {
         folder = new Folder(Folder.desktop.fsName + "/EditFlowPro_Exports");
     }
     if (!folder.exists) folder.create();
+    if (!folder.exists) {
+        return '{"status":"error","message":"Cannot create export folder: ' + folder.fsName + '"}';
+    }
     var name = (fileName && fileName !== "") ? fileName : seq.name;
     // Sanitize filename
     name = name.replace(/[^a-zA-Z0-9_\-\. ]/g, "_");
     if (name.indexOf(".mp4") === -1) name += ".mp4";
-    var out = folder.fsName + "/" + name;
-    var f = new File(out); var d = 1;
-    while (f.exists) { out = folder.fsName + "/" + name.replace(".mp4", "_v" + d + ".mp4"); f = new File(out); d++; }
+    
+    // Normalise output path using File object to ensure correct platform slashes
+    var out = new File(folder.fsName + "/" + name);
+    var d = 1;
+    while (out.exists) {
+        out = new File(folder.fsName + "/" + name.replace(".mp4", "_v" + d + ".mp4"));
+        d++;
+    }
+    var outPath = out.fsName;
+    var normPresetPath = new File(presetPath).fsName;
+    
+    if (!new File(normPresetPath).exists) {
+        return '{"status":"error","message":"Preset file not found: ' + normPresetPath + '"}';
+    }
+    
     try {
-        seq.exportAsMediaDirect(out, presetPath, 1);
-        return '{"status":"success","message":"Exported ' + new File(out).name + '","filePath":"' + out.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"}';
+        seq.exportAsMediaDirect(outPath, normPresetPath, 1);
+        
+        // Wait/poll for the file to exist (Media Direct export is synchronous in JSX but let's poll to be 100% sure on slow Windows systems)
+        var maxWait = 40; // 10 seconds (40 * 250ms)
+        var waited = 0;
+        while (waited < maxWait) {
+            if (new File(outPath).exists) break;
+            $.sleep(250);
+            waited++;
+        }
+        if (!new File(outPath).exists) {
+            return '{"status":"error","message":"Export timed out. File not found at: ' + outPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"}';
+        }
+        return '{"status":"success","message":"Exported ' + out.name + '","filePath":"' + outPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"}';
     } catch(e) { return '{"status":"error","message":"' + e.message + '"}'; }
 };
 
