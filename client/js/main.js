@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.12";
+var CURRENT_VERSION = "1.3.13";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -1495,23 +1495,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }, intervalMs);
     }
 
-    function getSafeTempDir() {
-        if (!fsModule || !osModule || !pathModule) return "";
-        var isWin = (osModule.platform() === "win32");
-        if (isWin) {
-            var publicDir = process.env["PUBLIC"] || "C:\\Users\\Public";
-            var safeDir = pathModule.join(publicDir, "EditFlowPro_Temp");
-            try {
-                if (!fsModule.existsSync(safeDir)) {
-                    fsModule.mkdirSync(safeDir, { recursive: true });
-                }
-                return safeDir;
-            } catch(e) {
-                return osModule.tmpdir();
-            }
-        }
-        return osModule.tmpdir();
-    }
+
 
     // Helper: Find built-in PNG Preset for native capture
     function getFFmpegPath() {
@@ -2270,6 +2254,23 @@ function readSettingsForm() {
         applyLanguage(currentLang);
     }
     if (typeof window.__refreshAuto === "function") window.__refreshAuto();
+}
+function getSafeTempDir() {
+    if (!fsModule || !osModule || !pathModule) return "";
+    var isWin = (osModule.platform() === "win32");
+    if (isWin) {
+        var publicDir = process.env["PUBLIC"] || "C:\\Users\\Public";
+        var safeDir = pathModule.join(publicDir, "EditFlowPro_Temp");
+        try {
+            if (!fsModule.existsSync(safeDir)) {
+                fsModule.mkdirSync(safeDir, { recursive: true });
+            }
+            return safeDir;
+        } catch(e) {
+            return osModule.tmpdir();
+        }
+    }
+    return osModule.tmpdir();
 }
 function findExportPreset() {
     if (!fsModule) return;
