@@ -369,7 +369,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 var targetUrl = downloadUrl;
                 var isWin = (osModule && osModule.platform() === "win32");
                 if (isWin && targetUrl.indexOf(".pkg") !== -1) {
-                    targetUrl = "https://www.najmedia.com/editflow/EditFlow%20Pro%20Installer.zip";
+                    targetUrl = "https://www.najmedia.com/editflow/EditFlow%20Pro%20Installer.exe";
                 }
                 csInterface.openURLInDefaultBrowser(targetUrl);
                 banner.classList.remove("visible");
@@ -480,9 +480,9 @@ document.addEventListener("DOMContentLoaded", function() {
                         if (btnDismiss) btnDismiss.style.display = "block";
                         
                         if (isWin) {
-                            btnNow.innerHTML = currentLang === "ar" ? "تنزيل الـ ZIP" : "Download ZIP";
+                            btnNow.innerHTML = currentLang === "ar" ? "تنزيل الـ EXE" : "Download EXE";
                             btnNow.onclick = function() {
-                                csInterface.openURLInDefaultBrowser("https://www.najmedia.com/editflow/EditFlow%20Pro%20Installer.zip");
+                                csInterface.openURLInDefaultBrowser("https://www.najmedia.com/editflow/EditFlow%20Pro%20Installer.exe");
                                 banner.classList.remove("visible");
                             };
                         } else {
@@ -528,7 +528,7 @@ document.addEventListener("DOMContentLoaded", function() {
             var isWin = (osModule && osModule.platform() === "win32");
             var fallbackUrl = downloadUrl;
             if (isWin && fallbackUrl.indexOf(".pkg") !== -1) {
-                fallbackUrl = "https://www.najmedia.com/editflow/EditFlow%20Pro%20Installer.zip";
+                fallbackUrl = "https://www.najmedia.com/editflow/EditFlow%20Pro%20Installer.exe";
             }
 
             msg.innerHTML = currentLang === "ar" ? "فشل التحديث التلقائي! يرجى تحميله يدوياً." : "Auto-update failed! Please install manually.";
@@ -538,7 +538,7 @@ document.addEventListener("DOMContentLoaded", function() {
             if (btnDismiss) btnDismiss.style.display = "block";
             
             if (isWin) {
-                btnNow.innerHTML = currentLang === "ar" ? "تنزيل الـ ZIP" : "Download ZIP";
+                btnNow.innerHTML = currentLang === "ar" ? "تنزيل الـ EXE" : "Download EXE";
             } else {
                 btnNow.innerHTML = currentLang === "ar" ? "تنزيل الـ PKG" : "Download PKG";
             }
