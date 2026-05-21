@@ -1931,27 +1931,7 @@ $._editflow.exportCustom = function(presetPath, fileName, folderPath) {
             } catch(e) {}
         }
         
-        // ── Route through Adobe Media Encoder (AME) if available ──
-        var queuedInAME = false;
-        if (app.encoder) {
-            try {
-                app.encoder.launchEncoder();
-                // encodeSequence parameters: sequence, outputPath, presetPath, workAreaType, removeUponCompletion
-                var success = app.encoder.encodeSequence(seq, outPath, normPresetPath, workAreaType, 0);
-                if (success) {
-                    app.encoder.startBatch();
-                    queuedInAME = true;
-                }
-            } catch(err) {
-                // fallback to direct if AME fails
-            }
-        }
-
-        if (queuedInAME) {
-            return '{"status":"success","queued":true,"message":"Export queued in Adobe Media Encoder","filePath":"' + outPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"}';
-        }
-        
-        // ── Fallback: Direct background render (runs asynchronously or synchronously depending on platform) ──
+        // ── Direct background render (always use direct Premiere export to match Mac experience and support systems without AME) ──
         seq.exportAsMediaDirect(outPath, normPresetPath, workAreaType);
         
         return '{"status":"success","queued":false,"message":"Export started directly","filePath":"' + outPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"}';

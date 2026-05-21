@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.13";
+var CURRENT_VERSION = "1.3.14";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
