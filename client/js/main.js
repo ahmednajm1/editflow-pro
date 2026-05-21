@@ -8,9 +8,9 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.9";
+var CURRENT_VERSION = "1.3.10";
 var csInterface = null, dsp = null;
-var fsModule = null, osModule = null, pathModule = null, execModule = null;
+var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
 var operationRunning = false, statusTimer = null;
 var activeCaptionProcess = null;
@@ -245,14 +245,19 @@ document.addEventListener("DOMContentLoaded", function() {
                 opts = undefined;
             }
             var isWin = (osModule && osModule.platform() === "win32");
-            var finalCmd = cmd;
-            if (isWin) {
-                finalCmd = '"' + cmd + '"';
-            }
-            console.log("[EFP exec] Windows: " + isWin + ", Command:", finalCmd);
-            return rawExec(finalCmd, opts, callback);
+            console.log("[EFP exec] Windows: " + isWin + ", Command:", cmd);
+            return rawExec(cmd, opts, callback);
         };
-    } catch(e) { console.warn("[EFP] No exec:", e.message); }
+        var rawExecFile = require("child_process").execFile;
+        execFileModule = function(file, args, opts, callback) {
+            if (typeof opts === 'function') {
+                callback = opts;
+                opts = undefined;
+            }
+            console.log("[EFP execFile] File:", file, "Args:", args);
+            return rawExecFile(file, args, opts, callback);
+        };
+    } catch(e) { console.warn("[EFP] No exec/execFile:", e.message); }
 
     try {
         csInterface = new CSInterface();
@@ -873,27 +878,17 @@ document.addEventListener("DOMContentLoaded", function() {
 
             // Step 1: Extract audio to MP3
             progressCb("Extracting audio…", 10);
-        var extractCmd;
-        if (isWin) {
-            extractCmd = '"' + ffmpegBin + '" -y -hide_banner -loglevel error -i "' + mPath + '"';
-            if (cIn > 0) extractCmd += ' -ss ' + cIn.toFixed(3);
-            if (cOut > cIn && cOut > 0) extractCmd += ' -to ' + cOut.toFixed(3);
-            extractCmd += ' -ac 1 -ar 16000 -b:a 64k "' + mp3Path + '"';
-        } else {
-            var safeMPath = mPath.replace(/'/g, "'\\''");
-            var safeMp3 = mp3Path.replace(/'/g, "'\\''");
-            extractCmd = "'" + ffmpegBin + "' -y -hide_banner -loglevel error -i '" + safeMPath + "'";
-            if (cIn > 0) extractCmd += " -ss " + cIn.toFixed(3);
-            if (cOut > cIn && cOut > 0) extractCmd += " -to " + cOut.toFixed(3);
-            extractCmd += " -ac 1 -ar 16000 -b:a 64k '" + safeMp3 + "'";
-        }
+            var args = ["-y", "-hide_banner", "-loglevel", "error", "-i", mPath];
+            if (cIn > 0) args.push("-ss", cIn.toFixed(3));
+            if (cOut > cIn && cOut > 0) args.push("-to", cOut.toFixed(3));
+            args.push("-ac", "1", "-ar", "16000", "-b:a", "64k", mp3Path);
 
-        console.log("[jsTranscribe] extract cmd:", extractCmd);
-        execModule(extractCmd, { maxBuffer: 16 * 1024 * 1024, timeout: 120000 }, function(err) {
-            if (err) {
-                callback({ status: "error", message: "Audio extraction failed: " + (err.message || "").slice(0, 100) });
-                return;
-            }
+            console.log("[jsTranscribe] running execFile:", ffmpegBin, args);
+            execFileModule(ffmpegBin, args, { maxBuffer: 16 * 1024 * 1024, timeout: 120000 }, function(err) {
+                if (err) {
+                    callback({ status: "error", message: "Audio extraction failed: " + (err.message || "").slice(0, 800) });
+                    return;
+                }
             if (!fsModule.existsSync(mp3Path)) {
                 callback({ status: "error", message: "Audio extraction produced no output." });
                 return;
@@ -1062,7 +1057,14 @@ document.addEventListener("DOMContentLoaded", function() {
 
         var statusLine = document.getElementById("cap-status");
         function setStatus(t) { if (statusLine) statusLine.textContent = t; }
-        function shq(s) { return '"' + String(s).replace(/(["\\$`])/g, "\\$1") + '"'; }
+        function shq(s) {
+            var isWin = (osModule && osModule.platform() === "win32");
+            if (isWin) {
+                return '"' + String(s) + '"';
+            } else {
+                return '"' + String(s).replace(/(["\\$`])/g, "\\$1") + '"';
+            }
+        }
         var opts = { maxBuffer: 16 * 1024 * 1024, timeout: 30 * 60 * 1000 };
 
         showProgress("Finding audio...", 3, true);
@@ -1216,7 +1218,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     if (errData && errData.message) {
                         showStatus("Caption error: " + errData.message.slice(0, 120), "red");
                     } else {
-                        showStatus("Transcription failed: " + (stderr || err.message || "unknown").slice(0, 100), "red");
+                        showStatus("Transcription failed: " + (stderr || err.message || "unknown").slice(0, 800), "red");
                     }
                     return;
                 }
@@ -1268,16 +1270,13 @@ document.addEventListener("DOMContentLoaded", function() {
                     clips.forEach(function(clip, idx) {
                         var partFile = osModule.tmpdir() + "/efp_part_" + Date.now() + "_" + idx + ".wav";
                         partFiles.push(partFile);
-                        var extractCmd = shq(ffmpegBin) + " -y -hide_banner -loglevel error" +
-                            " -i " + shq(clip.mediaPath);
+                        var extractArgs = ["-y", "-hide_banner", "-loglevel", "error", "-i", clip.mediaPath];
                         if (clip.clipOut > clip.clipIn && clip.duration > 0.1) {
-                            extractCmd += " -ss " + (clip.clipIn || 0).toFixed(3) +
-                                          " -to " + (clip.clipOut || 0).toFixed(3);
+                            extractArgs.push("-ss", (clip.clipIn || 0).toFixed(3), "-to", (clip.clipOut || 0).toFixed(3));
                         }
-                        // Extract to WAV to avoid MP3 padding/drift when concatenating
-                        extractCmd += " -vn -ac 1 -ar 16000 -c:a pcm_s16le " + shq(partFile);
+                        extractArgs.push("-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", partFile);
 
-                        activeCaptionProcess = execModule(extractCmd, opts, function(err2) {
+                        activeCaptionProcess = execFileModule(ffmpegBin, extractArgs, opts, function(err2) {
                             activeCaptionProcess = null;
                             if (err2) {
                                 if (err2.killed || err2.signal === 'SIGTERM') {
@@ -1291,7 +1290,7 @@ document.addEventListener("DOMContentLoaded", function() {
                             if (pending === 0) {
                                 if (extractError) {
                                     hideProgress(); setStatus("");
-                                    showStatus("Audio extraction failed: " + (extractError.message || "").slice(0,100), "red");
+                                    showStatus("Audio extraction failed: " + (extractError.message || "").slice(0, 800), "red");
                                     return;
                                 }
                                 // Build concat list file
@@ -1302,11 +1301,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
                                 // Concatenate all parts
                                 var combinedFile = osModule.tmpdir() + "/efp_combined_" + Date.now() + ".wav";
-                                var concatCmd = shq(ffmpegBin) + " -y -hide_banner -loglevel error" +
-                                    " -f concat -safe 0 -i " + shq(concatList) +
-                                    " -c copy " + shq(combinedFile);
+                                var concatArgs = ["-y", "-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", concatList, "-c", "copy", combinedFile];
 
-                                activeCaptionProcess = execModule(concatCmd, opts, function(err3) {
+                                activeCaptionProcess = execFileModule(ffmpegBin, concatArgs, opts, function(err3) {
                                     activeCaptionProcess = null;
                                     // Cleanup part files
                                     partFiles.forEach(function(f) { try { fsModule.unlinkSync(f); } catch(e){} });
@@ -1319,7 +1316,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                             return;
                                         }
                                         hideProgress(); setStatus("");
-                                        showStatus("Audio concat failed: " + (err3.message || "").slice(0,100), "red");
+                                        showStatus("Audio concat failed: " + (err3.message || "").slice(0, 800), "red");
                                         return;
                                     }
 
@@ -1638,9 +1635,17 @@ document.addEventListener("DOMContentLoaded", function() {
                         showStatus("ffmpeg setup failed: " + err, "red");
                         return;
                     }
-                    var cmd;
                     if (osModule && osModule.platform() === "win32") {
-                        cmd = '"' + ffmpegBin + '" -y -i "' + r.mediaPath + '" -ss ' + r.sourceTime.toFixed(6) + ' -map 0:v:0 -vframes 1 -q:v 2 "' + pngPath + '"';
+                        var args = ["-y", "-i", r.mediaPath, "-ss", r.sourceTime.toFixed(6), "-map", "0:v:0", "-vframes", "1", "-q:v", "2", pngPath];
+                        execFileModule(ffmpegBin, args, function(ffErr, ffOut, ffStderr) {
+                            if (!fsModule.existsSync(pngPath)) {
+                                showProgress("", 0); hideProgress();
+                                var detail = ffStderr ? ffStderr.substring(ffStderr.lastIndexOf('\n', ffStderr.length - 2) + 1).trim() : "unknown";
+                                showStatus("Capture failed: " + detail.substring(0, 120), "red");
+                                return;
+                            }
+                            copyFrameToClipboard(pngPath, 'PNG');
+                        });
                     } else {
                         var safeMedia = r.mediaPath.replace(/'/g, "'\\''");
                         var safePng = pngPath.replace(/'/g, "'\\''");
@@ -1651,17 +1656,17 @@ document.addEventListener("DOMContentLoaded", function() {
                             " -ss " + r.sourceTime.toFixed(6) +
                             " -map 0:v:0 -vframes 1 -q:v 2" +
                             " '" + safePng + "'";
-                    }
 
-                    execModule(cmd, function(ffErr, ffOut, ffStderr) {
-                        if (!fsModule.existsSync(pngPath)) {
-                            showProgress("", 0); hideProgress();
-                            var detail = ffStderr ? ffStderr.substring(ffStderr.lastIndexOf('\n', ffStderr.length - 2) + 1).trim() : "unknown";
-                            showStatus("Capture failed: " + detail.substring(0, 120), "red");
-                            return;
-                        }
-                        copyFrameToClipboard(pngPath, 'PNG');
-                    });
+                        execModule(cmd, function(ffErr, ffOut, ffStderr) {
+                            if (!fsModule.existsSync(pngPath)) {
+                                showProgress("", 0); hideProgress();
+                                var detail = ffStderr ? ffStderr.substring(ffStderr.lastIndexOf('\n', ffStderr.length - 2) + 1).trim() : "unknown";
+                                showStatus("Capture failed: " + detail.substring(0, 120), "red");
+                                return;
+                            }
+                            copyFrameToClipboard(pngPath, 'PNG');
+                        });
+                    }
                 });
             } catch(e) {
                 showProgress("", 0); hideProgress();
