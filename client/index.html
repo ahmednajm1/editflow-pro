@@ -486,7 +486,10 @@
             <button id="btn-capture-frame" class="secondary" data-tooltip="Capture the current frame at the playhead and copy it to your clipboard. Paste anywhere instantly." style="margin-top:8px;" data-i18n="export_capture">
                 📷 Capture Frame
             </button>
-            <p id="paste-status" style="font-size:11px; color:var(--text-mute); margin:6px 0 0; text-align:center;"></p>
+            <div id="paste-status-container" style="display: flex; flex-direction: column; align-items: center; margin-top: 6px;">
+                <p id="paste-status" style="font-size:11px; color:var(--text-mute); margin:0; text-align:center;"></p>
+                <button id="btn-paste-cancel" class="secondary hidden" style="margin-top: 4px; padding: 2px 8px; font-size: 10px; width: auto;" data-i18n="btn_stop">Stop</button>
+            </div>
         </div>
 
         <!-- 4. FAST CAPTIONS — brand-feature highlight -->

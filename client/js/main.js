@@ -8,12 +8,12 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.11";
+var CURRENT_VERSION = "1.3.12";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
 var operationRunning = false, statusTimer = null;
-var activeCaptionProcess = null;
+var activeCaptionProcess = null, activeClipboardProcess = null;
 var EFP_BIN_DIR = "";
 var DEFAULT_SETTINGS = {
     language: "en",
@@ -105,6 +105,7 @@ var i18n = {
         about_contact: "Contact Us",
         about_rights: "All rights reserved.",
         btn_cancel: "Cancel",
+        btn_stop: "Stop",
         btn_save: "Save Changes",
         confirm_title: "Confirm",
         confirm_text: "Are you sure?",
@@ -201,6 +202,7 @@ var i18n = {
         about_contact: "تواصل معنا",
         about_rights: "جميع الحقوق محفوظة.",
         btn_cancel: "إلغاء",
+        btn_stop: "إيقاف",
         btn_save: "حفظ التغييرات",
         confirm_title: "تأكيد",
         confirm_text: "هل أنت متأكد؟",
@@ -1453,6 +1455,12 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     function pollExportFile(filePath, startTime, maxDurationMs) {
+        if (!filePath || typeof filePath !== "string") {
+            showProgress("Export failed", 0);
+            setTimeout(hideProgress, 1000);
+            showStatus("Export failed: invalid output path.", "red");
+            return;
+        }
         showProgress("Exporting (Direct)...", 45);
         var intervalMs = 2000;
         var checkFile = setInterval(function() {
@@ -1800,6 +1808,7 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     safeBind("btn-paste-clipboard", function() { pasteFromClipboard(); });
+    safeBind("btn-paste-cancel", function() { cancelPaste(); });
 
     // SETTINGS
     var helpBtn = document.getElementById("btn-help-toggle");
@@ -1936,7 +1945,7 @@ document.addEventListener("DOMContentLoaded", function() {
     var expectedButtons = [
         "btn-audio-up", "btn-audio-down",
         "reset-clip-transform", "apply-scale",
-        "btn-paste-clipboard",
+        "btn-paste-clipboard", "btn-paste-cancel",
         "btn-export-selected", "btn-capture-frame", "btn-export-browse"
     ];
     var missing = [];
@@ -2269,7 +2278,7 @@ function findExportPreset() {
     
     if (isWin) {
         var programFiles = process.env["ProgramFiles"] || "C:\\Program Files";
-        var years = ["2027", "2026", "2025", "2024", "2023"];
+        var years = ["2029", "2028", "2027", "2026", "2025", "2024", "2023", "2022", "2021", "2020"];
         for (var i = 0; i < years.length; i++) {
             knownPaths.push(programFiles + "\\Adobe\\Adobe Media Encoder " + years[i] + "\\MediaIO\\systempresets\\4E49434B_48323634\\00 - Match Source - High bitrate.epr");
             knownPaths.push(programFiles + "\\Adobe\\Adobe Premiere Pro " + years[i] + "\\MediaIO\\systempresets\\4E49434B_48323634\\00 - Match Source - High bitrate.epr");
@@ -2295,7 +2304,8 @@ function findExportPreset() {
     // Fallback: search with command
     if (!execModule) return;
     if (isWin) {
-        var winCmd = 'powershell -Command "Get-ChildItem -Path \'' + (process.env["ProgramFiles"] || 'C:\\Program Files') + '\\Adobe\' -Filter \'00 - Match Source - High bitrate.epr\' -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -First 1"';
+        var adobeDir = (process.env["ProgramFiles"] || 'C:\\Program Files') + '\\Adobe';
+        var winCmd = 'powershell -NoProfile -InputFormat None -Command "Get-ChildItem -Path \'' + adobeDir + '\\Adobe Premiere Pro *\', \'' + adobeDir + '\\Adobe Media Encoder *\' -Filter \'00 - Match Source - High bitrate.epr\' -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -First 1"';
         execModule(winCmd, function(e, o) {
             if (o && o.trim()) {
                 foundPresetPath = o.trim();
@@ -2328,15 +2338,39 @@ function modifyPresetBitrate(cb) {
     var brEl = document.getElementById("batch-bitrate-input");
     var br = (brEl ? brEl.value : null) || String(settings.bitrate || 10);
     fsModule.readFile(foundPresetPath, "utf8", function(e, xml) {
-        if (e) { showStatus("Can't read preset.", "red"); return; }
-        var lines = xml.split("\n"), inB = false;
-        for (var i = 0; i < lines.length; i++) {
-            if (lines[i].indexOf("ADBEVideoTargetBitrate") !== -1) inB = true;
-            if (inB && lines[i].indexOf("<ParamValue>") !== -1) { lines[i] = "\t\t<ParamValue>" + br + ".</ParamValue>"; inB = false; }
+        if (e || !xml) {
+            console.error("[modifyPresetBitrate] Failed to read preset:", e);
+            showStatus("Can't read preset.", "red");
+            showProgress("Export failed", 0);
+            setTimeout(hideProgress, 1000);
+            return;
         }
-        var tmp = pathModule.join(getSafeTempDir(), "efp_" + Date.now() + ".epr");
-        fsModule.writeFileSync(tmp, lines.join("\n"), "utf8");
-        cb(tmp, br);
+        try {
+            var lines = String(xml).split("\n"), inB = false;
+            for (var i = 0; i < lines.length; i++) {
+                if (lines[i].indexOf("ADBEVideoTargetBitrate") !== -1) inB = true;
+                if (inB && lines[i].indexOf("<ParamValue>") !== -1) { 
+                    lines[i] = "\t\t<ParamValue>" + br + ".</ParamValue>"; 
+                    inB = false; 
+                }
+            }
+            var content = lines.join("\n");
+            var tempDir = getSafeTempDir();
+            var tmp = pathModule.join(tempDir, "efp_" + Date.now() + ".epr");
+            try {
+                fsModule.writeFileSync(tmp, content, "utf8");
+            } catch(writeErr) {
+                console.warn("[modifyPresetBitrate] Failed to write to tempDir, using os.tmpdir():", writeErr);
+                tmp = pathModule.join(osModule.tmpdir(), "efp_" + Date.now() + ".epr");
+                fsModule.writeFileSync(tmp, content, "utf8");
+            }
+            cb(tmp, br);
+        } catch(err) {
+            console.error("[modifyPresetBitrate] Error modifying preset:", err);
+            showStatus("Error modifying preset: " + err.message, "red");
+            showProgress("Export failed", 0);
+            setTimeout(hideProgress, 1000);
+        }
     });
 }
 
@@ -2344,6 +2378,8 @@ function modifyPresetBitrate(cb) {
 function pasteFromClipboard() {
     if (!execFileModule || !fsModule || !osModule || !pathModule) { showStatus("NodeJS required.", "red"); return; }
     var ps = document.getElementById("paste-status"); if (ps) ps.innerText = "Reading...";
+    var cancelBtn = document.getElementById("btn-paste-cancel");
+    if (cancelBtn) cancelBtn.classList.remove("hidden");
     var isWin = (osModule && osModule.platform() === "win32");
     
     var safeTemp = getSafeTempDir();
@@ -2389,9 +2425,12 @@ function pasteFromClipboard() {
 
         try {
             fsModule.writeFileSync(tempPs1, scriptContent, 'utf8');
-            var args = ['-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', tempPs1];
+            var args = ['-NoProfile', '-STA', '-InputFormat', 'None', '-ExecutionPolicy', 'Bypass', '-File', tempPs1];
             console.log("[pasteFromClipboard] Running powershell with script:", tempPs1);
-            execFileModule('powershell.exe', args, { timeout: 15000 }, function(e) {
+            activeClipboardProcess = execFileModule('powershell.exe', args, { timeout: 15000 }, function(e) {
+                activeClipboardProcess = null;
+                var cbBtn = document.getElementById("btn-paste-cancel");
+                if (cbBtn) cbBtn.classList.add("hidden");
                 try { fsModule.unlinkSync(tempPs1); } catch(err) {}
                 if (e || !fsModule.existsSync(tmp)) {
                     console.error("[pasteFromClipboard] PowerShell error or output file missing.", e);
@@ -2407,6 +2446,8 @@ function pasteFromClipboard() {
                 });
             });
         } catch(err) {
+            activeClipboardProcess = null;
+            if (cancelBtn) cancelBtn.classList.add("hidden");
             console.error("[pasteFromClipboard] Script write failed:", err);
             if (ps) ps.innerText = "Failed.";
             showStatus("Failed to access temporary directory.", "red");
@@ -2425,7 +2466,10 @@ function pasteFromClipboard() {
             '-e', 'end try'
         ];
         console.log("[pasteFromClipboard] Running osascript for clipboard");
-        execFileModule('osascript', args, function(e, o) {
+        activeClipboardProcess = execFileModule('osascript', args, function(e, o) {
+            activeClipboardProcess = null;
+            var cbBtn = document.getElementById("btn-paste-cancel");
+            if (cbBtn) cbBtn.classList.add("hidden");
             var out = o ? o.trim() : "";
             if (e || out === "no") {
                 console.error("[pasteFromClipboard] osascript error or returned 'no':", e, out);
@@ -2446,6 +2490,23 @@ function pasteFromClipboard() {
             });
         });
     }
+}
+
+function cancelPaste() {
+    if (activeClipboardProcess) {
+        try {
+            activeClipboardProcess.kill('SIGTERM');
+            console.log("[Cancel] Sent SIGTERM to activeClipboardProcess");
+        } catch(e) {
+            console.warn("[Cancel] Error killing clipboard process:", e.message);
+        }
+        activeClipboardProcess = null;
+    }
+    var ps = document.getElementById("paste-status");
+    if (ps) ps.innerText = "Cancelled.";
+    var cancelBtn = document.getElementById("btn-paste-cancel");
+    if (cancelBtn) cancelBtn.classList.add("hidden");
+    showStatus("Paste cancelled.", "orange");
 }
 function importBlob(blob) {
     if (!fsModule) return;
