@@ -1502,23 +1502,40 @@ document.addEventListener("DOMContentLoaded", function() {
 
         function copyFrameToClipboard(imgPath, type) {
             showProgress("Copying to clipboard...", 90);
-            var asClass = type === 'TIFF' ? '\u00ABclass TIFF\u00BB' : '\u00ABclass PNGf\u00BB';
-            var scptPath = imgPath.replace(/\.[^.]+$/, '.applescript');
-            var scptBody = 'set the clipboard to (read (POSIX file "' + imgPath + '") as ' + asClass + ')';
-            try {
-                fsModule.writeFileSync(scptPath, scptBody, 'utf8');
-                execModule('osascript "' + scptPath + '"', function(clipErr) {
-                    try { fsModule.unlinkSync(scptPath); } catch(e) {}
+            var isWin = (osModule && osModule.platform() === "win32");
+            if (isWin) {
+                var winPath = imgPath.replace(/\//g, "\\");
+                // Use PowerShell to copy the image to the clipboard
+                var psCmd = 'powershell -Command "& { Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; [System.Windows.Forms.Clipboard]::SetImage([System.Drawing.Image]::FromFile(\'' + winPath + '\')) }"';
+                console.log("[copyFrameToClipboard] Copy cmd:", psCmd);
+                execModule(psCmd, function(clipErr) {
                     showProgress("Done!", 100); setTimeout(hideProgress, 2000);
                     if (clipErr) {
+                        console.log("[copyFrameToClipboard] PowerShell error:", clipErr.message);
                         showStatus("Frame saved to: " + imgPath, "green");
                     } else {
-                        showStatus("Frame copied! Cmd+V to paste.", "green");
+                        showStatus("Frame copied! Ctrl+V to paste.", "green");
                     }
                 });
-            } catch(wErr) {
-                showProgress("Done!", 100); setTimeout(hideProgress, 2000);
-                showStatus("Frame saved to: " + imgPath, "green");
+            } else {
+                var asClass = type === 'TIFF' ? '\u00ABclass TIFF\u00BB' : '\u00ABclass PNGf\u00BB';
+                var scptPath = imgPath.replace(/\.[^.]+$/, '.applescript');
+                var scptBody = 'set the clipboard to (read (POSIX file "' + imgPath + '") as ' + asClass + ')';
+                try {
+                    fsModule.writeFileSync(scptPath, scptBody, 'utf8');
+                    execModule('osascript "' + scptPath + '"', function(clipErr) {
+                        try { fsModule.unlinkSync(scptPath); } catch(e) {}
+                        showProgress("Done!", 100); setTimeout(hideProgress, 2000);
+                        if (clipErr) {
+                            showStatus("Frame saved to: " + imgPath, "green");
+                        } else {
+                            showStatus("Frame copied! Cmd+V to paste.", "green");
+                        }
+                    });
+                } catch(wErr) {
+                    showProgress("Done!", 100); setTimeout(hideProgress, 2000);
+                    showStatus("Frame saved to: " + imgPath, "green");
+                }
             }
         }
     });
