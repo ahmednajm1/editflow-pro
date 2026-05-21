@@ -366,7 +366,12 @@ document.addEventListener("DOMContentLoaded", function() {
             if (hotUpdateUrl) {
                 startHotUpdate(hotUpdateUrl, downloadUrl, newVer);
             } else {
-                csInterface.openURLInDefaultBrowser(downloadUrl);
+                var targetUrl = downloadUrl;
+                var isWin = (osModule && osModule.platform() === "win32");
+                if (isWin && targetUrl.indexOf(".pkg") !== -1) {
+                    targetUrl = "https://www.najmedia.com/editflow/EditFlow%20Pro%20Installer.zip";
+                }
+                csInterface.openURLInDefaultBrowser(targetUrl);
                 banner.classList.remove("visible");
             }
         };
@@ -401,17 +406,42 @@ document.addEventListener("DOMContentLoaded", function() {
 
         var tempZipPath = pathModule.join(osModule.tmpdir(), "efp_update_" + Date.now() + ".zip");
         
-        // Step 1: Download using curl
-        var downloadCmd = 'curl -L -f -s -o "' + tempZipPath + '" "' + hotUpdateUrl + '"';
-        console.log("[HotUpdate] Downloading:", downloadCmd);
+        function nativeDownload(url, dest, callback) {
+            var https = require("https");
+            var fs = require("fs");
+            var file = fs.createWriteStream(dest);
+            var request = https.get(url, function(response) {
+                if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                    file.close();
+                    try { fs.unlinkSync(dest); } catch(e) {}
+                    return nativeDownload(response.headers.location, dest, callback);
+                }
+                if (response.statusCode !== 200) {
+                    file.close();
+                    try { fs.unlinkSync(dest); } catch(e) {}
+                    return callback(new Error("HTTP status " + response.statusCode));
+                }
+                response.pipe(file);
+                file.on('finish', function() {
+                    file.close(function() {
+                        callback(null);
+                    });
+                });
+            });
+            request.on('error', function(err) {
+                file.close();
+                try { fs.unlinkSync(dest); } catch(e) {}
+                callback(err);
+            });
+            request.setTimeout(60000, function() {
+                request.abort();
+                file.close();
+                try { fs.unlinkSync(dest); } catch(e) {}
+                callback(new Error("Download timeout"));
+            });
+        }
 
-        execModule(downloadCmd, function(err, stdout, stderr) {
-            if (err) {
-                console.error("[HotUpdate] Download failed:", err.message, stderr);
-                showHotUpdateError();
-                return;
-            }
-
+        function proceedToUnzip() {
             if (!fsModule.existsSync(tempZipPath) || fsModule.statSync(tempZipPath).size < 100) {
                 console.error("[HotUpdate] Downloaded file is empty or missing.");
                 showHotUpdateError();
@@ -434,8 +464,34 @@ document.addEventListener("DOMContentLoaded", function() {
 
                 if (unzipErr) {
                     console.error("[HotUpdate] Extraction failed:", unzipErr.message, unzipStderr);
-                    if (unzipStderr.indexOf("Permission denied") !== -1 || unzipErr.message.indexOf("Permission denied") !== -1) {
-                        msg.innerHTML = currentLang === "ar" ? "فشل التحديث بسبب الصلاحيات. يرجى التثبيت بالـ PKG." : "Failed due to permissions. Reinstall via PKG.";
+                    var errStr = ((unzipStderr || "") + " " + unzipErr.message).toLowerCase();
+                    if (errStr.indexOf("permission") !== -1 || 
+                        errStr.indexOf("access") !== -1 || 
+                        errStr.indexOf("unauthorized") !== -1) {
+                        
+                        var isWin = (osModule && osModule.platform() === "win32");
+                        msg.innerHTML = currentLang === "ar" ? 
+                            "فشل التحديث بسبب الصلاحيات. يرجى التثبيت يدوياً." : 
+                            "Failed due to permissions. Reinstall manually.";
+                            
+                        btnNow.disabled = false;
+                        btnNow.style.opacity = "1";
+                        btnNow.style.pointerEvents = "auto";
+                        if (btnDismiss) btnDismiss.style.display = "block";
+                        
+                        if (isWin) {
+                            btnNow.innerHTML = currentLang === "ar" ? "تنزيل الـ ZIP" : "Download ZIP";
+                            btnNow.onclick = function() {
+                                csInterface.openURLInDefaultBrowser("https://www.najmedia.com/editflow/EditFlow%20Pro%20Installer.zip");
+                                banner.classList.remove("visible");
+                            };
+                        } else {
+                            btnNow.innerHTML = currentLang === "ar" ? "تنزيل الـ PKG" : "Download PKG";
+                            btnNow.onclick = function() {
+                                csInterface.openURLInDefaultBrowser(downloadUrl);
+                                banner.classList.remove("visible");
+                            };
+                        }
                     } else {
                         showHotUpdateError();
                     }
@@ -448,17 +504,47 @@ document.addEventListener("DOMContentLoaded", function() {
                     location.reload();
                 }, 1500);
             });
+        }
+
+        // Try native download first, fallback to curl
+        nativeDownload(hotUpdateUrl, tempZipPath, function(nativeErr) {
+            if (nativeErr) {
+                console.warn("[HotUpdate] Native download failed, falling back to curl...", nativeErr.message);
+                var downloadCmd = 'curl -L -f -s -o "' + tempZipPath + '" "' + hotUpdateUrl + '"';
+                execModule(downloadCmd, function(curlErr) {
+                    if (curlErr) {
+                        console.error("[HotUpdate] curl download failed too:", curlErr.message);
+                        showHotUpdateError();
+                        return;
+                    }
+                    proceedToUnzip();
+                });
+            } else {
+                proceedToUnzip();
+            }
         });
 
         function showHotUpdateError() {
+            var isWin = (osModule && osModule.platform() === "win32");
+            var fallbackUrl = downloadUrl;
+            if (isWin && fallbackUrl.indexOf(".pkg") !== -1) {
+                fallbackUrl = "https://www.najmedia.com/editflow/EditFlow%20Pro%20Installer.zip";
+            }
+
             msg.innerHTML = currentLang === "ar" ? "فشل التحديث التلقائي! يرجى تحميله يدوياً." : "Auto-update failed! Please install manually.";
             btnNow.disabled = false;
             btnNow.style.opacity = "1";
             btnNow.style.pointerEvents = "auto";
             if (btnDismiss) btnDismiss.style.display = "block";
-            btnNow.innerHTML = currentLang === "ar" ? "تنزيل الـ PKG" : "Download PKG";
+            
+            if (isWin) {
+                btnNow.innerHTML = currentLang === "ar" ? "تنزيل الـ ZIP" : "Download ZIP";
+            } else {
+                btnNow.innerHTML = currentLang === "ar" ? "تنزيل الـ PKG" : "Download PKG";
+            }
+
             btnNow.onclick = function() {
-                csInterface.openURLInDefaultBrowser(downloadUrl);
+                csInterface.openURLInDefaultBrowser(fallbackUrl);
                 banner.classList.remove("visible");
             };
         }
