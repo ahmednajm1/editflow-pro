@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.8";
+var CURRENT_VERSION = "1.3.9";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -776,53 +776,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         // ── Ensure ffmpeg is available ──
         function ensureFFmpeg(cb) {
-            var ffmpegBin = getFFmpegPath();
-            // If getFFmpegPath returned a real path (not bare "ffmpeg"), we're good
-            if (ffmpegBin !== "ffmpeg" && fsModule.existsSync(ffmpegBin)) {
-                return cb(null, ffmpegBin);
-            }
-            // On macOS, ffmpeg is usually in PATH via homebrew
-            if (!isWin) return cb(null, "ffmpeg");
-            
-            // Windows: Download ffmpeg automatically
-            progressCb("Downloading ffmpeg (one-time)…", 5);
-            console.log("[jsTranscribe] ffmpeg not found, downloading...");
-            
-            var toolsDir = (process.env["APPDATA"] || (osModule.homedir() + "\\AppData\\Roaming")) + "\\EditFlowPro\\tools";
-            var outPath = toolsDir + "\\ffmpeg.exe";
-            
-            // Create directory
-            try { fsModule.mkdirSync(toolsDir, { recursive: true }); } catch(e) {}
-            
-            // Check if already downloaded from a previous attempt
-            if (fsModule.existsSync(outPath)) {
-                console.log("[jsTranscribe] ffmpeg already exists at:", outPath);
-                return cb(null, outPath);
-            }
-            
-            var downloadUrl = "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-win32-x64";
-            
-            // Use curl.exe (built into Windows 10+) — handles redirects natively
-            var dlCmd = 'curl.exe -L -o "' + outPath + '" "' + downloadUrl + '"';
-            console.log("[jsTranscribe] Download cmd:", dlCmd);
-            
-            execModule(dlCmd, { timeout: 180000, maxBuffer: 16 * 1024 * 1024 }, function(dlErr) {
-                if (dlErr || !fsModule.existsSync(outPath)) {
-                    console.log("[jsTranscribe] curl failed, trying PowerShell...", dlErr ? dlErr.message : "no file");
-                    // Fallback: PowerShell (handles TLS and redirects)
-                    var psCmd = 'powershell -Command "& { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri \'' + downloadUrl + '\' -OutFile \'' + outPath + '\' }"';
-                    execModule(psCmd, { timeout: 180000, maxBuffer: 16 * 1024 * 1024 }, function(psErr) {
-                        if (psErr || !fsModule.existsSync(outPath)) {
-                            return cb("ffmpeg download failed. Install ffmpeg manually.");
-                        }
-                        console.log("[jsTranscribe] ffmpeg downloaded via PowerShell to:", outPath);
-                        cb(null, outPath);
-                    });
-                    return;
-                }
-                console.log("[jsTranscribe] ffmpeg downloaded via curl to:", outPath);
-                cb(null, outPath);
-            });
+            ensureFFmpegGlobal(progressCb, cb);
         }
 
         ensureFFmpeg(function(err, ffmpegBin) {
@@ -1213,79 +1167,81 @@ document.addEventListener("DOMContentLoaded", function() {
                 showProgress("Extracting audio from " + clips.length + " clips…", 8, true);
                 setStatus("Combining " + clips.length + " clips for transcription…");
 
-                // Build ffmpeg concat filter: extract the used portion from each clip
-                var ffmpegBin = EFP_BIN_DIR + "/ffmpeg";
-                if (!fsModule.existsSync(ffmpegBin)) ffmpegBin = "/opt/homebrew/bin/ffmpeg";
-                if (!fsModule.existsSync(ffmpegBin)) ffmpegBin = "/usr/local/bin/ffmpeg";
-                if (!fsModule.existsSync(ffmpegBin)) ffmpegBin = "ffmpeg"; // last resort: try PATH
-
-                var concatList = osModule.tmpdir() + "/efp_concat_" + Date.now() + ".txt";
-                var partFiles = [];
-                var pending = clips.length;
-                var extractError = null;
-
-                clips.forEach(function(clip, idx) {
-                    var partFile = osModule.tmpdir() + "/efp_part_" + Date.now() + "_" + idx + ".wav";
-                    partFiles.push(partFile);
-                    var extractCmd = shq(ffmpegBin) + " -y -hide_banner -loglevel error" +
-                        " -i " + shq(clip.mediaPath);
-                    if (clip.clipOut > clip.clipIn && clip.duration > 0.1) {
-                        extractCmd += " -ss " + (clip.clipIn || 0).toFixed(3) +
-                                      " -to " + (clip.clipOut || 0).toFixed(3);
+                ensureFFmpegGlobal(function(msg, pct) { showProgress(msg, pct, true); }, function(err, ffmpegBin) {
+                    if (err) {
+                        hideProgress(); setStatus("");
+                        showStatus("ffmpeg setup failed: " + err, "red");
+                        return;
                     }
-                    // Extract to WAV to avoid MP3 padding/drift when concatenating
-                    extractCmd += " -vn -ac 1 -ar 16000 -c:a pcm_s16le " + shq(partFile);
 
-                    activeCaptionProcess = execModule(extractCmd, opts, function(err2) {
-                        activeCaptionProcess = null;
-                        if (err2) {
-                            if (err2.killed || err2.signal === 'SIGTERM') {
-                                hideProgress(); setStatus("Captioning cancelled.");
-                                showStatus("Captioning cancelled by user.", "orange");
-                                return;
-                            }
-                            extractError = err2;
+                    var concatList = osModule.tmpdir() + "/efp_concat_" + Date.now() + ".txt";
+                    var partFiles = [];
+                    var pending = clips.length;
+                    var extractError = null;
+
+                    clips.forEach(function(clip, idx) {
+                        var partFile = osModule.tmpdir() + "/efp_part_" + Date.now() + "_" + idx + ".wav";
+                        partFiles.push(partFile);
+                        var extractCmd = shq(ffmpegBin) + " -y -hide_banner -loglevel error" +
+                            " -i " + shq(clip.mediaPath);
+                        if (clip.clipOut > clip.clipIn && clip.duration > 0.1) {
+                            extractCmd += " -ss " + (clip.clipIn || 0).toFixed(3) +
+                                          " -to " + (clip.clipOut || 0).toFixed(3);
                         }
-                        pending--;
-                        if (pending === 0) {
-                            if (extractError) {
-                                hideProgress(); setStatus("");
-                                showStatus("Audio extraction failed: " + (extractError.message || "").slice(0,100), "red");
-                                return;
-                            }
-                            // Build concat list file
-                            var listContent = partFiles.map(function(f) {
-                                return "file '" + f.replace(/'/g, "'\\''") + "'";
-                            }).join("\n");
-                            fsModule.writeFileSync(concatList, listContent, "utf8");
+                        // Extract to WAV to avoid MP3 padding/drift when concatenating
+                        extractCmd += " -vn -ac 1 -ar 16000 -c:a pcm_s16le " + shq(partFile);
 
-                            // Concatenate all parts
-                            var combinedFile = osModule.tmpdir() + "/efp_combined_" + Date.now() + ".wav";
-                            var concatCmd = shq(ffmpegBin) + " -y -hide_banner -loglevel error" +
-                                " -f concat -safe 0 -i " + shq(concatList) +
-                                " -c copy " + shq(combinedFile);
-
-                            activeCaptionProcess = execModule(concatCmd, opts, function(err3) {
-                                activeCaptionProcess = null;
-                                // Cleanup part files
-                                partFiles.forEach(function(f) { try { fsModule.unlinkSync(f); } catch(e){} });
-                                try { fsModule.unlinkSync(concatList); } catch(e){}
-
-                                if (err3) {
-                                    if (err3.killed || err3.signal === 'SIGTERM') {
-                                        hideProgress(); setStatus("Captioning cancelled.");
-                                        showStatus("Captioning cancelled by user.", "orange");
-                                        return;
-                                    }
-                                    hideProgress(); setStatus("");
-                                    showStatus("Audio concat failed: " + (err3.message || "").slice(0,100), "red");
+                        activeCaptionProcess = execModule(extractCmd, opts, function(err2) {
+                            activeCaptionProcess = null;
+                            if (err2) {
+                                if (err2.killed || err2.signal === 'SIGTERM') {
+                                    hideProgress(); setStatus("Captioning cancelled.");
+                                    showStatus("Captioning cancelled by user.", "orange");
                                     return;
                                 }
+                                extractError = err2;
+                            }
+                            pending--;
+                            if (pending === 0) {
+                                if (extractError) {
+                                    hideProgress(); setStatus("");
+                                    showStatus("Audio extraction failed: " + (extractError.message || "").slice(0,100), "red");
+                                    return;
+                                }
+                                // Build concat list file
+                                var listContent = partFiles.map(function(f) {
+                                    return "file '" + f.replace(/'/g, "'\\''") + "'";
+                                }).join("\n");
+                                fsModule.writeFileSync(concatList, listContent, "utf8");
 
-                                // Run transcriber on combined audio (no --start/--end since we already trimmed)
-                                runTranscriber(combinedFile, firstTlStart, 0, 0, 0);
-                            });
-                        }
+                                // Concatenate all parts
+                                var combinedFile = osModule.tmpdir() + "/efp_combined_" + Date.now() + ".wav";
+                                var concatCmd = shq(ffmpegBin) + " -y -hide_banner -loglevel error" +
+                                    " -f concat -safe 0 -i " + shq(concatList) +
+                                    " -c copy " + shq(combinedFile);
+
+                                activeCaptionProcess = execModule(concatCmd, opts, function(err3) {
+                                    activeCaptionProcess = null;
+                                    // Cleanup part files
+                                    partFiles.forEach(function(f) { try { fsModule.unlinkSync(f); } catch(e){} });
+                                    try { fsModule.unlinkSync(concatList); } catch(e){}
+
+                                    if (err3) {
+                                        if (err3.killed || err3.signal === 'SIGTERM') {
+                                            hideProgress(); setStatus("Captioning cancelled.");
+                                            showStatus("Captioning cancelled by user.", "orange");
+                                            return;
+                                        }
+                                        hideProgress(); setStatus("");
+                                        showStatus("Audio concat failed: " + (err3.message || "").slice(0,100), "red");
+                                        return;
+                                    }
+
+                                    // Run transcriber on combined audio (no --start/--end since we already trimmed)
+                                    runTranscriber(combinedFile, firstTlStart, 0, 0, 0);
+                                });
+                            }
+                        });
                     });
                 });
             } else if (!info.mediaPath) {
@@ -1344,6 +1300,22 @@ document.addEventListener("DOMContentLoaded", function() {
                 return;
             }
         }
+
+        // Cleanup old temp presets (older than 10 mins) to keep temp folder clean
+        try {
+            var tempDir = getSafeTempDir();
+            var files = fsModule.readdirSync(tempDir);
+            var now = Date.now();
+            files.forEach(function(file) {
+                if (file.indexOf("efp_") === 0 && file.indexOf(".epr") !== -1) {
+                    var filePath = pathModule.join(tempDir, file);
+                    var stat = fsModule.statSync(filePath);
+                    if (now - stat.mtimeMs > 600000) { // 10 minutes
+                        try { fsModule.unlinkSync(filePath); } catch(err) {}
+                    }
+                }
+            });
+        } catch(err) {}
         
         console.log("[Export] File: " + (fileName || "(auto)") + " | Path: " + (savePath || "(default)"));
         showProgress("Preparing...", 10);
@@ -1353,21 +1325,26 @@ document.addEventListener("DOMContentLoaded", function() {
             var fpEsc = savePath.replace(/\\/g,"\\\\").replace(/"/g,'\\"');
             console.log("[Export] Bitrate: " + br + " Mbps");
             csInterface.evalScript('$._editflow.exportCustom("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '", "' + fnEsc + '", "' + fpEsc + '")', function(res) {
-                showProgress("Done!", 100); setTimeout(hideProgress, 2000);
                 console.log("[<-JSX] exportCustom:", res);
-                try { fsModule.unlinkSync(tmp); } catch(e) {}
+                // Delete the temp preset after a delay (e.g. 5 minutes) to give AME/Premiere ample time to read it
+                setTimeout(function() {
+                    try { fsModule.unlinkSync(tmp); } catch(e) {}
+                }, 300000);
                 
                 var r = safeParse(res);
                 if (r && r.status === "success") {
+                    showProgress("Done!", 100); 
+                    setTimeout(hideProgress, 2000);
                     if (r.filePath) {
                         showStatus("✅ Exported: " + r.filePath, "green");
                     } else {
                         showStatus(r.message || "Export complete!", "green");
                     }
-                } else if (r && r.status === "error") {
-                    showStatus(r.message || "Export failed.", "red");
                 } else {
-                    showStatus("Export complete.", "green");
+                    showProgress("Export failed", 0);
+                    setTimeout(hideProgress, 1000);
+                    var errMsg = (r && r.message) ? r.message : "Export failed.";
+                    showStatus(errMsg, "red");
                 }
             });
         });
@@ -1407,6 +1384,50 @@ document.addEventListener("DOMContentLoaded", function() {
         var toolsPath = toolsDir + (isWin ? "\\" : "/") + "ffmpeg" + ext;
         if (fsModule.existsSync(toolsPath)) return toolsPath;
         return "ffmpeg";
+    }
+
+    function ensureFFmpegGlobal(progressCb, cb) {
+        if (!fsModule || !osModule) return cb("Node modules not available");
+        var isWin = (osModule.platform() === "win32");
+        var ffmpegBin = getFFmpegPath();
+        if (ffmpegBin !== "ffmpeg" && fsModule.existsSync(ffmpegBin)) {
+            return cb(null, ffmpegBin);
+        }
+        if (!isWin) return cb(null, "ffmpeg");
+        
+        progressCb("Downloading ffmpeg (one-time)…", 5);
+        console.log("[ensureFFmpegGlobal] ffmpeg not found, downloading...");
+        
+        var toolsDir = (process.env["APPDATA"] || (osModule.homedir() + "\\AppData\\Roaming")) + "\\EditFlowPro\\tools";
+        var outPath = toolsDir + "\\ffmpeg.exe";
+        
+        try { fsModule.mkdirSync(toolsDir, { recursive: true }); } catch(e) {}
+        
+        if (fsModule.existsSync(outPath)) {
+            console.log("[ensureFFmpegGlobal] ffmpeg already exists at:", outPath);
+            return cb(null, outPath);
+        }
+        
+        var downloadUrl = "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-win32-x64";
+        var dlCmd = 'curl.exe -L -o "' + outPath + '" "' + downloadUrl + '"';
+        console.log("[ensureFFmpegGlobal] Download cmd:", dlCmd);
+        
+        execModule(dlCmd, { timeout: 180000, maxBuffer: 16 * 1024 * 1024 }, function(dlErr) {
+            if (dlErr || !fsModule.existsSync(outPath)) {
+                console.log("[ensureFFmpegGlobal] curl failed, trying PowerShell...", dlErr ? dlErr.message : "no file");
+                var psCmd = 'powershell -Command "& { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri \'' + downloadUrl + '\' -OutFile \'' + outPath + '\' }"';
+                execModule(psCmd, { timeout: 180000, maxBuffer: 16 * 1024 * 1024 }, function(psErr) {
+                    if (psErr || !fsModule.existsSync(outPath)) {
+                        return cb("ffmpeg download failed. Install ffmpeg manually.");
+                    }
+                    console.log("[ensureFFmpegGlobal] ffmpeg downloaded via PowerShell to:", outPath);
+                    cb(null, outPath);
+                });
+                return;
+            }
+            console.log("[ensureFFmpegGlobal] ffmpeg downloaded via curl to:", outPath);
+            cb(null, outPath);
+        });
     }
 
     var foundPngPreset = null;
@@ -1525,30 +1546,36 @@ document.addEventListener("DOMContentLoaded", function() {
                 var pngPath = pathModule.join(getSafeTempDir(), 'editflow_frame_' + Date.now() + '.png');
                 showProgress("Extracting frame...", 60);
 
-                var ffmpegBin = getFFmpegPath();
-                var cmd;
-                if (osModule && osModule.platform() === "win32") {
-                    cmd = '"' + ffmpegBin + '" -y -i "' + r.mediaPath + '" -ss ' + r.sourceTime.toFixed(6) + ' -map 0:v:0 -vframes 1 -q:v 2 "' + pngPath + '"';
-                } else {
-                    var safeMedia = r.mediaPath.replace(/'/g, "'\\''");
-                    var safePng = pngPath.replace(/'/g, "'\\''");
-                    var binPath = extensionPath + "/bin";
-                    cmd = "export PATH=\"" + binPath + ":/opt/homebrew/bin:/usr/local/bin:$PATH\" && " +
-                        "ffmpeg -y" +
-                        " -i '" + safeMedia + "'" +
-                        " -ss " + r.sourceTime.toFixed(6) +
-                        " -map 0:v:0 -vframes 1 -q:v 2" +
-                        " '" + safePng + "'";
-                }
-
-                execModule(cmd, function(ffErr, ffOut, ffStderr) {
-                    if (!fsModule.existsSync(pngPath)) {
+                ensureFFmpegGlobal(function(msg, pct) { showProgress(msg, pct, true); }, function(err, ffmpegBin) {
+                    if (err) {
                         showProgress("", 0); hideProgress();
-                        var detail = ffStderr ? ffStderr.substring(ffStderr.lastIndexOf('\n', ffStderr.length - 2) + 1).trim() : "unknown";
-                        showStatus("Capture failed: " + detail.substring(0, 120), "red");
+                        showStatus("ffmpeg setup failed: " + err, "red");
                         return;
                     }
-                    copyFrameToClipboard(pngPath, 'PNG');
+                    var cmd;
+                    if (osModule && osModule.platform() === "win32") {
+                        cmd = '"' + ffmpegBin + '" -y -i "' + r.mediaPath + '" -ss ' + r.sourceTime.toFixed(6) + ' -map 0:v:0 -vframes 1 -q:v 2 "' + pngPath + '"';
+                    } else {
+                        var safeMedia = r.mediaPath.replace(/'/g, "'\\''");
+                        var safePng = pngPath.replace(/'/g, "'\\''");
+                        var binPath = extensionPath + "/bin";
+                        cmd = "export PATH=\"" + binPath + ":/opt/homebrew/bin:/usr/local/bin:$PATH\" && " +
+                            "ffmpeg -y" +
+                            " -i '" + safeMedia + "'" +
+                            " -ss " + r.sourceTime.toFixed(6) +
+                            " -map 0:v:0 -vframes 1 -q:v 2" +
+                            " '" + safePng + "'";
+                    }
+
+                    execModule(cmd, function(ffErr, ffOut, ffStderr) {
+                        if (!fsModule.existsSync(pngPath)) {
+                            showProgress("", 0); hideProgress();
+                            var detail = ffStderr ? ffStderr.substring(ffStderr.lastIndexOf('\n', ffStderr.length - 2) + 1).trim() : "unknown";
+                            showStatus("Capture failed: " + detail.substring(0, 120), "red");
+                            return;
+                        }
+                        copyFrameToClipboard(pngPath, 'PNG');
+                    });
                 });
             } catch(e) {
                 showProgress("", 0); hideProgress();

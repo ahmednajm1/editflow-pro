@@ -1917,12 +1917,45 @@ $._editflow.exportCustom = function(presetPath, fileName, folderPath) {
     if (!new File(normPresetPath).exists) {
         return '{"status":"error","message":"Preset file not found: ' + normPresetPath + '"}';
     }
+
+    // Set sequence in/out points if a clip is currently selected
+    var sel = null;
+    try { sel = seq.getSelection(); } catch(e) {}
+    if (sel && sel.length > 0) {
+        try {
+            seq.setInPoint(sel[0].start.ticks);
+            seq.setOutPoint(sel[0].end.ticks);
+        } catch(e) {}
+    }
     
+    // ── Route through Adobe Media Encoder (AME) if available ──
+    var queuedInAME = false;
+    if (app.encoder) {
+        try {
+            app.encoder.launchEncoder();
+            // encodeSequence parameters: sequence, outputPath, presetPath, workAreaType, removeUponCompletion
+            // workAreaType: 1 = ENCODE_IN_TO_OUT (respects In/Out markers set above)
+            // removeUponCompletion: 0 (keeps it in AME queue so user sees it)
+            var success = app.encoder.encodeSequence(seq, outPath, normPresetPath, 1, 0);
+            if (success) {
+                app.encoder.startBatch();
+                queuedInAME = true;
+            }
+        } catch(err) {
+            // fallback to direct if AME fails
+        }
+    }
+
+    if (queuedInAME) {
+        return '{"status":"success","message":"Export queued in Adobe Media Encoder","filePath":"' + outPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"}';
+    }
+    
+    // ── Fallback: Direct background render (original behavior) ──
     try {
         seq.exportAsMediaDirect(outPath, normPresetPath, 1);
         
         // Wait/poll for the file to exist (Media Direct export is synchronous in JSX but let's poll to be 100% sure on slow Windows systems)
-        var maxWait = 40; // 10 seconds (40 * 250ms)
+        var maxWait = 120; // 30 seconds (120 * 250ms)
         var waited = 0;
         while (waited < maxWait) {
             if (new File(outPath).exists) break;
