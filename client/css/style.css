@@ -898,10 +898,13 @@ button.secondary { color: var(--text-mute); }
 
 .row-label {
   display: grid;
-  grid-template-columns: 65px 1fr 75px;
+  grid-template-columns: 65px minmax(0, 1fr) 75px;
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
+}
+.row-label > * {
+  min-width: 0;
 }
 .label { font-size: 11px; color: var(--text-mute); white-space: nowrap; text-align: right; }
 .label-unit { font-size: 10px; color: var(--text-mute); text-align: left; }
@@ -1355,4 +1358,112 @@ button.secondary { color: var(--text-mute); }
 }
 #btn-progress-cancel.hidden {
   display: none !important;
+}
+
+/* ====================================
+   SCROLLBAR & RESPONSIVENESS CUSTOMIZATIONS
+   ==================================== */
+
+/* Prevent horizontal scroll entirely */
+html, body {
+  overflow-x: hidden !important;
+}
+
+/* Sleek, premium custom scrollbar for the main panel body */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Responsive query for narrow panels (e.g. Adobe Premiere sidebar placement) */
+@media (max-width: 290px) {
+  .panel-content {
+    padding: 12px;
+  }
+  
+  .transform-section {
+    padding: 12px 10px;
+  }
+  
+  /* Stack row-label into 2 lines: label & inputs on line 1, preset chips on line 2 */
+  .row-label {
+    grid-template-areas: 
+      "label input"
+      "chips chips";
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  
+  .row-label > .label {
+    grid-area: label;
+    text-align: left;
+  }
+  
+  .row-label > .btn-group {
+    grid-area: chips;
+  }
+  
+  .row-label > div:last-child {
+    grid-area: input;
+    justify-content: flex-end;
+  }
+  
+  /* Constrain small input boxes when they are placed in dynamic width environments */
+  .row-label .input-small {
+    width: 45px;
+    flex-shrink: 0;
+  }
+  
+  /* Make position control arrows responsive */
+  .arrow-row {
+    gap: 6px !important;
+  }
+  
+  .btn-arrow {
+    width: 34px;
+    height: 32px;
+    font-size: 11px;
+  }
+  
+  /* Stack tools-row to avoid side spillover */
+  .tools-row {
+    display: grid;
+    grid-template-areas: 
+      "label label"
+      "fit anchor";
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  
+  .tools-row > .label {
+    grid-area: label;
+    text-align: left;
+    margin-bottom: 2px;
+  }
+  
+  .tools-row > #btn-fit-frame {
+    grid-area: fit;
+  }
+  
+  .tools-row > #btn-center-anchor {
+    grid-area: anchor;
+  }
+  
+  /* Fit preset chips on a single line */
+  .chip {
+    font-size: 11px;
+    padding: 6px 4px;
+  }
 }

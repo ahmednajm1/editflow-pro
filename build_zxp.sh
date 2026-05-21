@@ -80,19 +80,32 @@ rsync -a "$SCRIPT_DIR/" "$BUILD_DIR/" \
     --exclude="Install EditFlow Pro.command" \
     --exclude="install.sh"
 
-# 4. Remove old ZXP if exists
+# 4. Obfuscate main.js in temporary build directory (protection layer)
+OBFUSCATOR="/Users/ahmed/.gemini/antigravity/scratch/node_modules/.bin/javascript-obfuscator"
+OBF_CONFIG="$SCRIPT_DIR/obfuscator.config.json"
+MAIN_JS="$BUILD_DIR/client/js/main.js"
+
+if [ -f "$OBFUSCATOR" ] && [ -f "$OBF_CONFIG" ] && [ -f "$MAIN_JS" ]; then
+    echo "[INFO] 🔒 Obfuscating main.js..."
+    "$OBFUSCATOR" "$MAIN_JS" --output "$MAIN_JS" --config "$OBF_CONFIG"
+    echo "[INFO] ✅ Code protection applied"
+else
+    echo "[WARN] ⚠️ Skipping obfuscation (obfuscator or config not found)"
+fi
+
+# 5. Remove old ZXP if exists
 if [ -f "$OUTPUT_FILE" ]; then
     echo "[INFO] Removing old ZXP build..."
     rm "$OUTPUT_FILE"
 fi
 
-# 5. Sign and package ZXP
+# 6. Sign and package ZXP
 echo "[INFO] Signing and packaging ZXP..."
 "$ZXPSIGN" -sign "$BUILD_DIR" "$OUTPUT_FILE" "$CERT_FILE" "$CERT_PASS"
 
 STATUS=$?
 
-# 6. Cleanup
+# 7. Cleanup
 rm -rf "$BUILD_DIR"
 
 if [ $STATUS -eq 0 ]; then
