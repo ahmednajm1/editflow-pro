@@ -779,45 +779,35 @@ document.addEventListener("DOMContentLoaded", function() {
             // Create directory
             try { fsModule.mkdirSync(toolsDir, { recursive: true }); } catch(e) {}
             
-            var downloadUrl = "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-win32-x64";
-            
-            function followRedirects(reqUrl, maxRedirects) {
-                if (maxRedirects <= 0) return cb("Too many redirects");
-                var parsed = require("url").parse(reqUrl);
-                var mod = parsed.protocol === "https:" ? https : http;
-                
-                mod.get(reqUrl, function(res) {
-                    if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-                        followRedirects(res.headers.location, maxRedirects - 1);
-                        return;
-                    }
-                    if (res.statusCode !== 200) {
-                        return cb("Download failed: HTTP " + res.statusCode);
-                    }
-                    
-                    var fileStream = fsModule.createWriteStream(outPath);
-                    var downloaded = 0;
-                    var total = parseInt(res.headers["content-length"] || "0", 10);
-                    
-                    res.on("data", function(chunk) {
-                        downloaded += chunk.length;
-                        if (total > 0) {
-                            var pct = Math.round(downloaded / total * 100);
-                            progressCb("Downloading ffmpeg… " + pct + "%", 5 + Math.round(pct * 0.05));
-                        }
-                    });
-                    
-                    res.pipe(fileStream);
-                    fileStream.on("finish", function() {
-                        fileStream.close();
-                        console.log("[jsTranscribe] ffmpeg downloaded to:", outPath);
-                        cb(null, outPath);
-                    });
-                    fileStream.on("error", function(e) { cb("Write error: " + e.message); });
-                }).on("error", function(e) { cb("Network error: " + e.message); });
+            // Check if already downloaded from a previous attempt
+            if (fsModule.existsSync(outPath)) {
+                console.log("[jsTranscribe] ffmpeg already exists at:", outPath);
+                return cb(null, outPath);
             }
             
-            followRedirects(downloadUrl, 10);
+            var downloadUrl = "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-win32-x64";
+            
+            // Use curl.exe (built into Windows 10+) — handles redirects natively
+            var dlCmd = 'curl.exe -L -o "' + outPath + '" "' + downloadUrl + '"';
+            console.log("[jsTranscribe] Download cmd:", dlCmd);
+            
+            execModule(dlCmd, { timeout: 180000, maxBuffer: 16 * 1024 * 1024 }, function(dlErr) {
+                if (dlErr || !fsModule.existsSync(outPath)) {
+                    console.log("[jsTranscribe] curl failed, trying PowerShell...", dlErr ? dlErr.message : "no file");
+                    // Fallback: PowerShell (handles TLS and redirects)
+                    var psCmd = 'powershell -Command "& { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri \'' + downloadUrl + '\' -OutFile \'' + outPath + '\' }"';
+                    execModule(psCmd, { timeout: 180000, maxBuffer: 16 * 1024 * 1024 }, function(psErr) {
+                        if (psErr || !fsModule.existsSync(outPath)) {
+                            return cb("ffmpeg download failed. Install ffmpeg manually.");
+                        }
+                        console.log("[jsTranscribe] ffmpeg downloaded via PowerShell to:", outPath);
+                        cb(null, outPath);
+                    });
+                    return;
+                }
+                console.log("[jsTranscribe] ffmpeg downloaded via curl to:", outPath);
+                cb(null, outPath);
+            });
         }
 
         ensureFFmpeg(function(err, ffmpegBin) {
