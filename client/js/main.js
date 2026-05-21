@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.6";
+var CURRENT_VERSION = "1.3.7";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -1358,6 +1358,24 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     });
 
+    function getSafeTempDir() {
+        if (!fsModule || !osModule || !pathModule) return "";
+        var isWin = (osModule.platform() === "win32");
+        if (isWin) {
+            var publicDir = process.env["PUBLIC"] || "C:\\Users\\Public";
+            var safeDir = pathModule.join(publicDir, "EditFlowPro_Temp");
+            try {
+                if (!fsModule.existsSync(safeDir)) {
+                    fsModule.mkdirSync(safeDir, { recursive: true });
+                }
+                return safeDir;
+            } catch(e) {
+                return osModule.tmpdir();
+            }
+        }
+        return osModule.tmpdir();
+    }
+
     // Helper: Find built-in PNG Preset for native capture
     function getFFmpegPath() {
         if (!fsModule || !osModule) return "ffmpeg";
@@ -1433,7 +1451,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     console.log('[CAPTURE] Falling back to Native MediaDirect...');
                     showProgress("Rendering frame...", 40);
                     
-                    var safeTempDir = osModule.tmpdir().replace(/\\/g, "/");
+                    var safeTempDir = getSafeTempDir().replace(/\\/g, "/");
                     var safePreset = pngPreset.replace(/\\/g, "/");
                     
                     csInterface.evalScript('$._editflow.exportNativeFrame("' + safePreset + '", "' + safeTempDir + '")', function(res) {
@@ -1489,7 +1507,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     return;
                 }
 
-                var pngPath = osModule.tmpdir() + '/editflow_frame_' + Date.now() + '.png';
+                var pngPath = pathModule.join(getSafeTempDir(), 'editflow_frame_' + Date.now() + '.png');
                 showProgress("Extracting frame...", 60);
 
                 var ffmpegBin = getFFmpegPath();
@@ -1527,12 +1545,21 @@ document.addEventListener("DOMContentLoaded", function() {
             showProgress("Copying to clipboard...", 90);
             var isWin = (osModule && osModule.platform() === "win32");
             if (isWin) {
-                var winPath = imgPath.replace(/\//g, "\\");
-                var tempPs1 = pathModule.join(osModule.tmpdir(), "efp_copy_" + Date.now() + ".ps1");
+                var safeTemp = getSafeTempDir();
+                var safeImgPath = pathModule.join(safeTemp, "efp_clip_temp.png");
+                try {
+                    fsModule.copyFileSync(imgPath, safeImgPath);
+                } catch(copyErr) {
+                    console.error("[copyFrameToClipboard] Copy to safe path failed:", copyErr);
+                    safeImgPath = imgPath;
+                }
+                
+                var winPath = safeImgPath.replace(/\//g, "\\");
+                var tempPs1 = pathModule.join(safeTemp, "efp_copy.ps1");
                 var scriptContent = [
                     'Add-Type -AssemblyName System.Windows.Forms',
                     'Add-Type -AssemblyName System.Drawing',
-                    '$inputPath = $args[0]',
+                    '$inputPath = "' + winPath.replace(/"/g, '`"') + '"',
                     'if (Test-Path $inputPath) {',
                     '    $img = [System.Drawing.Image]::FromFile($inputPath)',
                     '    [System.Windows.Forms.Clipboard]::SetImage($img)',
@@ -1544,10 +1571,11 @@ document.addEventListener("DOMContentLoaded", function() {
                 
                 try {
                     fsModule.writeFileSync(tempPs1, scriptContent, 'utf8');
-                    var psCmd = 'powershell -NoProfile -STA -ExecutionPolicy Bypass -File "' + tempPs1 + '" "' + winPath + '"';
+                    var psCmd = 'powershell -NoProfile -STA -ExecutionPolicy Bypass -File "' + tempPs1 + '"';
                     console.log("[copyFrameToClipboard] Running:", psCmd);
                     execModule(psCmd, function(clipErr) {
                         try { fsModule.unlinkSync(tempPs1); } catch(e) {}
+                        try { fsModule.unlinkSync(safeImgPath); } catch(e) {}
                         showProgress("Done!", 100); setTimeout(hideProgress, 2000);
                         if (clipErr) {
                             console.error("[copyFrameToClipboard] Error:", clipErr.message);
@@ -2112,7 +2140,7 @@ function modifyPresetBitrate(cb) {
             if (lines[i].indexOf("ADBEVideoTargetBitrate") !== -1) inB = true;
             if (inB && lines[i].indexOf("<ParamValue>") !== -1) { lines[i] = "\t\t<ParamValue>" + br + ".</ParamValue>"; inB = false; }
         }
-        var tmp = osModule.tmpdir() + "/efp_" + Date.now() + ".epr";
+        var tmp = pathModule.join(getSafeTempDir(), "efp_" + Date.now() + ".epr");
         fsModule.writeFileSync(tmp, lines.join("\n"), "utf8");
         cb(tmp, br);
     });
@@ -2123,15 +2151,16 @@ function pasteFromClipboard() {
     if (!execModule || !fsModule || !osModule || !pathModule) { showStatus("NodeJS required.", "red"); return; }
     var ps = document.getElementById("paste-status"); if (ps) ps.innerText = "Reading...";
     var isWin = (osModule && osModule.platform() === "win32");
-    var tmp = pathModule.join(osModule.tmpdir(), "efp_paste_" + Date.now() + ".png");
-
+    
     if (isWin) {
+        var safeTemp = getSafeTempDir();
+        var tmp = pathModule.join(safeTemp, "efp_paste.png");
         var winPath = tmp.replace(/\//g, "\\");
-        var tempPs1 = pathModule.join(osModule.tmpdir(), "efp_paste_script_" + Date.now() + ".ps1");
+        var tempPs1 = pathModule.join(safeTemp, "efp_paste_script.ps1");
         var scriptContent = [
             'Add-Type -AssemblyName System.Windows.Forms',
             'Add-Type -AssemblyName System.Drawing',
-            '$outputPath = $args[0]',
+            '$outputPath = "' + winPath.replace(/"/g, '`"') + '"',
             'if ([System.Windows.Forms.Clipboard]::ContainsImage()) {',
             '    $img = [System.Windows.Forms.Clipboard]::GetImage()',
             '    $img.Save($outputPath, [System.Drawing.Imaging.ImageFormat]::Png)',
@@ -2152,7 +2181,7 @@ function pasteFromClipboard() {
 
         try {
             fsModule.writeFileSync(tempPs1, scriptContent, 'utf8');
-            var psCmd = 'powershell -NoProfile -STA -ExecutionPolicy Bypass -File "' + tempPs1 + '" "' + winPath + '"';
+            var psCmd = 'powershell -NoProfile -STA -ExecutionPolicy Bypass -File "' + tempPs1 + '"';
             console.log("[pasteFromClipboard] Running:", psCmd);
             execModule(psCmd, { timeout: 15000 }, function(e) {
                 try { fsModule.unlinkSync(tempPs1); } catch(err) {}

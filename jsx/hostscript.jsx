@@ -2725,10 +2725,24 @@ $._editflow.getPlayheadFrameInfo = function() {
         if (!time) return '{"status":"error","message":"Cannot read playhead"}';
 
         // ATTEMPT 1: Native Timeline Frame Export (Premiere 24.0+)
-        var tempPng = Folder.temp.fsName + "/editflow_frame_" + new Date().getTime() + ".png";
+        var isWin = (Folder.fs == "Windows");
+        var tempPng;
+        if (isWin) {
+            var publicDir = $.getenv("PUBLIC") || "C:\\Users\\Public";
+            var safeDir = new Folder(publicDir + "/EditFlowPro_Temp");
+            if (!safeDir.exists) safeDir.create();
+            tempPng = safeDir.fsName + "/editflow_frame_" + new Date().getTime() + ".png";
+        } else {
+            tempPng = Folder.temp.fsName + "/editflow_frame_" + new Date().getTime() + ".png";
+        }
         var safeTempPng = tempPng.replace(/\\/g, "/");
         try {
             if (typeof seq.exportFramePNG === 'function') {
+                var nativePath = new File(tempPng).fsName;
+                seq.exportFramePNG(time.ticks, nativePath);
+                if (new File(nativePath).exists) {
+                    return '{"status":"success","method":"native","path":"' + nativePath.replace(/\\/g, "/") + '"}';
+                }
                 seq.exportFramePNG(time.ticks, safeTempPng);
                 if (new File(safeTempPng).exists) {
                     return '{"status":"success","method":"native","path":"' + safeTempPng + '"}';
@@ -2779,6 +2793,9 @@ $._editflow.getPlayheadFrameInfo = function() {
 // CAPTURE FRAME — Native Export via Media Direct
 // Captures timeline effects perfectly without ffmpeg math
 // =========================================================
+// CAPTURE FRAME — Native Export via Media Direct
+// Captures timeline effects perfectly without ffmpeg math
+// =========================================================
 $._editflow.exportNativeFrame = function(presetPath, tempDir) {
     try {
         var seq = app.project.activeSequence;
@@ -2793,12 +2810,24 @@ $._editflow.exportNativeFrame = function(presetPath, tempDir) {
         seq.setOutPoint(String(Number(time.ticks) + 254016000)); 
         
         var baseName = "editflow_frame_" + new Date().getTime();
-        var outPath = tempDir + "/" + baseName + ".png"; 
+        
+        var isWin = (Folder.fs == "Windows");
+        var finalTempDir = tempDir;
+        if (isWin) {
+            var publicDir = $.getenv("PUBLIC") || "C:\\Users\\Public";
+            var safeDir = new Folder(publicDir + "/EditFlowPro_Temp");
+            if (!safeDir.exists) safeDir.create();
+            finalTempDir = safeDir.fsName;
+        }
+        
+        var outPath = finalTempDir + "/" + baseName + ".png"; 
+        var normOutPath = new File(outPath).fsName;
+        var normPresetPath = new File(presetPath).fsName;
         
         // Export using Sequence In/Out (1)
-        seq.exportAsMediaDirect(outPath, presetPath, 1);
+        seq.exportAsMediaDirect(normOutPath, normPresetPath, 1);
         
-        return '{"status":"success","method":"media_direct","baseName":"' + baseName + '","tempDir":"' + tempDir + '","oldIn":"' + oldIn + '","oldOut":"' + oldOut + '"}';
+        return '{"status":"success","method":"media_direct","baseName":"' + baseName + '","tempDir":"' + finalTempDir.replace(/\\/g, "/") + '","oldIn":"' + oldIn + '","oldOut":"' + oldOut + '"}';
     } catch(e) {
         return '{"status":"error","message":"' + e.message.replace(/"/g, "'") + '"}';
     }
