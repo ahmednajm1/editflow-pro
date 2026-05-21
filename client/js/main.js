@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.14";
+var CURRENT_VERSION = "1.3.15";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -2347,12 +2347,26 @@ function modifyPresetBitrate(cb) {
             return;
         }
         try {
-            var lines = String(xml).split("\n"), inB = false;
+            var lines = String(xml).split("\n");
+            var inTarget = false, inMax = false;
+            var targetVal = parseFloat(br) || 10.0;
+            var maxVal = Math.max(targetVal, Math.round(targetVal * 1.2));
+            
             for (var i = 0; i < lines.length; i++) {
-                if (lines[i].indexOf("ADBEVideoTargetBitrate") !== -1) inB = true;
-                if (inB && lines[i].indexOf("<ParamValue>") !== -1) { 
-                    lines[i] = "\t\t<ParamValue>" + br + ".</ParamValue>"; 
-                    inB = false; 
+                if (lines[i].indexOf("ADBEVideoTargetBitrate") !== -1) {
+                    inTarget = true;
+                }
+                if (inTarget && lines[i].indexOf("<ParamValue>") !== -1) { 
+                    lines[i] = "\t\t<ParamValue>" + targetVal + ".</ParamValue>"; 
+                    inTarget = false; 
+                }
+                
+                if (lines[i].indexOf("ADBEVideoMaxBitrate") !== -1) {
+                    inMax = true;
+                }
+                if (inMax && lines[i].indexOf("<ParamValue>") !== -1) { 
+                    lines[i] = "\t\t<ParamValue>" + maxVal + ".</ParamValue>"; 
+                    inMax = false; 
                 }
             }
             var content = lines.join("\n");
