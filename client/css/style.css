@@ -209,6 +209,11 @@ html, body {
   background: rgba(255, 255, 255, 0.1);
 }
 
+html[dir="rtl"] .header-dropdown {
+  right: auto;
+  left: 0;
+}
+
 /* ---------- PANEL CONTENT ---------- */
 .panel-content {
   padding: calc(var(--u)*5);

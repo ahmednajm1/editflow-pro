@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.17";
+var CURRENT_VERSION = "1.3.18";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -134,7 +134,12 @@ var i18n = {
         sfx_cat_all: "All",
         sfx_no_sounds: "No sounds found",
         sfx_added: "Added to timeline ✓",
-        sfx_count: "{n} sounds"
+        sfx_count: "{n} sounds",
+        help_tutorials: "Video Tutorials",
+        help_contact: "Contact & Help",
+        audio_voice: "Voice",
+        audio_sfx: "SFX",
+        audio_bgm: "BGM"
     },
     ar: {
         audio_title: "مستوى الصوت",
@@ -231,7 +236,12 @@ var i18n = {
         sfx_cat_all: "الكل",
         sfx_no_sounds: "لا توجد مؤثرات",
         sfx_added: "تمت الإضافة للتايملاين ✓",
-        sfx_count: "{n} مؤثر صوتي"
+        sfx_count: "{n} مؤثر صوتي",
+        help_tutorials: "شروحات الفيديو",
+        help_contact: "الدعم والمساعدة",
+        audio_voice: "صوت",
+        audio_sfx: "مؤثرات",
+        audio_bgm: "موسيقى"
     }
 };
 
