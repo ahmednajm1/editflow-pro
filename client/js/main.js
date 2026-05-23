@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.18";
+var CURRENT_VERSION = "1.3.19";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -112,9 +112,10 @@ var i18n = {
         confirm_yes: "Confirm",
         welcome_btn: "Get Started",
         welcome_tagline: "Professional one-click editing tools",
-        welcome_f1: "Audio presets · Quick volume · Static scale",
-        welcome_f2: "AI captions · Auto-transcribe 15+ languages",
-        welcome_f3: "Transform tools · Fit to frame · Web paste",
+        welcome_f1: "Auto-transcribe and translate in 15+ languages",
+        welcome_f2: "200 Cinematic SFX ready to inject into your timeline",
+        welcome_f3: "Dynamic Subtitles with instant professional animations",
+        welcome_f4: "Smart Tools: Transform, Web Paste & Frame Capture",
         welcome_dont_show: "Don't show this again",
         welcome_made_by: "Crafted by",
         status_ready: "EditFlow Pro · ready",
@@ -214,9 +215,10 @@ var i18n = {
         confirm_yes: "تأكيد",
         welcome_btn: "ابدأ الآن",
         welcome_tagline: "أدوات احترافية بكبسة زر",
-        welcome_f1: "صوت سريع · مستويات جاهزة · تكبير ثابت",
-        welcome_f2: "ترجمة AI · تفريغ تلقائي لأكثر من ١٥ لغة",
-        welcome_f3: "أدوات تحويل · ملائمة الإطار · لصق من الويب",
+        welcome_f1: "تفريغ وترجمة تلقائية لأكثر من ١٥ لغة",
+        welcome_f2: "٢٠٠ مؤثر صوتي سينمائي جاهز للإضافة للتايملاين",
+        welcome_f3: "ترجمة نصية تفاعلية مع حركات احترافية فورية",
+        welcome_f4: "أدوات ذكية: التحويل، لصق من الويب، والتقاط الإطارات",
         welcome_dont_show: "لا تظهر هذه الرسالة مرة أخرى",
         welcome_made_by: "صُنع بإتقان بواسطة",
         status_ready: "EditFlow Pro · جاهز",
