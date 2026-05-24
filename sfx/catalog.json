@@ -40,7 +40,7 @@
     {
       "id": "cinematic",
       "name": "Cinematic",
-      "icon": "🎥",
+      "icon": "🎞️",
       "name_ar": "سينمائي"
     }
   ],
@@ -946,6 +946,27 @@
       "name": "Virtual Vibes Glitch",
       "category": "transition",
       "file": "Transition/Virtual Vibes Glitch.mp3",
+      "duration": "0:01"
+    },
+    {
+      "id": "Alarms Buzzer Wrong 2.mp3",
+      "name": "Alarms Buzzer Wrong 2",
+      "category": "ui",
+      "file": "UI/Alarms Buzzer Wrong 2.mp3",
+      "duration": "0:00"
+    },
+    {
+      "id": "Alarms Buzzer Wrong 3.mp3",
+      "name": "Alarms Buzzer Wrong 3",
+      "category": "ui",
+      "file": "UI/Alarms Buzzer Wrong 3.mp3",
+      "duration": "0:01"
+    },
+    {
+      "id": "Alarms Buzzer Wrong.mp3",
+      "name": "Alarms Buzzer Wrong",
+      "category": "ui",
+      "file": "UI/Alarms Buzzer Wrong.mp3",
       "duration": "0:01"
     },
     {

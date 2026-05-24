@@ -27,7 +27,8 @@ defaults = {
     'Riser':      {'id':'riser',      'name':'Riser',      'icon':'📈', 'name_ar':'تصاعد'},
     'Transition': {'id':'transition', 'name':'Transition', 'icon':'🔄', 'name_ar':'انتقال'},
     'UI':         {'id':'ui',         'name':'UI',         'icon':'🔔', 'name_ar':'واجهة'},
-    'Foley':      {'id':'foley',      'name':'Foley',      'icon':'🎬', 'name_ar':'فولي'}
+    'Foley':      {'id':'foley',      'name':'Foley',      'icon':'🎬', 'name_ar':'فولي'},
+    'Cinematic':  {'id':'cinematic',  'name':'Cinematic',  'icon':'🎞️', 'name_ar':'سينمائي'}
 }
 # Merge
 for folder_name, default_cat in defaults.items():
@@ -47,7 +48,8 @@ sounds = []
 # Map folder names to category IDs
 folder_map = {
     'Whoosh': 'whoosh', 'Impact': 'impact', 'Riser': 'riser',
-    'Transition': 'transition', 'UI': 'ui', 'Foley': 'foley'
+    'Transition': 'transition', 'UI': 'ui', 'Foley': 'foley',
+    'Cinematic': 'cinematic'
 }
 
 audio_exts = {'.mp3', '.wav', '.aif', '.aiff', '.m4a', '.ogg', '.flac'}
@@ -88,7 +90,7 @@ for folder_name, cat_id in folder_map.items():
 # Fix file paths to match actual folder names
 for s in sounds:
     cat = s['category']
-    folder_names = {'whoosh':'Whoosh','impact':'Impact','riser':'Riser','transition':'Transition','ui':'UI','foley':'Foley'}
+    folder_names = {'whoosh':'Whoosh','impact':'Impact','riser':'Riser','transition':'Transition','ui':'UI','foley':'Foley','cinematic':'Cinematic'}
     s['file'] = folder_names.get(cat, cat) + '/' + s['id']
 
 print(json.dumps(sounds, indent=2))
