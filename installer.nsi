@@ -7,6 +7,11 @@
 !define COMP_NAME "Najm Media"
 !define VERSION "1.2.6"
 
+; ANSI stub: this Mac's Homebrew makensis has a broken x86-unicode stub
+; (std::bad_alloc). Install paths are ASCII and extension files are copied
+; byte-for-byte, so ANSI is safe here.
+Unicode false
+
 Name "${APP_NAME}"
 OutFile "EditFlow Pro Installer.exe"
 InstallDir "$APPDATA\Adobe\CEP\extensions\EditFlowPro"

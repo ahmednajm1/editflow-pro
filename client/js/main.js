@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.20";
+var CURRENT_VERSION = "1.3.22";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -320,6 +320,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
     var vBadge = document.getElementById("version-badge");
     if (vBadge) vBadge.innerHTML = "v" + CURRENT_VERSION;
+    var aboutVer = document.getElementById("about-version");
+    if (aboutVer) aboutVer.innerHTML = "Version " + CURRENT_VERSION;
 
     // Step 5: Verify JSX is loaded
     csInterface.evalScript('typeof $._editflow_loaded', function(result) {

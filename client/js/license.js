@@ -1,7 +1,7 @@
 /**
  * EditFlow Pro - License Key Management Module
  * Exposes a global License object to manage activation, validation, and deactivation.
- * Integrates with Lemon Squeezy License API with offline grace periods and local testing mock keys.
+ * Integrates with Lemon Squeezy License API with offline grace periods.
  */
 
 (function () {
@@ -22,7 +22,7 @@
     // Standard translation strings for bilingual support
     const TRANSLATIONS = {
         ar: {
-            title: "تفعيل EditFlow Pro",
+            title: "فعّل أداتك للبدء",
             desc: "أدخل مفتاح الترخيص الذي وصلك في بريدك الإلكتروني لتنشيط الميزات الاحترافية.",
             placeholder: "أدخل مفتاح الترخيص هنا...",
             btn_activate: "⚡ تفعيل الأداة",
@@ -33,15 +33,16 @@
             success: "✓ تم التفعيل بنجاح! جاري تنشيط الأداة...",
             status_pro: "⭐ Pro Activated ✓",
             status_unlicensed: "🔒 Unlicensed",
-            err_invalid: "مفتاح غير صحيح. تحقق من بريدك الإلكتروني",
+            err_invalid: "المفتاح غير صحيح. افتح آخر إيميل وصلك من Lemon Squeezy بعد الشراء وانسخ الكود كاملاً",
             err_max_devices: "تجاوزت الحد الأقصى للأجهزة (2). يرجى إلغاء تفعيل جهاز آخر أولاً",
             err_disabled: "تم إلغاء هذا الترخيص. تواصل مع الدعم",
             err_network: "خطأ في الاتصال. تحقق من الإنترنت وحاول مرة أخرى",
             err_offline_activation: "يجب أن تكون متصلاً بالإنترنت لتفعيل الأداة لأول مرة",
-            err_grace_expired: "انتهت فترة الصلاحية دون اتصال (7 أيام). يرجى الاتصال بالإنترنت للمتابعة"
+            err_grace_expired: "انتهت فترة الصلاحية دون اتصال (7 أيام). يرجى الاتصال بالإنترنت للمتابعة",
+            err_deactivate_failed: "تعذّر إلغاء التفعيل من الخادم. تحقّق من اتصالك وحاول مرة أخرى"
         },
         en: {
-            title: "Activate EditFlow Pro",
+            title: "Activate to Get Started",
             desc: "Enter the license key received in your email to unlock all professional features.",
             placeholder: "Enter license key here...",
             btn_activate: "⚡ Activate Panel",
@@ -52,12 +53,13 @@
             success: "✓ Activated successfully! Loading panel...",
             status_pro: "⭐ Pro Activated ✓",
             status_unlicensed: "🔒 Unlicensed",
-            err_invalid: "Invalid key. Please check your purchase email",
+            err_invalid: "Invalid key. Open your last Lemon Squeezy purchase email and copy the full code",
             err_max_devices: "Max devices reached (2). Please deactivate another machine first",
             err_disabled: "This license has been disabled or refunded. Contact support",
             err_network: "Connection error. Please check your internet and try again",
             err_offline_activation: "An internet connection is required for first-time activation",
-            err_grace_expired: "Offline grace period (7 days) expired. Please connect to validate your license"
+            err_grace_expired: "Offline grace period (7 days) expired. Please connect to validate your license",
+            err_deactivate_failed: "Couldn't release the activation on the server. Check your connection and try again"
         }
     };
 
@@ -143,16 +145,20 @@
                 return;
             }
 
-            // Run background check if more than 24h since last validation
+            // Soft background refresh if more than 24h since last validation.
+            // Within the 7-day grace window we NEVER hard-lock on a single failed
+            // revalidation: a transient server hiccup or a test-mode key can return
+            // valid:false and would otherwise lock out a legitimate, paying user.
+            // A genuinely revoked license still gets locked by the >168h forced
+            // check above once the grace window elapses (validate() only refreshes
+            // last_validated_at on success, so the grace clock keeps counting).
             if (hoursSinceCheck > 24) {
-                console.log("[License] Background revalidation triggered (>24h)...");
+                console.log("[License] Background revalidation (soft, within grace)...");
                 this.validate().then((valid) => {
-                    if (!valid) {
-                        console.warn("[License] Background revalidation failed. Locking panel.");
-                        this.clearLicenseStorage();
-                        this.showActivationScreen(TRANSLATIONS[getLang()].err_disabled);
-                    } else {
+                    if (valid) {
                         console.log("[License] Background validation successful.");
+                    } else {
+                        console.warn("[License] Background revalidation not confirmed; keeping license within 7-day grace.");
                     }
                 });
             }
@@ -173,34 +179,6 @@
 
             const machineId = getMachineId();
 
-            // ── LOCAL MOCK KEYS FOR TESTING ──
-            if (key.startsWith("MOCK-")) {
-                await new Promise(r => setTimeout(r, 1000)); // Simulate async network call
-                if (key === "MOCK-VALID-PRO" || key === "MOCK-KEY-REVOKED-LATER") {
-                    const mockLicense = {
-                        key: key,
-                        instance_id: "mock-instance-12345",
-                        customer_email: "tester@najmedia.com",
-                        customer_name: "Ahmed Tester",
-                        product_name: "EditFlow Pro",
-                        activated_at: new Date().toISOString(),
-                        last_validated_at: new Date().toISOString(),
-                        status: "active"
-                    };
-                    const config = loadConfig();
-                    config.license = mockLicense;
-                    writeConfig(config);
-                    this.updateBadge();
-                    return { success: true };
-                } else if (key === "MOCK-MAX-DEVICES") {
-                    return { success: false, error: TRANSLATIONS[getLang()].err_max_devices };
-                } else if (key === "MOCK-DISABLED-REVOKED") {
-                    return { success: false, error: TRANSLATIONS[getLang()].err_disabled };
-                } else {
-                    return { success: false, error: TRANSLATIONS[getLang()].err_invalid };
-                }
-            }
-
             // Real network activation via Lemon Squeezy
             try {
                 const response = await fetch(LS_ACTIVATE_URL, {
@@ -212,11 +190,20 @@
                     body: `license_key=${encodeURIComponent(key)}&instance_name=${encodeURIComponent(machineId)}`
                 });
 
-                if (!response.ok) {
-                    return { success: false, error: TRANSLATIONS[getLang()].err_network };
+                // Parse the JSON body even on non-2xx responses. Lemon Squeezy returns
+                // 400/404 with { activated:false, error:"..." } for invalid/expired keys.
+                // Only a genuine fetch failure (caught below) is a real network error.
+                let data;
+                try {
+                    data = await response.json();
+                } catch (parseErr) {
+                    // Body wasn't JSON: treat 5xx as network, everything else as invalid key.
+                    if (response.status >= 500) {
+                        return { success: false, error: TRANSLATIONS[getLang()].err_network };
+                    }
+                    return { success: false, error: TRANSLATIONS[getLang()].err_invalid };
                 }
 
-                const data = await response.json();
                 if (data.activated === true) {
                     const newLicense = {
                         key: key,
@@ -257,18 +244,6 @@
             const key = config.license.key;
             const instanceId = config.license.instance_id;
 
-            // Mock Validation
-            if (key.startsWith("MOCK-")) {
-                if (key === "MOCK-KEY-REVOKED-LATER") {
-                    // Simulate key got revoked/refunded
-                    return false;
-                }
-                // Renew validation time
-                config.license.last_validated_at = new Date().toISOString();
-                writeConfig(config);
-                return true;
-            }
-
             try {
                 const response = await fetch(LS_VALIDATE_URL, {
                     method: 'POST',
@@ -307,12 +282,6 @@
             const key = config.license.key;
             const instanceId = config.license.instance_id;
 
-            if (key.startsWith("MOCK-")) {
-                this.clearLicenseStorage();
-                this.updateBadge();
-                return { success: true };
-            }
-
             try {
                 const response = await fetch(LS_DEACTIVATE_URL, {
                     method: 'POST',
@@ -323,16 +292,28 @@
                     body: `license_key=${encodeURIComponent(key)}&instance_id=${encodeURIComponent(instanceId)}`
                 });
 
-                // Clear license locally regardless of response
-                this.clearLicenseStorage();
-                this.updateBadge();
-                return { success: true };
+                let data = {};
+                try { data = await response.json(); } catch (e) {}
+
+                // Only release the license locally if the server actually freed the
+                // slot (deactivated:true), or the instance is already gone server-side.
+                // Otherwise keep the local license so the user is NOT locked out and
+                // the activation slot is NOT permanently stranded (2/2 forever).
+                const errStr = data && data.error ? String(data.error).toLowerCase() : "";
+                const alreadyGone = errStr.includes("not found") || errStr.includes("no instance");
+                if ((response.ok && data.deactivated === true) || alreadyGone) {
+                    this.clearLicenseStorage();
+                    this.updateBadge();
+                    return { success: true };
+                }
+
+                console.warn("[License] Deactivation not confirmed by server; keeping local license.");
+                return { success: false, error: TRANSLATIONS[getLang()].err_deactivate_failed };
             } catch (err) {
-                console.error("[License] Deactivation error:", err);
-                // Force local clearing anyway
-                this.clearLicenseStorage();
-                this.updateBadge();
-                return { success: true };
+                console.error("[License] Deactivation network error:", err);
+                // Network failure: do NOT clear locally (that would strand the slot
+                // and lock the user out). Keep the license; user can retry online.
+                return { success: false, error: TRANSLATIONS[getLang()].err_deactivate_failed };
             }
         },
 
@@ -387,10 +368,11 @@
             // Populate HTML dynamically to guarantee bilingual rendering
             overlay.innerHTML = `
                 <div class="license-card">
-                    <img src="img/splash_logo.png" class="license-logo" alt="EditFlow Pro">
+                    <img src="img/ef_logo.png" class="license-logo" alt="EditFlow Pro">
+                    <div class="license-badge-pro">✦ EditFlow Pro</div>
                     <h2 class="license-title">${TRANSLATIONS[lang].title}</h2>
                     <p class="license-subtitle">${TRANSLATIONS[lang].desc}</p>
-                    
+
                     <div class="license-input-wrapper">
                         <input type="text" id="licenseInputText" class="license-input" placeholder="${TRANSLATIONS[lang].placeholder}">
                     </div>
@@ -399,6 +381,8 @@
                     <div id="licenseSuccessText" class="license-success"></div>
 
                     <button id="btnLicenseSubmit" class="license-btn">${TRANSLATIONS[lang].btn_activate}</button>
+
+                    <div class="license-divider"></div>
 
                     <div class="license-footer-links">
                         <a href="#" class="license-link" onclick="if(window.csInterface) { window.csInterface.openURLInDefaultBrowser('https://najmedia.com/editflow'); } return false;">${TRANSLATIONS[lang].buy_link}</a>
@@ -483,10 +467,17 @@
                 deacBtn.textContent = TRANSLATIONS[lang].btn_deactivate + ` (${config.license.key.substring(0, 8)}...)`;
 
                 deacBtn.onclick = async () => {
+                    const origText = deacBtn.textContent;
                     deacBtn.disabled = true;
                     deacBtn.textContent = "...";
-                    await this.deactivate();
-                    location.reload();
+                    const res = await this.deactivate();
+                    if (res && res.success) {
+                        location.reload();
+                    } else {
+                        deacBtn.textContent = (res && res.error) ? res.error : origText;
+                        deacBtn.disabled = false;
+                        setTimeout(function () { deacBtn.textContent = origText; }, 4000);
+                    }
                 };
 
                 container.appendChild(deacBtn);
