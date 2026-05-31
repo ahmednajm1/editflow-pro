@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.22";
+var CURRENT_VERSION = "1.3.23";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -1210,7 +1210,7 @@ document.addEventListener("DOMContentLoaded", function() {
                             console.log("[Captions] placing synced editable captions");
                             showProgress("Syncing captions to timeline…", 75);
                             setStatus("Building timeline-synced captions…");
-                            fallbackSRT(summary, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", tlStart, setStatus);
+                            fallbackSRT(summary, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", tlStart, setStatus, wordsPerCaption);
                         }
                     );
                     return;
@@ -1261,7 +1261,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 console.log("[Captions] placing synced editable captions");
                 showProgress("Syncing captions to timeline…", 75);
                 setStatus("Building timeline-synced captions…");
-                fallbackSRT(summary, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", tlStart, setStatus);
+                fallbackSRT(summary, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", tlStart, setStatus, wordsPerCaption);
                 return;
                 });
             }  // end runTranscriber()
@@ -1363,7 +1363,8 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     // SRT generation — creates timeline-synced captions via Premiere Caption API
-    function fallbackSRT(summary, style, anim, font, size, color, hl, timelineStart, setStatus) {
+    function fallbackSRT(summary, style, anim, font, size, color, hl, timelineStart, setStatus, wordsPerCaption) {
+        wordsPerCaption = parseInt(wordsPerCaption, 10) || 3;
         showProgress("Placing captions on timeline…", 80);
         setStatus("Building synced captions (" + style + " mode)…");
         var cfg = {
