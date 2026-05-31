@@ -27,6 +27,7 @@ var DEFAULT_SETTINGS = {
         language: "auto",
         model: "large",
         style: "phrase",
+        wordsPerCaption: 3,
         animation: "pop",
         font: "Inter",
         size: "72",
@@ -95,6 +96,9 @@ var i18n = {
         cfg_tscale_presets: "Transform Scale Chips (%)",
         cfg_cap_lang: "Default Language",
         cfg_cap_style: "Default Segmentation",
+        cap_words_per: "Words/cap",
+        cap_words_per_hint: "words per caption",
+        cfg_cap_words_per: "Words per caption",
         cfg_bitrate: "Default Bitrate (Mbps)",
         cfg_export_path: "Default Export Folder",
         cfg_filename_pattern: "Default Filename Pattern",
@@ -198,6 +202,9 @@ var i18n = {
         cfg_cap_lang: "اللغة الافتراضية للترجمة",
         cfg_cap_accuracy: "الدقة الافتراضية",
         cfg_cap_style: "تقسيم النص الافتراضي",
+        cap_words_per: "كلمة/مقطع",
+        cap_words_per_hint: "كلمة لكل مقطع",
+        cfg_cap_words_per: "عدد الكلمات في المقطع",
         cfg_bitrate: "معدل البت الافتراضي (Mbps)",
         cfg_export_path: "مجلد التصدير الافتراضي",
         cfg_filename_pattern: "نمط اسم الملف الافتراضي",
@@ -1070,6 +1077,8 @@ document.addEventListener("DOMContentLoaded", function() {
         var lang  = document.getElementById("cap-language").value;
         var model = document.getElementById("cap-model").value;
         var style = document.getElementById("cap-style").value;
+        var wordsPerCaption = parseInt((document.getElementById("cap-words-per") || {value: "3"}).value, 10) || 3;
+        if (wordsPerCaption < 1) wordsPerCaption = 1;
 
         var statusLine = document.getElementById("cap-status");
         function setStatus(t) { if (statusLine) statusLine.textContent = t; }
@@ -1360,7 +1369,8 @@ document.addEventListener("DOMContentLoaded", function() {
         var cfg = {
             style: style, animation: anim, font: font,
             size: size, color: color, highlight: hl,
-            offsetSecs: timelineStart
+            offsetSecs: timelineStart,
+            wordsPerCaption: wordsPerCaption
         };
         var cfgStr = JSON.stringify(cfg).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
         var jsonEsc = summary.json.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -2203,11 +2213,24 @@ function applySettingsToUI() {
     setSel("cap-language",  settings.captions.language);
     setSel("cap-model",     settings.captions.model);
     setSel("cap-style",     settings.captions.style);
+    var wpcEl = document.getElementById("cap-words-per");
+    if (wpcEl) wpcEl.value = settings.captions.wordsPerCaption || 3;
+    updateCapWordsPerVisibility();
 }
 function setSel(id, val) {
     var el = document.getElementById(id);
     if (el && val !== undefined && val !== null) el.value = String(val);
 }
+
+function updateCapWordsPerVisibility() {
+    var styleEl = document.getElementById("cap-style");
+    var rowEl   = document.getElementById("cap-words-per-row");
+    if (!rowEl) return;
+    rowEl.style.display = (styleEl && styleEl.value === "phrase") ? "flex" : "none";
+}
+
+var _capStyleEl = document.getElementById("cap-style");
+if (_capStyleEl) _capStyleEl.addEventListener("change", updateCapWordsPerVisibility);
 
 function populateSettingsForm() {
     setSel("cfg-language", settings.language);
@@ -2229,6 +2252,8 @@ function populateSettingsForm() {
     setSel("cfg-cap-language",  settings.captions.language);
     setSel("cfg-cap-model",     settings.captions.model);
     setSel("cfg-cap-style",     settings.captions.style);
+    var cfgWpcEl = document.getElementById("cfg-cap-words-per");
+    if (cfgWpcEl) cfgWpcEl.value = settings.captions.wordsPerCaption || 3;
 
     var gk = document.getElementById("cfg-groq-key");        if (gk) gk.value = settings.groqApiKey || "";
     var br = document.getElementById("cfg-bitrate");       if (br) br.value = settings.bitrate;
@@ -2254,9 +2279,10 @@ function readSettingsForm() {
     settings.transformScale = newTScale;
     settings.moveStep = newStep;
 
-    settings.captions.language  = (document.getElementById("cfg-cap-language")  || {value:settings.captions.language}).value;
-    settings.captions.model     = (document.getElementById("cfg-cap-model")     || {value:settings.captions.model}).value;
-    settings.captions.style     = (document.getElementById("cfg-cap-style")     || {value:settings.captions.style}).value;
+    settings.captions.language      = (document.getElementById("cfg-cap-language")  || {value:settings.captions.language}).value;
+    settings.captions.model         = (document.getElementById("cfg-cap-model")     || {value:settings.captions.model}).value;
+    settings.captions.style         = (document.getElementById("cfg-cap-style")     || {value:settings.captions.style}).value;
+    settings.captions.wordsPerCaption = parseInt((document.getElementById("cfg-cap-words-per") || {value:"3"}).value, 10) || 3;
 
     settings.bitrate    = +(document.getElementById("cfg-bitrate")     || {value:settings.bitrate}).value || 10;
     settings.groqApiKey = (document.getElementById("cfg-groq-key") || {value:""}).value;

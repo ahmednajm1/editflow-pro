@@ -130,6 +130,12 @@
                         </select>
                     </div>
 
+                    <label data-i18n="cfg_cap_words_per">Words per caption</label>
+                    <div class="settings-row" style="align-items:center; gap:8px;">
+                        <input type="number" id="cfg-cap-words-per" value="3" min="1" max="15" style="width:70px; text-align:center;">
+                        <span style="font-size:10px; color:var(--text-mute);">words per caption (for "Short phrases" mode)</span>
+                    </div>
+
                     <hr style="border-color:var(--border); margin:12px 0;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <label style="font-weight:600; color:var(--accent); margin:0;">🔑 Groq API Key</label>
@@ -527,9 +533,14 @@
                     <option value="phrase" selected>Short phrases</option>
                     <option value="line">Full lines</option>
                 </select>
-                
+
                 <!-- Hidden Accuracy input to keep JS from breaking -->
                 <input type="hidden" id="cap-model" value="large">
+            </div>
+            <div id="cap-words-per-row" class="input-row" style="display:flex; align-items:center; gap:6px; margin-top:4px;">
+                <span style="font-size:10px; color:var(--text-mute); width:42px;" data-i18n="cap_words_per">Words/cap</span>
+                <input type="number" id="cap-words-per" value="3" min="1" max="15" style="width:54px; text-align:center;" title="Number of words per caption group">
+                <span style="font-size:10px; color:var(--text-mute);" data-i18n="cap_words_per_hint">words per caption</span>
             </div>
 
             <button id="btn-generate-captions" data-tooltip="Generate captions and place them on the timeline." style="margin-top:8px;" data-i18n="cap_generate">

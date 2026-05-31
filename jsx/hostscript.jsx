@@ -2021,11 +2021,12 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
                 }
             }
         }
-    } else { // phrase: ~3–5 words per caption, using actual word timestamps
+    } else { // phrase: N words per caption (cfg.wordsPerCaption), using actual word timestamps
+        var step = parseInt(cfg.wordsPerCaption, 10) || 3;
+        if (step < 1) step = 1;
         for (var i = 0; i < segs.length; i++) {
             var seg = segs[i];
             var segWords = seg.words || [];
-            var step = 3;
             if (segWords.length > 0) {
                 // Use real word timestamps for accurate phrase timing
                 for (var k = 0; k < segWords.length; k += step) {
