@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.23";
+var CURRENT_VERSION = "1.3.24";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -1382,7 +1382,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 handleJSXResult(res);
                 var r = safeParse(res);
                 if (r && r.placed) {
-                    setStatus("✅ " + r.groups + " captions synced on timeline (" + style + ")");
+                    setStatus("✅ " + r.groups + " captions synced on timeline");
                 } else if (r && r.groups) {
                     setStatus("✅ " + r.groups + " captions ready → drag from EFP_Captions bin to Caption track (timing is synced)");
                 } else {
