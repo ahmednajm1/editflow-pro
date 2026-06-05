@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.24";
+var CURRENT_VERSION = "1.3.25";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -1537,6 +1537,21 @@ document.addEventListener("DOMContentLoaded", function() {
         }
         var toolsPath = toolsDir + (isWin ? "\\" : "/") + "ffmpeg" + ext;
         if (fsModule.existsSync(toolsPath)) return toolsPath;
+        // CEP panels launched from Dock/Spotlight have a minimal PATH
+        // (/usr/bin:/bin:/usr/sbin:/sbin) that excludes Homebrew/MacPorts, so a
+        // bare "ffmpeg" spawn throws ENOENT even when ffmpeg is installed.
+        // Probe the common install locations directly before giving up.
+        if (!isWin) {
+            var macCandidates = [
+                "/opt/homebrew/bin/ffmpeg", // Apple Silicon Homebrew
+                "/usr/local/bin/ffmpeg",    // Intel Homebrew
+                "/opt/local/bin/ffmpeg",    // MacPorts
+                "/usr/bin/ffmpeg"           // system
+            ];
+            for (var i = 0; i < macCandidates.length; i++) {
+                if (fsModule.existsSync(macCandidates[i])) return macCandidates[i];
+            }
+        }
         return "ffmpeg";
     }
 
