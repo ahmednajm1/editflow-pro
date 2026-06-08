@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.27";
+var CURRENT_VERSION = "1.3.28";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -2212,7 +2212,22 @@ function saveSettings() {
                 fsModule.mkdirSync(dir, { recursive: true });
             }
         }
-        if (fsModule) fsModule.writeFileSync(configPath, JSON.stringify(settings, null, 2), "utf8");
+        if (!fsModule) return;
+        // CRITICAL: editflow_config.json is SHARED with license.js, which stores
+        // the activation under config.license. We must MERGE our settings into
+        // the existing file — never overwrite it wholesale — or we wipe the
+        // license (and any other keys license.js owns) on every settings save,
+        // forcing the user back to the activation screen.
+        var out = {};
+        try {
+            if (fsModule.existsSync(configPath)) {
+                out = JSON.parse(fsModule.readFileSync(configPath, "utf8")) || {};
+            }
+        } catch(e) { out = {}; }
+        for (var k in settings) {
+            if (settings.hasOwnProperty(k)) out[k] = settings[k];
+        }
+        fsModule.writeFileSync(configPath, JSON.stringify(out, null, 2), "utf8");
     } catch(e) { console.log("[saveSettings] error:", e); }
 }
 function applySettingsToUI() {
