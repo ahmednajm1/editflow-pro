@@ -2085,43 +2085,66 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
         var maxW = parseInt(cfg.wordsMax, 10) || minW;
         if (minW < 1) minW = 1;
         if (maxW < minW) maxW = minW;
-        var PAUSE = 0.35; // seconds: a gap >= this between words is a natural break
 
-        // ── Flatten ALL words across segments into ONE stream ──
-        // Whisper splits speech into sentence-ish segments. Grouping per-segment
-        // forced a flush at every segment end, producing tiny 1–2 word captions
-        // (segment tails) that ignored the minimum. Flattening lets the minimum
-        // apply globally; real sentence ends still break via pause/punctuation.
+        // ── Flatten ALL words across segments into ONE stream (with de-dup) ──
+        // Whisper splits speech into sentence-ish segments; grouping per-segment
+        // forced a flush at every segment end, producing tiny captions. Flattening
+        // lets the range apply globally. We also drop a word that simply repeats
+        // the previous one at (almost) the same time — these are double-counts
+        // from overlapping segment word-lists or Whisper stutters (the repeated
+        // "X X X" artefact), not real speech.
         var all = [];
         for (var si2 = 0; si2 < segs.length; si2++) {
             var its = segItems(segs[si2]);
-            for (var a2 = 0; a2 < its.length; a2++) all.push(its[a2]);
+            for (var a2 = 0; a2 < its.length; a2++) {
+                var wd = its[a2];
+                var prevW = all.length ? all[all.length - 1] : null;
+                if (prevW && prevW.text === wd.text && wd.start < prevW.end + 0.12) {
+                    if (wd.end > prevW.end) prevW.end = wd.end; // keep the longer span
+                    continue;                                   // skip the duplicate
+                }
+                all.push(wd);
+            }
         }
 
-        // Build chunks (arrays of word objects) honouring min/max + boundaries.
-        var chunks = [];
-        var chunk = [];
-        for (var ci = 0; ci < all.length; ci++) {
-            var it = all[ci];
-            // Break BEFORE a clause starter once the minimum is satisfied,
-            // so the conjunction begins the next caption.
-            if (chunk.length >= minW && isClauseStarter(it.text)) {
-                chunks.push(chunk); chunk = [];
-            }
-            chunk.push(it);
-            var doBreak = false;
-            if (chunk.length >= maxW) {
-                doBreak = true;                          // hard cap
-            } else if (chunk.length >= minW) {
-                if (endsWithBreak(it.text)) {
-                    doBreak = true;                      // sentence / clause close
-                } else if (ci + 1 < all.length && (all[ci + 1].start - it.end) >= PAUSE) {
-                    doBreak = true;                      // natural speech pause
-                }
-            }
-            if (doBreak) { chunks.push(chunk); chunk = []; }
+        // ── Build chunks: for each caption, scan the [min..max] window and break
+        //    at the MOST NATURAL boundary — the max is a CEILING, not a target. ──
+        // Each candidate end is scored by how natural a break it is: sentence /
+        // clause punctuation (strongest), the next word starting a new clause, or
+        // a speech pause after it. We pick the highest score; when no boundary
+        // stands out we lean toward the minimum (shorter, baseline) rather than
+        // packing every caption to the maximum.
+        function boundaryScore(j) {
+            var sc = 0;
+            if (endsWithBreak(all[j].text)) sc += 1000;
+            if (j + 1 < all.length && isClauseStarter(all[j + 1].text)) sc += 400;
+            var gap = (j + 1 < all.length) ? (all[j + 1].start - all[j].end) : 999;
+            if (gap < 0) gap = 0;
+            sc += gap * 1200; // a larger trailing pause = a more natural break
+            return sc;
         }
-        if (chunk.length > 0) chunks.push(chunk);
+
+        var chunks = [];
+        var ii = 0;
+        while (ii < all.length) {
+            var remaining = all.length - ii;
+            var endIdx;
+            if (remaining <= minW) {
+                endIdx = all.length - 1;                  // tail: take whatever is left
+            } else {
+                var lo = ii + minW - 1;                   // shortest allowed (min words)
+                var hi = ii + maxW - 1;                   // longest allowed (max words)
+                if (hi > all.length - 1) hi = all.length - 1;
+                var bestIdx = lo, bestScore = -1;
+                for (var j = lo; j <= hi; j++) {
+                    var sc = boundaryScore(j);
+                    if (sc > bestScore) { bestScore = sc; bestIdx = j; } // strict > → ties favour shorter
+                }
+                endIdx = bestIdx;
+            }
+            chunks.push(all.slice(ii, endIdx + 1));
+            ii = endIdx + 1;
+        }
 
         // ── Safety net: merge any chunk below the minimum into a neighbour ──
         // Guarantees the user's minimum is respected (the only way a sub-min
