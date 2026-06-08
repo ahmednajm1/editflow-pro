@@ -110,10 +110,11 @@ def audio_duration(ffmpeg, path):
 
 
 # ── Groq API ──────────────────────────────────────────────────────────────────
-def groq_call(path, api_key, language):
+def groq_call(path, api_key, language, _attempt=1):
     import urllib.request
     import urllib.error
     import uuid
+    import time
     log(f"Groq API → {os.path.getsize(path)//1024} KB")
 
     boundary = uuid.uuid4().hex
@@ -156,27 +157,38 @@ def groq_call(path, api_key, language):
         with urllib.request.urlopen(req, timeout=180) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        err_msg = e.read().decode("utf-8", errors="replace")
-        raise Exception(f"Groq {e.code}: {err_msg[:300]}")
-    except Exception as e:
+        body_txt = e.read().decode("utf-8", errors="replace")
+        # Transient errors (rate limit / server) → back off and retry a few times.
+        if e.code in (429, 500, 502, 503, 529) and _attempt < 5:
+            time.sleep(min(2 ** _attempt, 20))
+            return groq_call(path, api_key, language, _attempt + 1)
+        raise Exception(f"Groq {e.code}: {body_txt[:300]}")
+    except urllib.error.URLError as e:
+        # Network blip → retry a couple of times before giving up.
+        if _attempt < 3:
+            time.sleep(2 * _attempt)
+            return groq_call(path, api_key, language, _attempt + 1)
         raise Exception(f"Groq request failed: {str(e)}")
 
 
 def transcribe(ffmpeg, mp3, api_key, language):
     is_english = (language == "en")
     dur = audio_duration(ffmpeg, mp3)
+    size = os.path.getsize(mp3)
 
-    # For English: chunk into ~25s segments to prevent Whisper's
-    # early-stopping bug. For other languages: only chunk when >24 MB.
-    CHUNK_SECS = 25 if is_english else 9999
-    if is_english and dur > CHUNK_SECS:
-        n = math.ceil(dur / CHUNK_SECS)
-        log(f"English: splitting {dur:.1f}s into {n} chunks of ~{CHUNK_SECS}s")
-    elif os.path.getsize(mp3) > MAX_BYTES:
-        n = math.ceil(os.path.getsize(mp3) / MAX_BYTES)
-        log(f"Audio >24 MB — splitting into {n} chunks")
-    else:
+    # English is capped to ~5 min chunks to avoid Whisper's early-stopping on
+    # long audio — but NOT smaller, or a long clip explodes into dozens of API
+    # calls that hit Groq's rate limit (a 25 min clip at 25s = 60+ calls → the
+    # whole job fails). 300s keeps even a 1 hr clip to ~12 calls. Other
+    # languages only split when the file exceeds Groq's 24 MB limit.
+    CHUNK_SECS = 300 if is_english else 9999
+    need_chunk = (dur > CHUNK_SECS) or (size > MAX_BYTES)
+    if not need_chunk:
         return [groq_call(mp3, api_key, language)]
+    n_dur  = math.ceil(dur / CHUNK_SECS) if dur > 0 else 1
+    n_size = math.ceil(size / MAX_BYTES)
+    n = max(n_dur, n_size, 1)
+    log(f"Splitting {dur:.1f}s / {size//1024//1024}MB into {n} chunks")
 
     cdur = dur / n
     results = []
