@@ -2087,37 +2087,71 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
         if (maxW < minW) maxW = minW;
         var PAUSE = 0.35; // seconds: a gap >= this between words is a natural break
 
-        for (var i = 0; i < segs.length; i++) {
-            var items = segItems(segs[i]);
-            if (items.length === 0) continue;
-            var chunk = [];
-            for (var ci = 0; ci < items.length; ci++) {
-                var it = items[ci];
-                // Break BEFORE a clause starter once the minimum is satisfied,
-                // so the conjunction begins the next caption.
-                if (chunk.length >= minW && isClauseStarter(it.text)) {
-                    pushGroup(chunk[0].start, chunk[chunk.length - 1].end, chunkText(chunk));
-                    chunk = [];
-                }
-                chunk.push(it);
-                var doBreak = false;
-                if (chunk.length >= maxW) {
-                    doBreak = true;                          // hard cap
-                } else if (chunk.length >= minW) {
-                    if (endsWithBreak(it.text)) {
-                        doBreak = true;                      // sentence / clause close
-                    } else if (ci + 1 < items.length && (items[ci + 1].start - it.end) >= PAUSE) {
-                        doBreak = true;                      // natural speech pause
-                    }
-                }
-                if (doBreak) {
-                    pushGroup(chunk[0].start, chunk[chunk.length - 1].end, chunkText(chunk));
-                    chunk = [];
+        // ── Flatten ALL words across segments into ONE stream ──
+        // Whisper splits speech into sentence-ish segments. Grouping per-segment
+        // forced a flush at every segment end, producing tiny 1–2 word captions
+        // (segment tails) that ignored the minimum. Flattening lets the minimum
+        // apply globally; real sentence ends still break via pause/punctuation.
+        var all = [];
+        for (var si2 = 0; si2 < segs.length; si2++) {
+            var its = segItems(segs[si2]);
+            for (var a2 = 0; a2 < its.length; a2++) all.push(its[a2]);
+        }
+
+        // Build chunks (arrays of word objects) honouring min/max + boundaries.
+        var chunks = [];
+        var chunk = [];
+        for (var ci = 0; ci < all.length; ci++) {
+            var it = all[ci];
+            // Break BEFORE a clause starter once the minimum is satisfied,
+            // so the conjunction begins the next caption.
+            if (chunk.length >= minW && isClauseStarter(it.text)) {
+                chunks.push(chunk); chunk = [];
+            }
+            chunk.push(it);
+            var doBreak = false;
+            if (chunk.length >= maxW) {
+                doBreak = true;                          // hard cap
+            } else if (chunk.length >= minW) {
+                if (endsWithBreak(it.text)) {
+                    doBreak = true;                      // sentence / clause close
+                } else if (ci + 1 < all.length && (all[ci + 1].start - it.end) >= PAUSE) {
+                    doBreak = true;                      // natural speech pause
                 }
             }
-            if (chunk.length > 0) {
-                pushGroup(chunk[0].start, chunk[chunk.length - 1].end, chunkText(chunk));
-            }
+            if (doBreak) { chunks.push(chunk); chunk = []; }
+        }
+        if (chunk.length > 0) chunks.push(chunk);
+
+        // ── Safety net: merge any chunk below the minimum into a neighbour ──
+        // Guarantees the user's minimum is respected (the only way a sub-min
+        // caption can survive is when the whole transcript is shorter than min).
+        var mi = 0;
+        while (mi < chunks.length && chunks.length > 1) {
+            if (chunks[mi].length >= minW) { mi++; continue; }
+            var prevFits = (mi > 0) && (chunks[mi - 1].length + chunks[mi].length <= maxW);
+            var nextFits = (mi < chunks.length - 1) && (chunks[mi].length + chunks[mi + 1].length <= maxW);
+            if (prevFits) {
+                chunks[mi - 1] = chunks[mi - 1].concat(chunks[mi]);
+                chunks.splice(mi, 1);            // recheck shifted element at mi
+            } else if (nextFits) {
+                chunks[mi] = chunks[mi].concat(chunks[mi + 1]);
+                chunks.splice(mi + 1, 1);        // recheck the now-larger chunk
+            } else if (mi > 0) {
+                // No neighbour stays within max — prefer a slightly-over-max
+                // caption to a lonely 1–2 word one.
+                chunks[mi - 1] = chunks[mi - 1].concat(chunks[mi]);
+                chunks.splice(mi, 1);
+            } else if (mi < chunks.length - 1) {
+                chunks[mi] = chunks[mi].concat(chunks[mi + 1]);
+                chunks.splice(mi + 1, 1);
+            } else { mi++; }
+        }
+
+        // Emit
+        for (var gx = 0; gx < chunks.length; gx++) {
+            var ck = chunks[gx];
+            pushGroup(ck[0].start, ck[ck.length - 1].end, chunkText(ck));
         }
     }
 
