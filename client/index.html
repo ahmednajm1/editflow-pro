@@ -132,8 +132,11 @@
 
                     <label data-i18n="cfg_cap_words_per">Words per caption</label>
                     <div class="settings-row" style="align-items:center; gap:8px;">
-                        <input type="number" id="cfg-cap-words-per" value="3" min="1" max="15" style="width:70px; text-align:center;">
-                        <span style="font-size:10px; color:var(--text-mute);">words per caption (for "Short phrases" mode)</span>
+                        <span style="font-size:11px; color:var(--text-mute);" data-i18n="cap_words_from">from</span>
+                        <input type="number" id="cfg-cap-words-per" value="3" min="1" max="15" style="width:60px; text-align:center;">
+                        <span style="font-size:11px; color:var(--text-mute);" data-i18n="cap_words_to">to</span>
+                        <input type="number" id="cfg-cap-words-max" value="5" min="1" max="15" style="width:60px; text-align:center;">
+                        <span style="font-size:10px; color:var(--text-mute);">words (Short phrases · smart split)</span>
                     </div>
 
                     <hr style="border-color:var(--border); margin:12px 0;">
@@ -537,10 +540,13 @@
                 <!-- Hidden Accuracy input to keep JS from breaking -->
                 <input type="hidden" id="cap-model" value="large">
             </div>
-            <div id="cap-words-per-row" class="input-row" style="display:flex; align-items:center; gap:6px; margin-top:4px;">
+            <div id="cap-words-per-row" class="input-row" style="display:flex; align-items:center; gap:6px; margin-top:4px; flex-wrap:wrap;">
                 <span style="font-size:10px; color:var(--text-mute);" data-i18n="cap_words_per">Words/cap</span>
-                <input type="number" id="cap-words-per" value="3" min="1" max="15" style="width:54px; text-align:center;" title="Number of words per caption group">
-                <span style="font-size:10px; color:var(--text-mute);" data-i18n="cap_words_per_hint">words per caption</span>
+                <span style="font-size:10px; color:var(--text-mute);" data-i18n="cap_words_from">from</span>
+                <input type="number" id="cap-words-per" value="3" min="1" max="15" style="width:46px; text-align:center;" title="Minimum words per caption group">
+                <span style="font-size:10px; color:var(--text-mute);" data-i18n="cap_words_to">to</span>
+                <input type="number" id="cap-words-max" value="5" min="1" max="15" style="width:46px; text-align:center;" title="Maximum words per caption group">
+                <span style="font-size:10px; color:var(--text-mute);" data-i18n="cap_words_range_hint">words · smart split at pauses</span>
             </div>
 
             <button id="btn-generate-captions" data-tooltip="Generate captions and place them on the timeline." style="margin-top:8px;" data-i18n="cap_generate">

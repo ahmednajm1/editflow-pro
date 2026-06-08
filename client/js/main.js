@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.25";
+var CURRENT_VERSION = "1.3.26";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
@@ -28,6 +28,8 @@ var DEFAULT_SETTINGS = {
         model: "large",
         style: "phrase",
         wordsPerCaption: 3,
+        wordsMin: 3,
+        wordsMax: 5,
         animation: "pop",
         font: "Inter",
         size: "72",
@@ -98,6 +100,9 @@ var i18n = {
         cfg_cap_style: "Default Segmentation",
         cap_words_per: "Words/cap",
         cap_words_per_hint: "words per caption",
+        cap_words_from: "from",
+        cap_words_to: "to",
+        cap_words_range_hint: "words · smart split at pauses",
         cfg_cap_words_per: "Words per caption",
         cfg_bitrate: "Default Bitrate (Mbps)",
         cfg_export_path: "Default Export Folder",
@@ -202,8 +207,11 @@ var i18n = {
         cfg_cap_lang: "اللغة الافتراضية للترجمة",
         cfg_cap_accuracy: "الدقة الافتراضية",
         cfg_cap_style: "تقسيم النص الافتراضي",
-        cap_words_per: "كلمة/مقطع",
+        cap_words_per: "كلمات/مقطع",
         cap_words_per_hint: "كلمة لكل مقطع",
+        cap_words_from: "من",
+        cap_words_to: "إلى",
+        cap_words_range_hint: "كلمة · تقسيم ذكي عند الوقفات",
         cfg_cap_words_per: "عدد الكلمات في المقطع",
         cfg_bitrate: "معدل البت الافتراضي (Mbps)",
         cfg_export_path: "مجلد التصدير الافتراضي",
@@ -1077,8 +1085,17 @@ document.addEventListener("DOMContentLoaded", function() {
         var lang  = document.getElementById("cap-language").value;
         var model = document.getElementById("cap-model").value;
         var style = document.getElementById("cap-style").value;
-        var wordsPerCaption = parseInt((document.getElementById("cap-words-per") || {value: "3"}).value, 10) || 3;
-        if (wordsPerCaption < 1) wordsPerCaption = 1;
+        var wordsMin = parseInt((document.getElementById("cap-words-per") || {value: "3"}).value, 10) || 3;
+        var wordsMax = parseInt((document.getElementById("cap-words-max") || {value: "5"}).value, 10) || 5;
+        if (wordsMin < 1) wordsMin = 1;
+        if (wordsMax < wordsMin) wordsMax = wordsMin; // guard: max never below min
+        if (wordsMax > 15) wordsMax = 15;
+        // Persist the chosen range so it survives panel reloads.
+        settings.captions.wordsMin = wordsMin;
+        settings.captions.wordsMax = wordsMax;
+        settings.captions.wordsPerCaption = wordsMin; // back-compat mirror
+        saveSettings();
+        var wordsPerCaption = wordsMin; // legacy var still used by jsTranscribe fallback path
 
         var statusLine = document.getElementById("cap-status");
         function setStatus(t) { if (statusLine) statusLine.textContent = t; }
@@ -1210,7 +1227,7 @@ document.addEventListener("DOMContentLoaded", function() {
                             console.log("[Captions] placing synced editable captions");
                             showProgress("Syncing captions to timeline…", 75);
                             setStatus("Building timeline-synced captions…");
-                            fallbackSRT(summary, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", tlStart, setStatus, wordsPerCaption);
+                            fallbackSRT(summary, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", tlStart, setStatus, wordsPerCaption, wordsMin, wordsMax);
                         }
                     );
                     return;
@@ -1261,7 +1278,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 console.log("[Captions] placing synced editable captions");
                 showProgress("Syncing captions to timeline…", 75);
                 setStatus("Building timeline-synced captions…");
-                fallbackSRT(summary, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", tlStart, setStatus, wordsPerCaption);
+                fallbackSRT(summary, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", tlStart, setStatus, wordsPerCaption, wordsMin, wordsMax);
                 return;
                 });
             }  // end runTranscriber()
@@ -1363,15 +1380,20 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     // SRT generation — creates timeline-synced captions via Premiere Caption API
-    function fallbackSRT(summary, style, anim, font, size, color, hl, timelineStart, setStatus, wordsPerCaption) {
+    function fallbackSRT(summary, style, anim, font, size, color, hl, timelineStart, setStatus, wordsPerCaption, wordsMin, wordsMax) {
         wordsPerCaption = parseInt(wordsPerCaption, 10) || 3;
+        wordsMin = parseInt(wordsMin, 10) || wordsPerCaption;
+        wordsMax = parseInt(wordsMax, 10) || Math.max(wordsMin, wordsPerCaption);
+        if (wordsMax < wordsMin) wordsMax = wordsMin;
         showProgress("Placing captions on timeline…", 80);
         setStatus("Building synced captions (" + style + " mode)…");
         var cfg = {
             style: style, animation: anim, font: font,
             size: size, color: color, highlight: hl,
             offsetSecs: timelineStart,
-            wordsPerCaption: wordsPerCaption
+            wordsPerCaption: wordsPerCaption,
+            wordsMin: wordsMin,
+            wordsMax: wordsMax
         };
         var cfgStr = JSON.stringify(cfg).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
         var jsonEsc = summary.json.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -2230,7 +2252,9 @@ function applySettingsToUI() {
     setSel("cap-model",     settings.captions.model);
     setSel("cap-style",     settings.captions.style);
     var wpcEl = document.getElementById("cap-words-per");
-    if (wpcEl) wpcEl.value = settings.captions.wordsPerCaption || 3;
+    if (wpcEl) wpcEl.value = settings.captions.wordsMin || settings.captions.wordsPerCaption || 3;
+    var wpcMaxEl = document.getElementById("cap-words-max");
+    if (wpcMaxEl) wpcMaxEl.value = settings.captions.wordsMax || 5;
     updateCapWordsPerVisibility();
 }
 function setSel(id, val) {
@@ -2269,7 +2293,9 @@ function populateSettingsForm() {
     setSel("cfg-cap-model",     settings.captions.model);
     setSel("cfg-cap-style",     settings.captions.style);
     var cfgWpcEl = document.getElementById("cfg-cap-words-per");
-    if (cfgWpcEl) cfgWpcEl.value = settings.captions.wordsPerCaption || 3;
+    if (cfgWpcEl) cfgWpcEl.value = settings.captions.wordsMin || settings.captions.wordsPerCaption || 3;
+    var cfgWpcMaxEl = document.getElementById("cfg-cap-words-max");
+    if (cfgWpcMaxEl) cfgWpcMaxEl.value = settings.captions.wordsMax || 5;
 
     var gk = document.getElementById("cfg-groq-key");        if (gk) gk.value = settings.groqApiKey || "";
     var br = document.getElementById("cfg-bitrate");       if (br) br.value = settings.bitrate;
@@ -2298,7 +2324,17 @@ function readSettingsForm() {
     settings.captions.language      = (document.getElementById("cfg-cap-language")  || {value:settings.captions.language}).value;
     settings.captions.model         = (document.getElementById("cfg-cap-model")     || {value:settings.captions.model}).value;
     settings.captions.style         = (document.getElementById("cfg-cap-style")     || {value:settings.captions.style}).value;
-    settings.captions.wordsPerCaption = parseInt((document.getElementById("cfg-cap-words-per") || {value:"3"}).value, 10) || 3;
+    var _cfgMin = parseInt((document.getElementById("cfg-cap-words-per") || {value:"3"}).value, 10) || 3;
+    var _cfgMax = parseInt((document.getElementById("cfg-cap-words-max") || {value:"5"}).value, 10) || 5;
+    if (_cfgMin < 1) _cfgMin = 1;
+    if (_cfgMax < _cfgMin) _cfgMax = _cfgMin;
+    if (_cfgMax > 15) _cfgMax = 15;
+    settings.captions.wordsMin = _cfgMin;
+    settings.captions.wordsMax = _cfgMax;
+    settings.captions.wordsPerCaption = _cfgMin; // back-compat mirror
+    // Reflect settings-tab change back onto the main panel inputs immediately
+    var _mpMin = document.getElementById("cap-words-per"); if (_mpMin) _mpMin.value = _cfgMin;
+    var _mpMax = document.getElementById("cap-words-max"); if (_mpMax) _mpMax.value = _cfgMax;
 
     settings.bitrate    = +(document.getElementById("cfg-bitrate")     || {value:settings.bitrate}).value || 10;
     settings.groqApiKey = (document.getElementById("cfg-groq-key") || {value:""}).value;

@@ -2000,6 +2000,60 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
         return s.split(/\s+/);
     }
 
+    // ── Context-aware phrase grouping helpers (used by "phrase" style) ──
+    // Join an array of word objects {start,end,text} into one caption string.
+    function chunkText(arr) {
+        var parts = [];
+        for (var z = 0; z < arr.length; z++) parts.push(arr[z].text);
+        return parts.join(" ");
+    }
+    // Trailing punctuation that should CLOSE a caption (sentence / clause end).
+    // Covers Latin (. ! ? : ; …) and Arabic (، ؛ ؟) marks.
+    function endsWithBreak(t) {
+        // . ! ? : ; + ellipsis(2026) + Arabic comma(060C) semicolon(061B) question(061F)
+        return /[\.\!\?:;\u2026\u060C\u061B\u061F]$/.test(t || "");
+    }
+    // Words that typically START a new clause. When the current caption already
+    // meets the minimum length, we break BEFORE these so related words stay
+    // together. Arabic keys are \u-escaped for ExtendScript source-encoding safety.
+    var CLAUSE_STARTERS = {
+        "\u0648\u0644\u0643\u0646":1, /* walakin  */
+        "\u0644\u0643\u0646":1,        /* lakin    */
+        "\u062B\u0645":1,               /* thumma   */
+        "\u0623\u0648":1,               /* aw       */
+        "\u062D\u062A\u0649":1,        /* hatta    */
+        "\u0644\u0623\u0646":1,        /* li-anna  */
+        "\u0644\u0623\u0646\u0647":1, /* li-annah */
+        "\u0643\u064A":1,               /* kay      */
+        "\u0625\u0630\u0627":1,        /* idha     */
+        "\u0639\u0646\u062F\u0645\u0627":1, /* indama */
+        "\u0628\u064A\u0646\u0645\u0627":1, /* baynama */
+        "\u062D\u064A\u062B":1,        /* haythu   */
+        "\u0643\u0645\u0627":1,        /* kama     */
+        "but":1,"and":1,"or":1,"so":1,"because":1,"then":1,"when":1,"while":1,
+        "which":1,"that":1,"if":1,"however":1
+    };
+    function isClauseStarter(t) {
+        t = (t || "").replace(/[^\u0600-\u06FFa-zA-Z]/g, "");
+        if (!t) return false;
+        return CLAUSE_STARTERS[t] === 1 || CLAUSE_STARTERS[t.toLowerCase()] === 1;
+    }
+    // Build a normalized [{start,end,text}] word list for a segment, using real
+    // Whisper word timestamps when present, else dividing the segment evenly.
+    function segItems(seg) {
+        var out = [];
+        var sw = seg.words || [];
+        if (sw.length > 0) {
+            for (var a = 0; a < sw.length; a++) out.push({ start: sw[a].start, end: sw[a].end, text: sw[a].text });
+        } else {
+            var ws = splitWords(seg.text);
+            if (ws.length === 0) return out;
+            var per = (seg.end - seg.start) / ws.length;
+            for (var b = 0; b < ws.length; b++) out.push({ start: seg.start + b * per, end: seg.start + (b + 1) * per, text: ws[b] });
+        }
+        return out;
+    }
+
     if (groupStyle === "line") {
         for (var i = 0; i < segs.length; i++) pushGroup(segs[i].start, segs[i].end, segs[i].text);
     } else if (groupStyle === "word") {
@@ -2021,35 +2075,48 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
                 }
             }
         }
-    } else { // phrase: N words per caption (cfg.wordsPerCaption), using actual word timestamps
-        var step = parseInt(cfg.wordsPerCaption, 10) || 3;
-        if (step < 1) step = 1;
+    } else { // phrase: context-aware grouping within [wordsMin .. wordsMax]
+        // Range support: user picks a min and max words-per-caption. Within that
+        // window we break at the most natural boundary — sentence/clause-ending
+        // punctuation, a speech pause, or before a clause-starting word — so the
+        // text stays meaningful ("في يوم من الأيام") instead of being chopped at
+        // a fixed count. Falls back to a hard break at the max.
+        var minW = parseInt(cfg.wordsMin, 10) || parseInt(cfg.wordsPerCaption, 10) || 3;
+        var maxW = parseInt(cfg.wordsMax, 10) || minW;
+        if (minW < 1) minW = 1;
+        if (maxW < minW) maxW = minW;
+        var PAUSE = 0.35; // seconds: a gap >= this between words is a natural break
+
         for (var i = 0; i < segs.length; i++) {
-            var seg = segs[i];
-            var segWords = seg.words || [];
-            if (segWords.length > 0) {
-                // Use real word timestamps for accurate phrase timing
-                for (var k = 0; k < segWords.length; k += step) {
-                    var chunkEnd = Math.min(k + step, segWords.length);
-                    var chunkTexts = [];
-                    for (var cw = k; cw < chunkEnd; cw++) {
-                        chunkTexts.push(segWords[cw].text);
+            var items = segItems(segs[i]);
+            if (items.length === 0) continue;
+            var chunk = [];
+            for (var ci = 0; ci < items.length; ci++) {
+                var it = items[ci];
+                // Break BEFORE a clause starter once the minimum is satisfied,
+                // so the conjunction begins the next caption.
+                if (chunk.length >= minW && isClauseStarter(it.text)) {
+                    pushGroup(chunk[0].start, chunk[chunk.length - 1].end, chunkText(chunk));
+                    chunk = [];
+                }
+                chunk.push(it);
+                var doBreak = false;
+                if (chunk.length >= maxW) {
+                    doBreak = true;                          // hard cap
+                } else if (chunk.length >= minW) {
+                    if (endsWithBreak(it.text)) {
+                        doBreak = true;                      // sentence / clause close
+                    } else if (ci + 1 < items.length && (items[ci + 1].start - it.end) >= PAUSE) {
+                        doBreak = true;                      // natural speech pause
                     }
-                    pushGroup(segWords[k].start, segWords[chunkEnd - 1].end,
-                              chunkTexts.join(" "));
                 }
-            } else {
-                // Fallback: split text and divide duration equally
-                var words = splitWords(seg.text);
-                if (words.length === 0) continue;
-                var per = (seg.end - seg.start) / words.length;
-                for (var k = 0; k < words.length; k += step) {
-                    var chunkN = Math.min(step, words.length - k);
-                    var chunkWords = words.slice(k, k + chunkN);
-                    pushGroup(seg.start + k * per,
-                              seg.start + (k + chunkN) * per,
-                              chunkWords.join(" "));
+                if (doBreak) {
+                    pushGroup(chunk[0].start, chunk[chunk.length - 1].end, chunkText(chunk));
+                    chunk = [];
                 }
+            }
+            if (chunk.length > 0) {
+                pushGroup(chunk[0].start, chunk[chunk.length - 1].end, chunkText(chunk));
             }
         }
     }
@@ -2067,6 +2134,25 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
         for (var gi = 0; gi < groups.length; gi++) {
             groups[gi].start += offsetSecs;
             groups[gi].end   += offsetSecs;
+        }
+    }
+
+    // ── Prevent overlapping captions (fixes "stacked" word-over-word) ──
+    // Whisper word/phrase timestamps can overlap slightly — a word's end may
+    // exceed the next word's start — which makes Premiere show two captions at
+    // once. Sort by start time and clamp each caption's end to just before the
+    // next one begins, guaranteeing exactly one caption on screen at a time.
+    groups.sort(function(a, b) { return a.start - b.start; });
+    var CAP_GAP = 0.03;  // 30 ms breathing space between consecutive captions
+    var MIN_DUR = 0.20;  // never show a caption for less than 200 ms
+    for (var oi = 0; oi < groups.length - 1; oi++) {
+        var maxEnd = groups[oi + 1].start - CAP_GAP;
+        if (groups[oi].end > maxEnd) groups[oi].end = maxEnd;
+        if (groups[oi].end < groups[oi].start + MIN_DUR) {
+            // Words extremely close together: keep a minimal duration but still
+            // cap at the next start so we never re-introduce an overlap.
+            groups[oi].end = Math.min(groups[oi].start + MIN_DUR, groups[oi + 1].start);
+            if (groups[oi].end <= groups[oi].start) groups[oi].end = groups[oi].start + 0.04;
         }
     }
 
