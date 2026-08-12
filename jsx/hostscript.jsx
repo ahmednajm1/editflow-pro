@@ -754,6 +754,169 @@ $._editflow = {
         } catch(e) {
             return '{"status":"error","message":"' + e.message + '"}';
         }
+    },
+
+    // =========================================================
+    // WEB DOWNLOADER — Import downloaded media
+    // mode arrives from evalScript as a string:
+    //   "timeline" - place at the playhead in the open sequence (default)
+    //   "newseq"   - build a new sequence matching the clip exactly
+    //   "bin"      - import to the project bin only
+    // =========================================================
+    importMediaToTimeline: function(filePath, mode) {
+        try {
+            var project = app.project;
+            if (!project) return '{"status":"error","message":"Open a project first."}';
+
+            var mediaFile = new File(encodeURI(filePath));
+            if (!mediaFile.exists) {
+                return '{"status":"error","message":"Downloaded file not found on disk."}';
+            }
+
+            // Find or create the EFP_Downloads bin
+            var bin = null;
+            var root = project.rootItem;
+            for (var i = 0; i < root.children.numItems; i++) {
+                var child = root.children[i];
+                if (child.name === "EFP_Downloads" && child.type === 2) { bin = child; break; }
+            }
+            if (!bin) {
+                try { bin = root.createBin("EFP_Downloads"); } catch(eb) { bin = root; }
+            }
+
+            // Snapshot the bin BEFORE importing so the new item can be found by
+            // identity instead of by name. Name matching is unreliable: macOS
+            // stores filenames decomposed (NFD) while Premiere reports them
+            // composed (NFC), so any accented character - the E-acute in "ROSE"
+            // for instance - never compares equal and the lookup silently fails.
+            var beforeIds = {};
+            var countBefore = 0;
+            try {
+                countBefore = bin.children.numItems;
+                for (var s = 0; s < countBefore; s++) {
+                    var pre = bin.children[s];
+                    try { if (pre && pre.nodeId) beforeIds[pre.nodeId] = true; } catch(ePre) {}
+                }
+            } catch(eSnap) {}
+
+            project.importFiles([mediaFile.fsName], true, bin, false);
+
+            var imported = null;
+            var targetPath = mediaFile.fsName;
+
+            // 1. a node that was not present before the import
+            try {
+                for (var j = bin.children.numItems - 1; j >= 0; j--) {
+                    var cand = bin.children[j];
+                    if (!cand) continue;
+                    var nid = null;
+                    try { nid = cand.nodeId; } catch(eId) {}
+                    if (nid && !beforeIds[nid]) { imported = cand; break; }
+                }
+            } catch(eScan) {}
+
+            // 2. exact media-path match (immune to any name encoding)
+            if (!imported) {
+                try {
+                    for (var k = bin.children.numItems - 1; k >= 0; k--) {
+                        var c2 = bin.children[k];
+                        var mp = "";
+                        try { mp = c2.getMediaPath(); } catch(eMp) {}
+                        if (mp && mp === targetPath) { imported = c2; break; }
+                    }
+                } catch(eScan2) {}
+            }
+
+            // 3. the bin simply grew - the newest child is ours
+            if (!imported) {
+                try {
+                    if (bin.children.numItems > countBefore) {
+                        imported = bin.children[bin.children.numItems - 1];
+                    }
+                } catch(eLast) {}
+            }
+
+            if (!imported) {
+                return '{"status":"warning","message":"Imported to EFP_Downloads bin. Drag it to the timeline."}';
+            }
+
+            if (mode === "bin") {
+                return '{"status":"success","message":"Added to Project > EFP_Downloads bin."}';
+            }
+
+            // Build a sequence that matches the clip's own resolution and frame
+            // rate. Dropping a 1080p clip into a 4K sequence otherwise leaves it
+            // scaled or cropped depending on the user's Default Media Scaling.
+            if (mode === "newseq") {
+                var seqName = decodeURI(mediaFile.name).replace(/\.[^.]+$/, "");
+                var madeSeq = null;
+                try {
+                    madeSeq = project.createNewSequenceFromClips(seqName, [imported], bin);
+                } catch(eSeq1) {
+                    try { madeSeq = project.createNewSequenceFromClips(seqName, [imported]); } catch(eSeq2) {
+                        this.log("createNewSequenceFromClips failed: " + eSeq2.message);
+                    }
+                }
+                if (madeSeq) {
+                    return '{"status":"success","message":"New sequence created matching the video."}';
+                }
+                return '{"status":"warning","message":"Imported to EFP_Downloads bin - could not create a matching sequence on this Premiere version. Drag the clip onto the New Item button instead."}';
+            }
+
+            var seq = this.getSeq();
+            if (!seq) {
+                return '{"status":"warning","message":"Imported to EFP_Downloads bin. Open a sequence to place it."}';
+            }
+
+            var playhead = seq.getPlayerPosition();
+            var playheadTicks = playhead.ticks;
+            var playheadSec = parseFloat(playhead.seconds);
+
+            // Prefer the first video track that is free at the playhead, so
+            // overwriteClip can never destroy an existing edit.
+            var targetTrack = null;
+            for (var t = 0; t < seq.videoTracks.numTracks; t++) {
+                var track = seq.videoTracks[t];
+                var occupied = false;
+                for (var c = 0; c < track.clips.numItems; c++) {
+                    var clip = track.clips[c];
+                    var cs = parseFloat(clip.start.seconds);
+                    var ce = parseFloat(clip.end.seconds);
+                    if (playheadSec >= cs - 0.001 && playheadSec < ce - 0.001) { occupied = true; break; }
+                }
+                if (!occupied) { targetTrack = track; break; }
+            }
+
+            // Every track is busy — try to add a fresh one above via QE
+            if (!targetTrack) {
+                try {
+                    app.enableQE();
+                    var qeSeq = qe.project.getActiveSequence();
+                    qeSeq.addTracks(1, seq.videoTracks.numTracks, 0, 0);
+                    if (seq.videoTracks.numTracks > 0) {
+                        targetTrack = seq.videoTracks[seq.videoTracks.numTracks - 1];
+                    }
+                } catch(eq) { this.log("importMediaToTimeline addTracks failed: " + eq.message); }
+            }
+
+            if (!targetTrack) {
+                return '{"status":"warning","message":"Imported to EFP_Downloads bin - every video track is busy at the playhead. Drag it in manually."}';
+            }
+
+            try {
+                targetTrack.overwriteClip(imported, playheadTicks);
+                return '{"status":"success","message":"Downloaded and placed on the timeline at the playhead."}';
+            } catch(e1) {
+                try {
+                    targetTrack.insertClip(imported, playheadTicks);
+                    return '{"status":"success","message":"Downloaded and placed on the timeline at the playhead."}';
+                } catch(e2) {
+                    return '{"status":"warning","message":"Imported to EFP_Downloads bin - drag it to the timeline. (' + e2.message + ')"}';
+                }
+            }
+        } catch(e) {
+            return '{"status":"error","message":"' + e.message + '"}';
+        }
     }
 };
 

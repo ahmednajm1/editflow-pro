@@ -10,7 +10,7 @@ window.onerror = function(msg, url, line) {
 
 var CURRENT_VERSION = "1.3.30";
 var csInterface = null, dsp = null;
-var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null;
+var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null, spawnModule = null;
 var foundPresetPath = null, extensionPath = "", configPath = "";
 var operationRunning = false, statusTimer = null;
 var activeCaptionProcess = null, activeClipboardProcess = null;
@@ -40,7 +40,18 @@ var DEFAULT_SETTINGS = {
     exportPath: "",
     filenamePattern: "sequence",
     groqApiKey: "",
-    favoriteSfx: []
+    favoriteSfx: [],
+    downloadPath: "",
+    downloadQuality: "1080",
+    downloadPlacement: "timeline",
+    refineProvider: "groq",
+    refineModel: "",
+    refineEnabled: false,
+    refineMode: "fix",
+    refineLang: "English",
+    anthropicApiKey: "",
+    openaiApiKey: "",
+    ytdlpLastUpdate: 0
 };
 var settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 var currentLang = "en";
@@ -149,7 +160,76 @@ var i18n = {
         help_contact: "Contact & Help",
         audio_voice: "Voice",
         audio_sfx: "SFX",
-        audio_bgm: "BGM"
+        audio_bgm: "BGM",
+        dl_title: "Import from Link",
+        cap_refine: "Refine with a stronger AI",
+        cap_refine_fix: "Fix errors and wording",
+        cap_refine_translate: "Fix, then translate to…",
+        cap_refine_hint: "Timings are preserved. Set the provider under Settings → Captions.",
+        cap_refine_working: "Refining the transcript…",
+        cap_refine_done: "Refined {n} segments ✓",
+        cap_refine_failed: "Refinement skipped — using the raw transcript.",
+        cap_refine_err_key: "No API key for the selected refinement provider. Add it under Settings → Captions.",
+        cfg_refine_title: "✨ AI Text Refinement",
+        cfg_refine_desc: "Which model cleans up and translates the transcript. Groq uses the free key above.",
+        cfg_refine_groq: "Groq · free (uses the key above)",
+        cfg_refine_claude: "Claude · best for Arabic",
+        cfg_refine_gpt: "GPT",
+        cfg_anthropic_key: "Anthropic API Key",
+        cfg_openai_key: "OpenAI API Key",
+        cfg_refine_model: "Model (optional override)",
+        cfg_refine_model_ph: "leave empty for the recommended model",
+        cfg_cap_accuracy: "Default Accuracy",
+        cap_lang: "Lang",
+        cap_style: "Style",
+        dl_place: "Place",
+        dl_place_timeline: "Current sequence, at the playhead",
+        dl_place_newseq: "New sequence matching the video",
+        dl_place_bin: "Project bin only",
+        dl_saveto: "Save to",
+        dl_path_ph: "Movies/EditFlow Downloads",
+        dl_open_folder: "Open folder",
+        dl_desc: "Paste a YouTube or Instagram link to bring your own or licensed footage straight onto the timeline.",
+        dl_url_ph: "Paste a video link\u2026",
+        dl_paste: "Paste",
+        dl_fetch: "Fetch",
+        dl_quality: "Quality",
+        dl_q_1080: "1080p \u00b7 instant, Premiere-ready",
+        dl_q_max: "Highest available \u00b7 converts, slower",
+        dl_trim: "Clip range (optional)",
+        dl_from_ph: "from 0:30",
+        dl_to_ph: "to 1:45",
+        dl_trim_hint: "Grabs only this part of the video instead of the whole file.",
+        dl_cookies: "Sign-in",
+        dl_cookies_none: "No sign-in",
+        dl_to_timeline: "Place on the timeline at the playhead",
+        dl_btn: "Download & Import",
+        dl_installing: "Setting up the download engine (one time)\u2026",
+        dl_fetching: "Reading the link\u2026",
+        dl_preparing: "Preparing\u2026",
+        dl_downloading: "Downloading\u2026",
+        dl_merging: "Merging video and audio\u2026",
+        dl_checking: "Checking the codec\u2026",
+        dl_converting: "Converting for Premiere\u2026",
+        dl_importing: "Importing into Premiere\u2026",
+        dl_done: "Done \u2713",
+        dl_cancelled: "Download cancelled.",
+        dl_err_nourl: "Paste a link first.",
+        dl_err_info: "Could not read that link.",
+        dl_err_login: "This post needs a sign-in. Pick your browser under Sign-in and try again.",
+        dl_err_bot: "YouTube is asking to confirm you are not a bot. Pick your browser under Sign-in, or wait a few minutes and retry.",
+        dl_err_format: "No Premiere-friendly format for this video. Try Highest available quality.",
+        dl_err_unsupported: "That link is not supported.",
+        dl_err_network: "Network problem. Check your connection and try again.",
+        dl_err_generic: "Download failed. Try again, or check the link.",
+        dl_err_nofile: "The download finished but the file could not be found.",
+        dl_err_convert: "Conversion for Premiere failed.",
+        dl_err_time: "Use a time like 0:30 or 1:02:15.",
+        dl_err_clipboard: "Could not read the clipboard.",
+        dl_err_folder: "That save folder cannot be used. Pick another one.",
+        dl_err_ffmpeg: "FFmpeg is required for downloads. Install it, then try again.",
+        cfg_download_path: "Downloads Folder",
+        cfg_download_path_ph: "Movies/EditFlow Downloads"
     },
     ar: {
         audio_title: "مستوى الصوت",
@@ -258,7 +338,74 @@ var i18n = {
         help_contact: "الدعم والمساعدة",
         audio_voice: "صوت",
         audio_sfx: "مؤثرات",
-        audio_bgm: "موسيقى"
+        audio_bgm: "موسيقى",
+        dl_title: "\u0627\u0633\u062a\u064a\u0631\u0627\u062f \u0645\u0646 \u0631\u0627\u0628\u0637",
+        cap_refine: "\u062a\u062d\u0633\u064a\u0646 \u0628\u0630\u0643\u0627\u0621 \u0627\u0635\u0637\u0646\u0627\u0639\u064a \u0623\u0642\u0648\u0649",
+        cap_refine_fix: "\u062a\u0635\u062d\u064a\u062d \u0627\u0644\u0623\u062e\u0637\u0627\u0621 \u0648\u0627\u0644\u0635\u064a\u0627\u063a\u0629",
+        cap_refine_translate: "\u062a\u0635\u062d\u064a\u062d \u062b\u0645 \u062a\u0631\u062c\u0645\u0629 \u0625\u0644\u0649\u2026",
+        cap_refine_hint: "\u0627\u0644\u062a\u0648\u0642\u064a\u062a\u0627\u062a \u0645\u062d\u0641\u0648\u0638\u0629. \u0627\u062e\u062a\u0631 \u0627\u0644\u0645\u0632\u0648\u0651\u062f \u0645\u0646 \u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a \u2190 \u0627\u0644\u062a\u0631\u062c\u0645\u0629.",
+        cap_refine_working: "\u062c\u0627\u0631\u064a \u062a\u062d\u0633\u064a\u0646 \u0627\u0644\u0646\u0635\u2026",
+        cap_refine_done: "\u062a\u0645 \u062a\u062d\u0633\u064a\u0646 {n} \u0645\u0642\u0637\u0639\u0627\u064b \u2713",
+        cap_refine_failed: "\u062a\u064f\u062e\u0637\u0651\u064a \u0627\u0644\u062a\u062d\u0633\u064a\u0646 \u2014 \u0627\u0633\u062a\u064f\u062e\u062f\u0645 \u0627\u0644\u0646\u0635 \u0627\u0644\u0623\u0635\u0644\u064a.",
+        cap_refine_err_key: "\u0644\u0627 \u064a\u0648\u062c\u062f \u0645\u0641\u062a\u0627\u062d API \u0644\u0644\u0645\u0632\u0648\u0651\u062f \u0627\u0644\u0645\u062e\u062a\u0627\u0631. \u0623\u0636\u0641\u0647 \u0645\u0646 \u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a \u2190 \u0627\u0644\u062a\u0631\u062c\u0645\u0629.",
+        cfg_refine_title: "\u2728 \u062a\u062d\u0633\u064a\u0646 \u0627\u0644\u0646\u0635 \u0628\u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a",
+        cfg_refine_desc: "\u0623\u064a \u0645\u0648\u062f\u064a\u0644 \u064a\u0646\u0642\u0651\u062d \u0627\u0644\u0646\u0635 \u0648\u064a\u062a\u0631\u062c\u0645\u0647. \u062e\u064a\u0627\u0631 Groq \u064a\u0633\u062a\u062e\u062f\u0645 \u0627\u0644\u0645\u0641\u062a\u0627\u062d \u0627\u0644\u0645\u062c\u0627\u0646\u064a \u0623\u0639\u0644\u0627\u0647.",
+        cfg_refine_groq: "Groq \xb7 \u0645\u062c\u0627\u0646\u064a (\u064a\u0633\u062a\u062e\u062f\u0645 \u0627\u0644\u0645\u0641\u062a\u0627\u062d \u0623\u0639\u0644\u0627\u0647)",
+        cfg_refine_claude: "Claude \xb7 \u0627\u0644\u0623\u0641\u0636\u0644 \u0644\u0644\u0639\u0631\u0628\u064a\u0629",
+        cfg_refine_gpt: "GPT",
+        cfg_anthropic_key: "\u0645\u0641\u062a\u0627\u062d Anthropic API",
+        cfg_openai_key: "\u0645\u0641\u062a\u0627\u062d OpenAI API",
+        cfg_refine_model: "\u0627\u0644\u0645\u0648\u062f\u064a\u0644 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)",
+        cfg_refine_model_ph: "\u0627\u062a\u0631\u0643\u0647 \u0641\u0627\u0631\u063a\u0627\u064b \u0644\u0644\u0645\u0648\u062f\u064a\u0644 \u0627\u0644\u0645\u0648\u0635\u0649 \u0628\u0647",
+        cap_generate: "\u26a1 \u062a\u0648\u0644\u064a\u062f \u062a\u0631\u062c\u0645\u0629 \u0642\u0627\u0628\u0644\u0629 \u0644\u0644\u062a\u0639\u062f\u064a\u0644",
+        dl_place: "\u0627\u0644\u0648\u0636\u0639",
+        dl_place_timeline: "\u0627\u0644\u0633\u064a\u0643\u0648\u064a\u0646\u0633 \u0627\u0644\u062d\u0627\u0644\u064a\u060c \u0639\u0646\u062f \u0627\u0644\u0645\u0624\u0634\u0631",
+        dl_place_newseq: "\u0633\u064a\u0643\u0648\u064a\u0646\u0633 \u062c\u062f\u064a\u062f \u0628\u0645\u0642\u0627\u0633 \u0627\u0644\u0641\u064a\u062f\u064a\u0648",
+        dl_place_bin: "\u0645\u062c\u0644\u062f \u0627\u0644\u0645\u0634\u0631\u0648\u0639 \u0641\u0642\u0637",
+        dl_saveto: "\u0627\u0644\u062d\u0641\u0638 \u0641\u064a",
+        dl_path_ph: "Movies/EditFlow Downloads",
+        dl_open_folder: "\u0641\u062a\u062d \u0627\u0644\u0645\u062c\u0644\u062f",
+        dl_desc: "\u0627\u0644\u0635\u0642 \u0631\u0627\u0628\u0637 \u064a\u0648\u062a\u064a\u0648\u0628 \u0623\u0648 \u0627\u0646\u0633\u062a\u063a\u0631\u0627\u0645 \u0644\u0625\u062d\u0636\u0627\u0631 \u0645\u0648\u0627\u062f\u0643 \u0623\u0648 \u0627\u0644\u0645\u0648\u0627\u062f \u0627\u0644\u0645\u0631\u062e\u0651\u0635\u0629 \u0645\u0628\u0627\u0634\u0631\u0629 \u0625\u0644\u0649 \u0627\u0644\u062a\u0627\u064a\u0645 \u0644\u0627\u064a\u0646.",
+        dl_url_ph: "\u0627\u0644\u0635\u0642 \u0631\u0627\u0628\u0637 \u0627\u0644\u0641\u064a\u062f\u064a\u0648\u2026",
+        dl_paste: "\u0644\u0635\u0642",
+        dl_fetch: "\u062c\u0644\u0628",
+        dl_quality: "\u0627\u0644\u062c\u0648\u062f\u0629",
+        dl_q_1080: "1080p \u00b7 \u0641\u0648\u0631\u064a \u0648\u062c\u0627\u0647\u0632 \u0644\u0628\u0631\u064a\u0645\u064a\u0631",
+        dl_q_max: "\u0623\u0639\u0644\u0649 \u062c\u0648\u062f\u0629 \u0645\u062a\u0627\u062d\u0629 \u00b7 \u064a\u062d\u0648\u0651\u0644\u060c \u0623\u0628\u0637\u0623",
+        dl_trim: "\u0645\u0642\u0637\u0639 \u0645\u062d\u062f\u062f (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)",
+        dl_from_ph: "\u0645\u0646 0:30",
+        dl_to_ph: "\u0625\u0644\u0649 1:45",
+        dl_trim_hint: "\u064a\u0646\u0632\u0651\u0644 \u0647\u0630\u0627 \u0627\u0644\u062c\u0632\u0621 \u0641\u0642\u0637 \u0628\u062f\u0644 \u0627\u0644\u0641\u064a\u062f\u064a\u0648 \u0643\u0627\u0645\u0644.",
+        dl_cookies: "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644",
+        dl_cookies_none: "\u0628\u062f\u0648\u0646 \u062a\u0633\u062c\u064a\u0644 \u062f\u062e\u0648\u0644",
+        dl_to_timeline: "\u0636\u0639\u0647 \u0641\u064a \u0627\u0644\u062a\u0627\u064a\u0645 \u0644\u0627\u064a\u0646 \u0639\u0646\u062f \u0627\u0644\u0645\u0624\u0634\u0631",
+        dl_btn: "\u062a\u062d\u0645\u064a\u0644 \u0648\u0627\u0633\u062a\u064a\u0631\u0627\u062f",
+        dl_installing: "\u062a\u062c\u0647\u064a\u0632 \u0645\u062d\u0631\u0643 \u0627\u0644\u062a\u062d\u0645\u064a\u0644 (\u0645\u0631\u0629 \u0648\u0627\u062d\u062f\u0629)\u2026",
+        dl_fetching: "\u062c\u0627\u0631\u064a \u0642\u0631\u0627\u0621\u0629 \u0627\u0644\u0631\u0627\u0628\u0637\u2026",
+        dl_preparing: "\u062c\u0627\u0631\u064a \u0627\u0644\u062a\u062d\u0636\u064a\u0631\u2026",
+        dl_downloading: "\u062c\u0627\u0631\u064a \u0627\u0644\u062a\u062d\u0645\u064a\u0644\u2026",
+        dl_merging: "\u062f\u0645\u062c \u0627\u0644\u0635\u0648\u0631\u0629 \u0648\u0627\u0644\u0635\u0648\u062a\u2026",
+        dl_checking: "\u0641\u062d\u0635 \u0627\u0644\u0643\u0648\u062f\u0643\u2026",
+        dl_converting: "\u062a\u062d\u0648\u064a\u0644 \u0644\u064a\u062a\u0648\u0627\u0641\u0642 \u0645\u0639 \u0628\u0631\u064a\u0645\u064a\u0631\u2026",
+        dl_importing: "\u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f \u0625\u0644\u0649 \u0628\u0631\u064a\u0645\u064a\u0631\u2026",
+        dl_done: "\u062a\u0645 \u2713",
+        dl_cancelled: "\u0623\u064f\u0644\u063a\u064a \u0627\u0644\u062a\u062d\u0645\u064a\u0644.",
+        dl_err_nourl: "\u0627\u0644\u0635\u0642 \u0631\u0627\u0628\u0637\u0627\u064b \u0623\u0648\u0644\u0627\u064b.",
+        dl_err_info: "\u062a\u0639\u0630\u0651\u0631\u062a \u0642\u0631\u0627\u0621\u0629 \u0647\u0630\u0627 \u0627\u0644\u0631\u0627\u0628\u0637.",
+        dl_err_login: "\u0647\u0630\u0627 \u0627\u0644\u0645\u0646\u0634\u0648\u0631 \u064a\u062d\u062a\u0627\u062c \u062a\u0633\u062c\u064a\u0644 \u062f\u062e\u0648\u0644. \u0627\u062e\u062a\u0631 \u0645\u062a\u0635\u0641\u062d\u0643 \u0645\u0646 \u062e\u0627\u0646\u0629 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0648\u0623\u0639\u062f \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629.",
+        dl_err_bot: "\u064a\u0648\u062a\u064a\u0648\u0628 \u064a\u0637\u0644\u0628 \u0627\u0644\u062a\u0623\u0643\u062f \u0645\u0646 \u0623\u0646\u0643 \u0644\u0633\u062a \u0631\u0648\u0628\u0648\u062a. \u0627\u062e\u062a\u0631 \u0645\u062a\u0635\u0641\u062d\u0643 \u0645\u0646 \u062e\u0627\u0646\u0629 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644\u060c \u0623\u0648 \u0627\u0646\u062a\u0638\u0631 \u062f\u0642\u0627\u0626\u0642 \u0648\u0623\u0639\u062f \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629.",
+        dl_err_format: "\u0644\u0627 \u062a\u0648\u062c\u062f \u0635\u064a\u063a\u0629 \u0645\u0646\u0627\u0633\u0628\u0629 \u0644\u0628\u0631\u064a\u0645\u064a\u0631 \u0644\u0647\u0630\u0627 \u0627\u0644\u0641\u064a\u062f\u064a\u0648. \u062c\u0631\u0651\u0628 \u062e\u064a\u0627\u0631 \u0623\u0639\u0644\u0649 \u062c\u0648\u062f\u0629 \u0645\u062a\u0627\u062d\u0629.",
+        dl_err_unsupported: "\u0647\u0630\u0627 \u0627\u0644\u0631\u0627\u0628\u0637 \u063a\u064a\u0631 \u0645\u062f\u0639\u0648\u0645.",
+        dl_err_network: "\u0645\u0634\u0643\u0644\u0629 \u0641\u064a \u0627\u0644\u0634\u0628\u0643\u0629. \u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u062a\u0635\u0627\u0644\u0643 \u0648\u0623\u0639\u062f \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629.",
+        dl_err_generic: "\u0641\u0634\u0644 \u0627\u0644\u062a\u062d\u0645\u064a\u0644. \u0623\u0639\u062f \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0623\u0648 \u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0631\u0627\u0628\u0637.",
+        dl_err_nofile: "\u0627\u0646\u062a\u0647\u0649 \u0627\u0644\u062a\u062d\u0645\u064a\u0644 \u0644\u0643\u0646 \u062a\u0639\u0630\u0651\u0631 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0627\u0644\u0645\u0644\u0641.",
+        dl_err_convert: "\u0641\u0634\u0644 \u0627\u0644\u062a\u062d\u0648\u064a\u0644 \u0644\u0635\u064a\u063a\u0629 \u0628\u0631\u064a\u0645\u064a\u0631.",
+        dl_err_time: "\u0627\u0633\u062a\u062e\u062f\u0645 \u0635\u064a\u063a\u0629 \u0648\u0642\u062a \u0645\u062b\u0644 0:30 \u0623\u0648 1:02:15.",
+        dl_err_clipboard: "\u062a\u0639\u0630\u0651\u0631\u062a \u0642\u0631\u0627\u0621\u0629 \u0627\u0644\u062d\u0627\u0641\u0638\u0629.",
+        dl_err_folder: "\u062a\u0639\u0630\u0651\u0631 \u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0645\u062c\u0644\u062f \u0627\u0644\u062d\u0641\u0638. \u0627\u062e\u062a\u0631 \u0645\u062c\u0644\u062f\u0627\u064b \u0622\u062e\u0631.",
+        dl_err_ffmpeg: "\u0627\u0644\u062a\u062d\u0645\u064a\u0644 \u064a\u062d\u062a\u0627\u062c FFmpeg. \u062b\u0628\u0651\u062a\u0647 \u062b\u0645 \u0623\u0639\u062f \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629.",
+        cfg_download_path: "\u0645\u062c\u0644\u062f \u0627\u0644\u062a\u062d\u0645\u064a\u0644\u0627\u062a",
+        cfg_download_path_ph: "Movies/EditFlow Downloads"
     }
 };
 
@@ -286,7 +433,15 @@ document.addEventListener("DOMContentLoaded", function() {
             console.log("[EFP execFile] File:", file, "Args:", args);
             return rawExecFile(file, args, opts, callback);
         };
-    } catch(e) { console.warn("[EFP] No exec/execFile:", e.message); }
+        // spawn is needed by the Web Downloader: exec/execFile only report back
+        // once the process exits, which is useless for a multi-minute download
+        // that has to stream live progress out of stdout.
+        var rawSpawn = require("child_process").spawn;
+        spawnModule = function(file, args, opts) {
+            console.log("[EFP spawn] File:", file, "Args:", args);
+            return rawSpawn(file, args, opts || {});
+        };
+    } catch(e) { console.warn("[EFP] No exec/execFile/spawn:", e.message); }
 
     try {
         csInterface = new CSInterface();
@@ -1099,6 +1254,33 @@ document.addEventListener("DOMContentLoaded", function() {
 
         var statusLine = document.getElementById("cap-status");
         function setStatus(t) { if (statusLine) statusLine.textContent = t; }
+
+        // Optional AI refinement between transcription and placement. Failures here
+        // are non-fatal by design: the user still gets the raw Whisper captions.
+        function withRefinement(summary, setStatus, next) {
+            var opts = (typeof window.efpRefineOptions === "function") ? window.efpRefineOptions() : null;
+            if (!opts || typeof window.efpRefineCaptions !== "function") return next(summary);
+
+            showProgress(t_refine("cap_refine_working"), 78, false);
+            setStatus(t_refine("cap_refine_working"));
+            window.efpRefineCaptions(summary, opts,
+                function(doneN, totalN) {
+                    var pct = 78 + Math.round((doneN / Math.max(totalN, 1)) * 4);
+                    showProgress(t_refine("cap_refine_working") + "  " + doneN + "/" + totalN, pct, false);
+                },
+                function(err, result, stats) {
+                    if (err === "missing_key") {
+                        showStatus(t_refine("cap_refine_err_key"), "orange");
+                    } else if (err) {
+                        console.error("[refine] " + err);
+                        showStatus(t_refine("cap_refine_failed") + " " + err, "orange");
+                    } else if (stats) {
+                        setStatus(t_refine("cap_refine_done").replace("{n}", stats.changed));
+                    }
+                    next(result || summary);
+                }
+            );
+        }
         function shq(s) {
             var isWin = (osModule && osModule.platform() === "win32");
             if (isWin) {
@@ -1227,7 +1409,9 @@ document.addEventListener("DOMContentLoaded", function() {
                             console.log("[Captions] placing synced editable captions");
                             showProgress("Syncing captions to timeline…", 75);
                             setStatus("Building timeline-synced captions…");
-                            fallbackSRT(summary, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", tlStart, setStatus, wordsPerCaption, wordsMin, wordsMax);
+                            withRefinement(summary, setStatus, function(_s) {
+                                fallbackSRT(_s, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", tlStart, setStatus, wordsPerCaption, wordsMin, wordsMax);
+                            });
                         }
                     );
                     return;
@@ -1278,7 +1462,9 @@ document.addEventListener("DOMContentLoaded", function() {
                 console.log("[Captions] placing synced editable captions");
                 showProgress("Syncing captions to timeline…", 75);
                 setStatus("Building timeline-synced captions…");
-                fallbackSRT(summary, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", tlStart, setStatus, wordsPerCaption, wordsMin, wordsMax);
+                withRefinement(summary, setStatus, function(_s) {
+                    fallbackSRT(_s, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", tlStart, setStatus, wordsPerCaption, wordsMin, wordsMax);
+                });
                 return;
                 });
             }  // end runTranscriber()
@@ -1576,6 +1762,11 @@ document.addEventListener("DOMContentLoaded", function() {
         }
         return "ffmpeg";
     }
+    // Exposed so the Web Downloader module (a separate top-level IIFE) can
+    // resolve ffmpeg without duplicating the probe list, and can reuse the
+    // one-time Windows auto-download instead of dead-ending the user.
+    window.efpGetFFmpegPath = getFFmpegPath;
+    window.efpEnsureFFmpeg = function(progressCb, cb) { ensureFFmpegGlobal(progressCb, cb); };
 
     function ensureFFmpegGlobal(progressCb, cb) {
         if (!fsModule || !osModule) return cb("Node modules not available");
@@ -1932,10 +2123,16 @@ document.addEventListener("DOMContentLoaded", function() {
     safeBind("btn-cfg-browse-path", function() {
         if (!csInterface) return;
         try {
-            var result = window.cep.fs.showOpenDialog(false, true, "Choose default export folder", "");
-            if (result.data && result.data.length > 0) {
-                document.getElementById("cfg-export-path").value = result.data[0];
-            }
+            // Same file:// trap as the downloader had - go through the JSX dialog.
+            csInterface.evalScript(
+                '(function() { var f = Folder.selectDialog("Choose default export folder"); return f ? f.fsName : ""; })()',
+                function(result) {
+                    if (result && result !== "null" && result !== "undefined" &&
+                        result !== "EvalScript error." && result !== "") {
+                        document.getElementById("cfg-export-path").value = result;
+                    }
+                }
+            );
         } catch(e) { console.log("Browse error:", e); }
     });
 
@@ -2040,6 +2237,13 @@ function applyLanguage(lang) {
 }
 
 // ── HELPERS ──────────────────────────────────────────────────
+function t_refine(key) {
+    try {
+        var tbl = i18n[currentLang] || i18n.en;
+        return tbl[key] || i18n.en[key] || key;
+    } catch (e) { return key; }
+}
+
 function safeBind(id, fn) {
     var el = document.getElementById(id);
     if (el) {
@@ -2175,6 +2379,19 @@ function hideProgress() {
 }
 
 // ── SETTINGS ─────────────────────────────────────────────────
+// CEP's cep.fs.showOpenDialog returns "file:///Users/..." (percent-encoded),
+// which every fs call rejects. Older builds saved that straight into the config,
+// silently breaking both the download folder and the export folder. Normalising
+// on load heals any value already stored on disk.
+function efpNormalizePath(p) {
+    var v = (p || "").toString().trim();
+    if (/^file:\/\//i.test(v)) {
+        v = v.replace(/^file:\/\/(localhost)?/i, "");
+        try { v = decodeURIComponent(v); } catch(e) {}
+    }
+    return v.replace(/[\/\\]+$/, "");
+}
+
 function loadSettings() {
     try {
         if (fsModule && fsModule.existsSync(configPath)) {
@@ -2193,9 +2410,20 @@ function loadSettings() {
                 }
             }
             if (typeof d.bitrate === "number") settings.bitrate = d.bitrate;
-            if (typeof d.exportPath === "string") settings.exportPath = d.exportPath;
+            if (typeof d.exportPath === "string") settings.exportPath = efpNormalizePath(d.exportPath);
             if (typeof d.groqApiKey === "string") settings.groqApiKey = d.groqApiKey;
             if (Array.isArray(d.favoriteSfx)) settings.favoriteSfx = d.favoriteSfx;
+            if (typeof d.downloadPath === "string") settings.downloadPath = efpNormalizePath(d.downloadPath);
+            if (typeof d.downloadQuality === "string") settings.downloadQuality = d.downloadQuality;
+            if (typeof d.downloadPlacement === "string") settings.downloadPlacement = d.downloadPlacement;
+            if (typeof d.refineProvider === "string") settings.refineProvider = d.refineProvider;
+            if (typeof d.refineModel === "string") settings.refineModel = d.refineModel;
+            if (typeof d.refineEnabled === "boolean") settings.refineEnabled = d.refineEnabled;
+            if (typeof d.refineMode === "string") settings.refineMode = d.refineMode;
+            if (typeof d.refineLang === "string") settings.refineLang = d.refineLang;
+            if (typeof d.anthropicApiKey === "string") settings.anthropicApiKey = d.anthropicApiKey;
+            if (typeof d.openaiApiKey === "string") settings.openaiApiKey = d.openaiApiKey;
+            if (typeof d.ytdlpLastUpdate === "number") settings.ytdlpLastUpdate = d.ytdlpLastUpdate;
         }
     } catch(e) { console.log("[loadSettings] error:", e); }
     if (settings.language && typeof applyLanguage === "function") {
@@ -2313,8 +2541,14 @@ function populateSettingsForm() {
     if (cfgWpcMaxEl) cfgWpcMaxEl.value = settings.captions.wordsMax || 5;
 
     var gk = document.getElementById("cfg-groq-key");        if (gk) gk.value = settings.groqApiKey || "";
+    var ak = document.getElementById("cfg-anthropic-key");   if (ak) ak.value = settings.anthropicApiKey || "";
+    var ok = document.getElementById("cfg-openai-key");      if (ok) ok.value = settings.openaiApiKey || "";
+    var rm = document.getElementById("cfg-refine-model");    if (rm) rm.value = settings.refineModel || "";
+    setSel("cfg-refine-provider", settings.refineProvider || "groq");
+    if (typeof window.efpSyncRefineUI === "function") window.efpSyncRefineUI();
     var br = document.getElementById("cfg-bitrate");       if (br) br.value = settings.bitrate;
     var ep = document.getElementById("cfg-export-path");   if (ep) ep.value = settings.exportPath || "";
+    var dp = document.getElementById("cfg-download-path"); if (dp) dp.value = settings.downloadPath || "";
     setSel("cfg-filename-pattern", settings.filenamePattern);
 }
 
@@ -2353,7 +2587,12 @@ function readSettingsForm() {
 
     settings.bitrate    = +(document.getElementById("cfg-bitrate")     || {value:settings.bitrate}).value || 10;
     settings.groqApiKey = (document.getElementById("cfg-groq-key") || {value:""}).value;
+    settings.anthropicApiKey = (document.getElementById("cfg-anthropic-key") || {value:""}).value;
+    settings.openaiApiKey = (document.getElementById("cfg-openai-key") || {value:""}).value;
+    settings.refineModel = (document.getElementById("cfg-refine-model") || {value:""}).value.trim();
+    settings.refineProvider = (document.getElementById("cfg-refine-provider") || {value:"groq"}).value;
     settings.exportPath =  (document.getElementById("cfg-export-path") || {value:""}).value;
+    settings.downloadPath = (document.getElementById("cfg-download-path") || {value:""}).value;
     settings.filenamePattern = (document.getElementById("cfg-filename-pattern") || {value:"sequence"}).value;
 
     if (settings.language !== currentLang) {
@@ -3018,5 +3257,1054 @@ function importBlob(blob) {
 
     window.reloadSFXLibrary = function() {
         if (sfxCatalog) { renderCategories(); renderSoundList(); }
+    };
+})();
+
+// =========================================================
+// WEB DOWNLOADER — YouTube / Instagram -> Premiere timeline
+// yt-dlp is provisioned on first use into the EditFlowPro tools dir rather
+// than bundled: the shipped zip stays ~30MB, and yt-dlp can self-update when
+// the sites change their extractors (which they do constantly).
+// =========================================================
+(function() {
+    var YTDLP_URL_MAC = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos";
+    var YTDLP_URL_WIN = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe";
+    var UPDATE_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+
+    var activeDownloadProc = null;
+    var lastInfo = null;
+    var busy = false;
+
+    function isWin() { return !!(osModule && osModule.platform() === "win32"); }
+    function el(id) { return document.getElementById(id); }
+
+    function dlStatus(msg, isError) {
+        var node = el("dl-status");
+        if (!node) return;
+        node.textContent = msg || "";
+        node.style.whiteSpace = "pre-line";
+        node.style.color = isError ? "#ff6b6b" : "";
+    }
+
+    function setBusy(state) {
+        busy = state;
+        var btn = el("btn-dl-download");
+        var stop = el("btn-dl-cancel");
+        if (btn) btn.disabled = state;
+        if (stop) stop.classList[state ? "remove" : "add"]("hidden");
+    }
+
+    // ---------- tool provisioning ----------
+
+    function getYtDlpPath() {
+        if (!fsModule || !osModule) return null;
+        var ext = isWin() ? ".exe" : "";
+        var bundled = extensionPath + "/bin/yt-dlp" + ext;
+        if (fsModule.existsSync(bundled)) return bundled;
+
+        var toolsPath = EFP_BIN_DIR + (isWin() ? "\\" : "/") + "yt-dlp" + ext;
+        if (fsModule.existsSync(toolsPath)) return toolsPath;
+
+        if (!isWin()) {
+            var candidates = ["/opt/homebrew/bin/yt-dlp", "/usr/local/bin/yt-dlp", "/opt/local/bin/yt-dlp"];
+            for (var i = 0; i < candidates.length; i++) {
+                if (fsModule.existsSync(candidates[i])) return candidates[i];
+            }
+        }
+        return null;
+    }
+
+    function ensureYtDlp(cb) {
+        if (!fsModule || !execModule) return cb("Node modules unavailable.");
+        var found = getYtDlpPath();
+        if (found) return cb(null, found);
+
+        try { fsModule.mkdirSync(EFP_BIN_DIR, { recursive: true }); } catch(e) {}
+
+        var outPath = EFP_BIN_DIR + (isWin() ? "\\yt-dlp.exe" : "/yt-dlp");
+        var url = isWin() ? YTDLP_URL_WIN : YTDLP_URL_MAC;
+
+        showProgress(t("dl_installing"), 18, false);
+        dlStatus(t("dl_installing"));
+
+        var curlCmd = (isWin() ? 'curl.exe' : 'curl') + ' -L --fail -o "' + outPath + '" "' + url + '"';
+        execModule(curlCmd, { timeout: 300000, maxBuffer: 16 * 1024 * 1024 }, function(err) {
+            if (!err && fsModule.existsSync(outPath)) return finishInstall(outPath, cb);
+
+            if (!isWin()) return cb("Could not download the download engine. Check your connection.");
+            var ps = 'powershell -Command "& { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri \'' + url + '\' -OutFile \'' + outPath + '\' }"';
+            execModule(ps, { timeout: 300000, maxBuffer: 16 * 1024 * 1024 }, function(psErr) {
+                if (psErr || !fsModule.existsSync(outPath)) {
+                    return cb("Could not download the download engine. Check your connection.");
+                }
+                finishInstall(outPath, cb);
+            });
+        });
+    }
+
+    function finishInstall(outPath, cb) {
+        if (!isWin()) {
+            // curl does not set the quarantine flag, but the file still needs
+            // the exec bit before it can be spawned.
+            try { fsModule.chmodSync(outPath, 493); } catch(e) { console.warn("[dl] chmod failed:", e.message); }
+        }
+        cb(null, outPath);
+    }
+
+    // Fire-and-forget weekly self-update. Never blocks or fails a download.
+    function maybeSelfUpdate(binPath) {
+        try {
+            var last = settings.ytdlpLastUpdate || 0;
+            if (Date.now() - last < UPDATE_INTERVAL_MS) return;
+            settings.ytdlpLastUpdate = Date.now();
+            saveSettings();
+            if (!execFileModule) return;
+            execFileModule(binPath, ["-U"], { timeout: 120000 }, function(err) {
+                console.log("[dl] self-update finished:", err ? err.message : "ok");
+            });
+        } catch(e) {}
+    }
+
+    // ---------- paths / args ----------
+
+    // CEP's cep.fs.showOpenDialog hands back a "file:///Users/..." URL, which every
+    // fs call rejects. Anything that reaches the panel gets normalised here so a
+    // value already saved by the broken build self-heals on next use.
+    function normalizePath(p) { return efpNormalizePath(p); }
+
+    // existsSync alone is not enough: a folder can exist and still be unwritable.
+    // Returns null when usable, otherwise a short reason code.
+    function folderProblem(dir) {
+        if (!dir) return "empty";
+        try { fsModule.mkdirSync(dir, { recursive: true }); } catch(e) {}
+        if (!fsModule.existsSync(dir)) return "missing";
+        try {
+            var probe = dir + (isWin() ? "\\" : "/") + ".efp_write_test";
+            fsModule.writeFileSync(probe, "x");
+            fsModule.unlinkSync(probe);
+            return null;
+        } catch(e) { return e.code || "denied"; }
+    }
+
+    function defaultDownloadDir() {
+        if (!osModule || !pathModule) return "";
+        var home = osModule.homedir();
+        return isWin()
+            ? pathModule.join(home, "Videos", "EditFlow Downloads")
+            : pathModule.join(home, "Movies", "EditFlow Downloads");
+    }
+
+    // The visible in-panel field wins, so the user always knows exactly where the
+    // file landed and can delete it later without hunting for it.
+    function getDownloadDir() {
+        var field = el("dl-path");
+        var typed = (field && field.value) ? normalizePath(field.value) : "";
+        if (typed) return typed;
+        if (settings.downloadPath) return normalizePath(settings.downloadPath);
+        return defaultDownloadDir();
+    }
+
+    function rememberDownloadDir(dir) {
+        dir = normalizePath(dir);
+        settings.downloadPath = dir;
+        saveSettings();
+        var field = el("dl-path");
+        if (field) field.value = dir;
+        var cfg = document.getElementById("cfg-download-path");
+        if (cfg) cfg.value = dir;
+    }
+
+    function isYouTube(url) { return /(?:youtube\.com|youtu\.be)/i.test(url); }
+
+    function validTime(v) { return /^(\d{1,2}:)?\d{1,2}:\d{1,2}$/.test(v) || /^\d+(\.\d+)?$/.test(v); }
+
+    function buildSectionArg() {
+        var from = (el("dl-from") && el("dl-from").value || "").trim();
+        var to = (el("dl-to") && el("dl-to").value || "").trim();
+        if (!from && !to) return null;
+        if (from && !validTime(from)) return "BAD";
+        if (to && !validTime(to)) return "BAD";
+        return "*" + (from || "0") + "-" + (to || "inf");
+    }
+
+    // CEP panels launched from the Dock inherit a minimal PATH that excludes
+    // Homebrew, so yt-dlp cannot find ffmpeg on its own. Without an explicit
+    // --ffmpeg-location it silently skips the merge and leaves the video and
+    // audio as two separate files — an import with no sound. Verified.
+    function resolveFFmpeg() {
+        var p = (typeof window.efpGetFFmpegPath === "function") ? window.efpGetFFmpegPath() : "ffmpeg";
+        if (p && p !== "ffmpeg" && fsModule && fsModule.existsSync(p)) return p;
+        return null;
+    }
+
+    function commonArgs(url) {
+        var args = ["--no-warnings", "--newline", "--no-color", "--retries", "5", "--fragment-retries", "10"];
+        var ff = resolveFFmpeg();
+        if (ff) args.push("--ffmpeg-location", ff);
+        // A bare YouTube link carrying &list= would otherwise pull the whole
+        // playlist; other sites (Instagram carousels) are capped instead.
+        if (isYouTube(url)) args.push("--no-playlist");
+        else args.push("--playlist-end", "20");
+
+        var cookies = el("dl-cookies") ? el("dl-cookies").value : "none";
+        if (cookies && cookies !== "none") args.push("--cookies-from-browser", cookies);
+        return args;
+    }
+
+    // ---------- metadata ----------
+
+    function fetchInfo() {
+        var url = (el("dl-url") && el("dl-url").value || "").trim();
+        if (!url) { dlStatus(t("dl_err_nourl"), true); return; }
+        if (busy) return;
+
+        lastInfo = null;
+        var card = el("dl-info");
+        if (card) card.classList.add("hidden");
+        dlStatus(t("dl_fetching"));
+
+        ensureYtDlp(function(err, bin) {
+            if (err) { hideProgress(); dlStatus(err, true); return; }
+            hideProgress();
+            if (!execFileModule) { dlStatus("Node exec unavailable.", true); return; }
+
+            var args = commonArgs(url).concat([
+                "--print", "%(title)s|||%(duration)s|||%(thumbnail)s|||%(uploader)s",
+                "--playlist-items", "1",
+                url
+            ]);
+
+            execFileModule(bin, args, { timeout: 90000, maxBuffer: 8 * 1024 * 1024 }, function(e, stdout, stderr) {
+                if (e && !stdout) {
+                    dlStatus(friendlyError(stderr || e.message), true);
+                    return;
+                }
+                var line = (stdout || "").split("\n")[0] || "";
+                var parts = line.split("|||");
+                if (!parts[0]) { dlStatus(t("dl_err_info"), true); return; }
+
+                lastInfo = { title: parts[0], duration: parseFloat(parts[1]) || 0, thumb: parts[2] || "", uploader: parts[3] || "" };
+                renderInfo(lastInfo);
+                dlStatus("");
+            });
+        });
+    }
+
+    function renderInfo(info) {
+        var card = el("dl-info");
+        if (!card) return;
+        var img = el("dl-thumb");
+        if (img) {
+            if (info.thumb && /^https?:/i.test(info.thumb)) { img.src = info.thumb; img.style.display = ""; }
+            else { img.style.display = "none"; }
+        }
+        var titleEl = el("dl-title");
+        if (titleEl) titleEl.textContent = info.title;
+        var metaEl = el("dl-meta");
+        if (metaEl) {
+            var d = info.duration;
+            var mm = Math.floor(d / 60), ss = Math.floor(d % 60);
+            var dur = d > 0 ? (mm + ":" + (ss < 10 ? "0" : "") + ss) : "--:--";
+            metaEl.textContent = (info.uploader ? info.uploader + " · " : "") + dur;
+        }
+        card.classList.remove("hidden");
+    }
+
+    // Pull the first real ERROR line out of yt-dlp's output so the user sees what
+    // actually went wrong. Bucketing errors into friendly text and discarding the
+    // original made a misclassification impossible to diagnose — never do that.
+    function errorDetail(s) {
+        var lines = (s || "").split(/\r?\n/);
+        for (var i = 0; i < lines.length; i++) {
+            var ln = lines[i].replace(/\s+/g, " ").trim();
+            if (!ln) continue;
+            if (/^ERROR:/i.test(ln) || /^WARNING:/i.test(ln)) {
+                ln = ln.replace(/^ERROR:\s*/i, "").replace(/^\[[^\]]+\]\s*/, "");
+                // Drop yt-dlp's boilerplate links/advice; keep the actual cause.
+                ln = ln.split(/\s*(?:See\s+https?:|Please report|Confirm you are on)/)[0].trim();
+                return ln.length > 160 ? ln.substring(0, 157) + "…" : ln;
+            }
+        }
+        return "";
+    }
+
+    function friendlyError(raw) {
+        var s = (raw || "").toString();
+        console.error("[dl] raw yt-dlp error:\n" + s);
+
+        var hint;
+        // Order matters: YouTube's bot check also contains "sign in", and
+        // "Requested format is not available" must never be read as a login wall.
+        if (/not a bot|confirm you'?re not|too many requests|429/i.test(s)) hint = t("dl_err_bot");
+        else if (/requested format is not available|no video formats|only images are available/i.test(s)) hint = t("dl_err_format");
+        else if (/login required|rate-limit|private|sign in|cookies|empty media response/i.test(s)) hint = t("dl_err_login");
+        else if (/unsupported url|is not a valid url/i.test(s)) hint = t("dl_err_unsupported");
+        else if (/unable to download|network|timed out|temporary failure|failed to resolve|connection/i.test(s)) hint = t("dl_err_network");
+        else hint = t("dl_err_generic");
+
+        var detail = errorDetail(s);
+        return detail ? (hint + "\n" + detail) : hint;
+    }
+
+    // ---------- download ----------
+
+    function startDownload() {
+        if (busy) return;
+        var url = (el("dl-url") && el("dl-url").value || "").trim();
+        if (!url) { dlStatus(t("dl_err_nourl"), true); return; }
+        if (!spawnModule || !fsModule || !pathModule) { dlStatus("Node modules unavailable.", true); return; }
+
+        var section = buildSectionArg();
+        if (section === "BAD") { dlStatus(t("dl_err_time"), true); return; }
+
+        // A user-typed folder can be unwritable or plain wrong; fail here with a
+        // clear message instead of letting yt-dlp die with a cryptic path error.
+        var dir = getDownloadDir();
+        var problem = folderProblem(dir);
+        if (problem) {
+            console.error("[dl] save folder unusable (" + problem + "): " + dir);
+            dlStatus(t("dl_err_folder") + "\n" + dir + "  [" + problem + "]", true);
+            return;
+        }
+
+        setBusy(true);
+        showProgress(t("dl_preparing"), 18, false);
+        dlStatus("");
+
+        // Merging the separate video/audio streams (and trimming a range) is done
+        // by ffmpeg — without it a download silently comes back as video with no
+        // sound. On Windows this also runs the one-time ffmpeg auto-download.
+        ensureFFmpegReady(function(ffErr) {
+            if (ffErr) { setBusy(false); hideProgress(); dlStatus(ffErr, true); return; }
+            ensureYtDlp(function(err, bin) {
+                if (err) { setBusy(false); hideProgress(); dlStatus(err, true); return; }
+                runYtDlp(bin, url, dir, section);
+            });
+        });
+    }
+
+    function ensureFFmpegReady(cb) {
+        if (resolveFFmpeg()) return cb(null);
+        if (typeof window.efpEnsureFFmpeg !== "function") return cb(t("dl_err_ffmpeg"));
+        window.efpEnsureFFmpeg(
+            function(msg, pct) { showProgress(msg, Math.max(pct || 0, 16), false); },
+            function() { cb(resolveFFmpeg() ? null : t("dl_err_ffmpeg")); }
+        );
+    }
+
+    function runYtDlp(bin, url, dir, section) {
+        var maxQuality = (el("dl-quality") && el("dl-quality").value) === "max";
+        var sep = isWin() ? "\\" : "/";
+        var pathFile = dir + sep + ".efp_lastfile";
+        try { if (fsModule.existsSync(pathFile)) fsModule.unlinkSync(pathFile); } catch(e) {}
+
+        var fmt = maxQuality
+            ? "bestvideo+bestaudio/best"
+            : "bestvideo[vcodec^=avc1][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4][height<=1080]/best[height<=1080]/best";
+
+        var args = commonArgs(url).concat([
+            "-f", fmt,
+            "--merge-output-format", "mp4",
+            "-o", dir + sep + "%(title).60B [%(id)s].%(ext)s",
+            "--print-to-file", "after_move:filepath", pathFile
+        ]);
+        // Highest resolution first, but prefer H.264 among formats AT that
+        // resolution. YouTube ranks AV1/VP9 above H.264 by default, so plain
+        // "bestvideo" grabs an AV1 file that then needs a slow transcode — even
+        // when a higher-bitrate H.264 of the same size exists. Verified: this
+        // turns a 3.5-minute convert into an instant import for 1080p sources.
+        if (maxQuality) args.push("-S", "res,vcodec:h264,br");
+        if (section) args.push("--download-sections", section);
+        args.push(url);
+
+        var passCount = 0;
+        var stderrBuf = "";
+
+        try {
+            activeDownloadProc = spawnModule(bin, args, {});
+        } catch(e) {
+            setBusy(false); hideProgress(); dlStatus(t("dl_err_generic"), true);
+            return;
+        }
+
+        activeDownloadProc.stdout.on("data", function(chunk) {
+            var lines = chunk.toString().split(/\r?\n/);
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i];
+                if (!line) continue;
+                if (/^\[download\] Destination:/.test(line)) passCount++;
+                var m = line.match(/\[download\]\s+([0-9.]+)%/);
+                if (m) {
+                    var raw = parseFloat(m[1]);
+                    // Video and audio are fetched as two separate passes; map
+                    // them onto one continuous bar instead of 0-100 twice.
+                    var mapped = passCount <= 1 ? 20 + raw * 0.45 : 65 + raw * 0.20;
+                    var speed = line.match(/at\s+([0-9.]+\s*[KMG]i?B\/s)/);
+                    var eta = line.match(/ETA\s+([0-9:]+)/);
+                    var label = t("dl_downloading");
+                    if (speed) label += "  " + speed[1];
+                    if (eta) label += "  ETA " + eta[1];
+                    showProgress(label, Math.min(Math.round(mapped), 85), false);
+                } else if (/^\[Merger\]/.test(line)) {
+                    showProgress(t("dl_merging"), 88, false);
+                }
+            }
+        });
+
+        activeDownloadProc.stderr.on("data", function(chunk) {
+            stderrBuf += chunk.toString();
+            if (stderrBuf.length > 8000) stderrBuf = stderrBuf.slice(-8000);
+        });
+
+        activeDownloadProc.on("error", function(e) {
+            activeDownloadProc = null;
+            setBusy(false); hideProgress();
+            dlStatus(t("dl_err_generic") + " (" + e.message + ")", true);
+        });
+
+        activeDownloadProc.on("close", function(code) {
+            var wasCancelled = (activeDownloadProc && activeDownloadProc.efpCancelled);
+            activeDownloadProc = null;
+            if (wasCancelled) { setBusy(false); hideProgress(); dlStatus(t("dl_cancelled")); return; }
+            if (code !== 0) {
+                setBusy(false); hideProgress();
+                dlStatus(friendlyError(stderrBuf), true);
+                return;
+            }
+            maybeSelfUpdate(bin);
+            resolveOutput(dir, pathFile, function(finalPath) {
+                if (!finalPath) {
+                    setBusy(false); hideProgress();
+                    dlStatus(t("dl_err_nofile"), true);
+                    return;
+                }
+                if (maxQuality) prepareForPremiere(finalPath);
+                else placeInPremiere(finalPath);
+            });
+        });
+    }
+
+    // The after_move:filepath sidecar is authoritative; fall back to the newest
+    // media file in the folder if yt-dlp could not write it.
+    function resolveOutput(dir, pathFile, cb) {
+        try {
+            if (fsModule.existsSync(pathFile)) {
+                var raw = fsModule.readFileSync(pathFile, "utf8").split(/\r?\n/);
+                for (var i = raw.length - 1; i >= 0; i--) {
+                    if (raw[i] && fsModule.existsSync(raw[i])) { try { fsModule.unlinkSync(pathFile); } catch(e) {} return cb(raw[i]); }
+                }
+            }
+        } catch(e) {}
+        try {
+            var entries = fsModule.readdirSync(dir);
+            var newest = null, newestTime = 0;
+            for (var j = 0; j < entries.length; j++) {
+                if (!/\.(mp4|mkv|webm|mov|m4a|mp3)$/i.test(entries[j])) continue;
+                // Skip yt-dlp's un-merged per-format leftovers (Name.f133.mp4),
+                // which are video-only or audio-only.
+                if (/\.f\d+\.[a-z0-9]+$/i.test(entries[j])) continue;
+                var full = dir + (isWin() ? "\\" : "/") + entries[j];
+                var st = fsModule.statSync(full);
+                if (st.mtimeMs > newestTime) { newestTime = st.mtimeMs; newest = full; }
+            }
+            return cb(newest);
+        } catch(e) { return cb(null); }
+    }
+
+    // Cached once per session. Hardware H.264 via VideoToolbox measured ~2x
+    // faster than libx264 on this Mac against a real 1080p60 AV1 source, and is
+    // more than enough for a file that Premiere will re-encode on final export.
+    var hwEncoder = null; // null = not probed yet, "" = none available
+    function detectHwEncoder(ffmpegBin, cb) {
+        if (hwEncoder !== null) return cb(hwEncoder);
+        if (!execFileModule) { hwEncoder = ""; return cb(hwEncoder); }
+        execFileModule(ffmpegBin, ["-hide_banner", "-encoders"], { timeout: 15000, maxBuffer: 4 * 1024 * 1024 }, function(e, stdout) {
+            hwEncoder = /h264_videotoolbox/.test(stdout || "") ? "h264_videotoolbox" : "";
+            console.log("[dl] hardware encoder:", hwEncoder || "none (using libx264)");
+            cb(hwEncoder);
+        });
+    }
+
+    function hhmmssToSec(h, m, s) { return parseInt(h, 10) * 3600 + parseInt(m, 10) * 60 + parseFloat(s); }
+
+    // Reached only when the download is still VP9/AV1 — i.e. YouTube offered no
+    // H.264 at that resolution (anything above 1080p). Premiere cannot use those.
+    function prepareForPremiere(filePath) {
+        var ffmpegBin = resolveFFmpeg() || "ffmpeg";
+        showProgress(t("dl_checking"), 90, false);
+
+        execFileModule(ffmpegBin, ["-hide_banner", "-i", filePath], { timeout: 30000, maxBuffer: 4 * 1024 * 1024 }, function(e, stdout, stderr) {
+            var probe = (stderr || "") + (stdout || "");
+            if (/Video:\s*h264/i.test(probe)) { placeInPremiere(filePath); return; }
+
+            var dm = probe.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+            var totalSec = dm ? hhmmssToSec(dm[1], dm[2], dm[3]) : 0;
+            var rm = probe.match(/,\s*(\d{2,5})x(\d{2,5})/);
+            var srcHeight = rm ? parseInt(rm[2], 10) : 1080;
+
+            detectHwEncoder(ffmpegBin, function(hw) {
+                runTranscode(ffmpegBin, filePath, totalSec, srcHeight, hw);
+            });
+        });
+    }
+
+    function runTranscode(ffmpegBin, filePath, totalSec, srcHeight, hw) {
+        var dot = filePath.lastIndexOf(".");
+        var outPath = (dot > 0 ? filePath.substring(0, dot) : filePath) + "_premiere.mp4";
+
+        var vArgs;
+        if (hw) {
+            // Hardware encoders need a higher bitrate than x264 for a comparable look.
+            var br = srcHeight <= 1080 ? "20M" : (srcHeight <= 1440 ? "35M" : "60M");
+            vArgs = ["-c:v", hw, "-b:v", br, "-profile:v", "high"];
+        } else {
+            vArgs = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"];
+        }
+        // No -movflags +faststart: it forces a second full pass over the file for
+        // no benefit on a local editing intermediate.
+        var args = ["-y", "-hide_banner", "-i", filePath]
+            .concat(vArgs)
+            .concat(["-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", outPath]);
+
+        // showCancel=false: the shared progress-bar cancel button is wired to the
+        // captions process. Cancelling happens through this section's Stop button.
+        showProgress(t("dl_converting"), 92, false);
+
+        try {
+            activeDownloadProc = spawnModule(ffmpegBin, args, {});
+        } catch (eSpawn) {
+            setBusy(false); hideProgress(); dlStatus(t("dl_err_convert"), true);
+            return;
+        }
+
+        var tail = "";
+        // CRITICAL: ffmpeg streams progress to stderr continuously. If nothing
+        // reads these pipes the 64KB OS buffer fills and ffmpeg blocks on write()
+        // FOREVER — the UI sits on "Converting..." while the process holds 0% CPU
+        // and the output file stops growing. Draining is what keeps it alive;
+        // the percentage readout is the bonus. Verified against a real hang.
+        function drain(stream) {
+            if (!stream) return;
+            stream.on("data", function(chunk) {
+                var chunkStr = chunk.toString();
+                tail = (tail + chunkStr).slice(-4000);
+                if (totalSec <= 0) return;
+                var all = chunkStr.match(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/g);
+                if (!all) return;
+                var last = all[all.length - 1].match(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/);
+                var ratio = Math.max(0, Math.min(hhmmssToSec(last[1], last[2], last[3]) / totalSec, 1));
+                showProgress(t("dl_converting") + "  " + Math.round(ratio * 100) + "%", 92 + Math.round(ratio * 6), false);
+            });
+        }
+        drain(activeDownloadProc.stderr);
+        drain(activeDownloadProc.stdout);
+
+        activeDownloadProc.on("error", function(err2) {
+            activeDownloadProc = null;
+            setBusy(false); hideProgress();
+            dlStatus(t("dl_err_convert") + " (" + err2.message + ")", true);
+        });
+
+        activeDownloadProc.on("close", function(code) {
+            var cancelled = (activeDownloadProc && activeDownloadProc.efpCancelled);
+            activeDownloadProc = null;
+            if (cancelled) {
+                try { fsModule.unlinkSync(outPath); } catch(e4) {}
+                setBusy(false); hideProgress(); dlStatus(t("dl_cancelled"));
+                return;
+            }
+            if (code !== 0 || !fsModule.existsSync(outPath)) {
+                console.error("[dl] ffmpeg transcode failed (code " + code + "):\n" + tail);
+                setBusy(false); hideProgress();
+                dlStatus(t("dl_err_convert"), true);
+                return;
+            }
+            // The source is unusable inside Premiere; keep only the H.264 copy.
+            try { fsModule.unlinkSync(filePath); } catch(e3) {}
+            placeInPremiere(outPath);
+        });
+    }
+
+    function placeInPremiere(filePath) {
+        showProgress(t("dl_importing"), 96, false);
+        var mode = el("dl-placement") ? el("dl-placement").value : "timeline";
+        var escaped = filePath.replace(/\\/g, "/").replace(/"/g, '\\"');
+
+        if (typeof csInterface === "undefined" || !csInterface) {
+            setBusy(false); hideProgress(); dlStatus(t("dl_err_generic"), true);
+            return;
+        }
+
+        csInterface.evalScript(
+            '$._editflow.importMediaToTimeline("' + escaped + '", "' + mode + '")',
+            function(result) {
+                console.log("[dl] importMediaToTimeline:", result);
+                setBusy(false);
+                hideProgress();
+                if (typeof handleJSXResult === "function") handleJSXResult(result);
+                var parsed = (typeof safeParse === "function") ? safeParse(result) : null;
+                if (parsed && parsed.status === "error") dlStatus(parsed.message, true);
+                else dlStatus(t("dl_done"));
+            }
+        );
+    }
+
+    function cancelDownload() {
+        if (!activeDownloadProc) return;
+        try {
+            activeDownloadProc.efpCancelled = true;
+            activeDownloadProc.kill("SIGTERM");
+        } catch(e) { console.warn("[dl] kill failed:", e.message); }
+    }
+
+    // ---------- i18n helper ----------
+
+    function t(key) {
+        try {
+            var table = i18n[currentLang] || i18n.en;
+            return table[key] || i18n.en[key] || key;
+        } catch(e) { return key; }
+    }
+
+    // ---------- wiring ----------
+
+    function init() {
+        var urlInput = el("dl-url");
+        if (!urlInput) return;
+
+        safeBind("btn-dl-fetch", fetchInfo);
+        safeBind("btn-dl-download", startDownload);
+        safeBind("btn-dl-cancel", cancelDownload);
+
+        safeBind("btn-dl-paste", function() {
+            if (!navigator.clipboard || !navigator.clipboard.readText) { dlStatus(t("dl_err_clipboard"), true); return; }
+            navigator.clipboard.readText().then(function(text) {
+                urlInput.value = (text || "").trim();
+                if (urlInput.value) fetchInfo();
+            })["catch"](function() { dlStatus(t("dl_err_clipboard"), true); });
+        });
+
+        urlInput.addEventListener("keypress", function(e) {
+            if (e.key === "Enter") { e.preventDefault(); fetchInfo(); }
+        });
+
+        var q = el("dl-quality");
+        if (q) {
+            q.value = settings.downloadQuality || "1080";
+            q.addEventListener("change", function() {
+                settings.downloadQuality = q.value;
+                saveSettings();
+            });
+        }
+        var pl = el("dl-placement");
+        if (pl) {
+            pl.value = settings.downloadPlacement || "timeline";
+            pl.addEventListener("change", function() {
+                settings.downloadPlacement = pl.value;
+                saveSettings();
+            });
+        }
+
+        var pathField = el("dl-path");
+        if (pathField) {
+            // Show the resolved folder up front rather than a placeholder, so the
+            // destination is never a mystery.
+            pathField.value = settings.downloadPath || defaultDownloadDir();
+            pathField.addEventListener("change", function() {
+                rememberDownloadDir(pathField.value.trim());
+            });
+        }
+
+        // Folder.selectDialog().fsName returns a real native path. The export
+        // browser already uses it for exactly this reason.
+        safeBind("btn-dl-browse", function() {
+            if (typeof csInterface === "undefined" || !csInterface) return;
+            csInterface.evalScript(
+                '(function() { var f = Folder.selectDialog("Select download folder"); return f ? f.fsName : ""; })()',
+                function(result) {
+                    if (result && result !== "null" && result !== "undefined" &&
+                        result !== "EvalScript error." && result !== "") {
+                        rememberDownloadDir(result);
+                    }
+                }
+            );
+        });
+
+        safeBind("btn-dl-open", function() {
+            var dir = getDownloadDir();
+            if (!dir || !execModule) return;
+            try { fsModule.mkdirSync(dir, { recursive: true }); } catch(e) {}
+            execModule((isWin() ? 'explorer "' : 'open "') + dir + '"', function() {});
+        });
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", function() { setTimeout(init, 300); });
+    } else {
+        setTimeout(init, 300);
+    }
+})();
+
+// =========================================================
+// CAPTION REFINEMENT — send Whisper's raw text through a stronger LLM to fix
+// transcription errors (and optionally translate), then map the corrected words
+// back onto the original timings.
+//
+// The hard constraint here is timing. Whisper returns per-word start/end times
+// that the word-by-word and short-phrase caption styles depend on. Rewriting the
+// text invalidates them, so every corrected segment is re-timed: word-for-word
+// when the count is unchanged (the usual case for spelling/hamza fixes — verified
+// against real Arabic output), proportionally otherwise.
+// =========================================================
+(function() {
+    var BATCH_SIZE = 40;          // segments per API call
+    var REQ_TIMEOUT = 180000;     // 3 min per call
+    // Groq rejects some default client User-Agents with a 403 — send an explicit
+    // one rather than relying on whatever the runtime sets. Verified.
+    var UA = "EditFlowPro/1.0";
+
+    var PROVIDERS = {
+        groq: {
+            host: "api.groq.com",
+            path: "/openai/v1/chat/completions",
+            defaultModel: "llama-3.3-70b-versatile",
+            key: function() { return settings.groqApiKey || ""; },
+            headers: function(k) { return { "Authorization": "Bearer " + k }; },
+            body: function(model, sys, userJson) {
+                return {
+                    model: model, temperature: 0.1, max_tokens: 8000,
+                    response_format: { type: "json_object" },
+                    messages: [
+                        { role: "system", content: sys },
+                        { role: "user", content: userJson }
+                    ]
+                };
+            },
+            extract: function(res) { return res.choices[0].message.content; }
+        },
+        openai: {
+            host: "api.openai.com",
+            path: "/v1/chat/completions",
+            defaultModel: "gpt-4.1",
+            key: function() { return settings.openaiApiKey || ""; },
+            headers: function(k) { return { "Authorization": "Bearer " + k }; },
+            body: function(model, sys, userJson) {
+                return {
+                    model: model, temperature: 0.1,
+                    response_format: { type: "json_object" },
+                    messages: [
+                        { role: "system", content: sys },
+                        { role: "user", content: userJson }
+                    ]
+                };
+            },
+            extract: function(res) { return res.choices[0].message.content; }
+        },
+        anthropic: {
+            host: "api.anthropic.com",
+            path: "/v1/messages",
+            defaultModel: "claude-opus-5",
+            key: function() { return settings.anthropicApiKey || ""; },
+            headers: function(k) {
+                return { "x-api-key": k, "anthropic-version": "2023-06-01" };
+            },
+            body: function(model, sys, userJson) {
+                // No temperature: Claude Opus 5 rejects sampling parameters with a 400.
+                // Effort "low" keeps this mechanical task from spending thinking tokens.
+                return {
+                    model: model, max_tokens: 16000, system: sys,
+                    messages: [{ role: "user", content: userJson }],
+                    output_config: {
+                        effort: "low",
+                        format: {
+                            type: "json_schema",
+                            schema: {
+                                type: "object",
+                                properties: {
+                                    segments: {
+                                        type: "array",
+                                        items: {
+                                            type: "object",
+                                            properties: {
+                                                i: { type: "integer" },
+                                                text: { type: "string" }
+                                            },
+                                            required: ["i", "text"],
+                                            additionalProperties: false
+                                        }
+                                    }
+                                },
+                                required: ["segments"],
+                                additionalProperties: false
+                            }
+                        }
+                    }
+                };
+            },
+            extract: function(res) {
+                var blocks = res.content || [];
+                for (var i = 0; i < blocks.length; i++) {
+                    if (blocks[i].type === "text") return blocks[i].text;
+                }
+                return "";
+            }
+        }
+    };
+
+    function buildSystemPrompt(mode, targetLang) {
+        var base =
+            "You are correcting raw speech-to-text output that will become video subtitles.\n" +
+            "Rules:\n" +
+            "- Fix transcription errors, spelling, punctuation, and (for Arabic) hamza, " +
+            "ta-marbuta and madda.\n" +
+            "- Preserve the speaker's meaning, tone and dialect. Do not summarise, " +
+            "rephrase for style, or add content.\n" +
+            "- Keep each segment's word count as close to the original as possible. " +
+            "Subtitle timing is derived from word positions, so adding or removing words " +
+            "degrades sync.\n" +
+            "- Return every segment you were given, with its original index.\n";
+        if (mode === "translate" && targetLang) {
+            base +=
+                "- After correcting, translate each segment into " + targetLang + ". " +
+                "Return only the translation as the segment text. Keep translations " +
+                "compact enough to read as a subtitle.\n";
+        }
+        base += 'Return ONLY JSON in this exact shape: ' +
+                '{"segments":[{"i":<original index>,"text":"<result>"}]}';
+        return base;
+    }
+
+    function httpJson(provider, apiKey, payload, cb) {
+        var https;
+        try { https = require("https"); } catch (e) { return cb("Node https unavailable"); }
+
+        var data = JSON.stringify(payload);
+        var hdrs = provider.headers(apiKey);
+        hdrs["Content-Type"] = "application/json";
+        hdrs["User-Agent"] = UA;
+        hdrs["Content-Length"] = Buffer.byteLength(data);
+
+        var req = https.request({
+            hostname: provider.host, path: provider.path, method: "POST", headers: hdrs
+        }, function(res) {
+            var body = "";
+            res.setEncoding("utf8");
+            res.on("data", function(c) { body += c; });
+            res.on("end", function() {
+                if (res.statusCode < 200 || res.statusCode >= 300) {
+                    // Surface the API's own message — a generic failure string here
+                    // makes provider/key/model problems impossible to diagnose.
+                    var detail = body.slice(0, 300);
+                    try {
+                        var errJson = JSON.parse(body);
+                        if (errJson.error && errJson.error.message) detail = errJson.error.message;
+                    } catch (e2) {}
+                    return cb("HTTP " + res.statusCode + ": " + detail);
+                }
+                var parsed;
+                try { parsed = JSON.parse(body); }
+                catch (e3) { return cb("Invalid JSON from provider"); }
+                cb(null, parsed);
+            });
+        });
+        req.on("error", function(e) { cb("Network error: " + e.message); });
+        req.setTimeout(REQ_TIMEOUT, function() {
+            req.destroy();
+            cb("Provider timed out (3 min)");
+        });
+        req.write(data);
+        req.end();
+    }
+
+    function round3(n) { return Math.round(n * 1000) / 1000; }
+
+    // Map the corrected text back onto the segment's original word timings.
+    function remapWords(seg, newText) {
+        var oldWords = seg.words || [];
+        var tokens = String(newText).split(/\s+/);
+        var clean = [];
+        for (var t = 0; t < tokens.length; t++) { if (tokens[t]) clean.push(tokens[t]); }
+        if (!clean.length) return oldWords;
+        if (!oldWords.length) return [];
+
+        // Same word count: reuse each original timing exactly. This is the common
+        // case for spelling and diacritic fixes, and keeps sync pixel-perfect.
+        if (clean.length === oldWords.length) {
+            var same = [];
+            for (var i = 0; i < clean.length; i++) {
+                same.push({ start: oldWords[i].start, end: oldWords[i].end, text: clean[i] });
+            }
+            return same;
+        }
+
+        // Count changed (words merged/split, or translated): spread the segment's
+        // own span across the new words in proportion to their length. Approximate
+        // per word, but exact at the segment boundaries, so captions never drift.
+        var start = parseFloat(seg.start) || 0;
+        var end = parseFloat(seg.end) || start;
+        var span = end - start;
+        if (span <= 0) span = 0.001;
+        var total = 0, j;
+        for (j = 0; j < clean.length; j++) total += clean[j].length + 1;
+        var out = [], cursor = start;
+        for (j = 0; j < clean.length; j++) {
+            var share = span * ((clean[j].length + 1) / total);
+            var wEnd = (j === clean.length - 1) ? end : Math.min(cursor + share, end);
+            out.push({ start: round3(cursor), end: round3(wEnd), text: clean[j] });
+            cursor = wEnd;
+        }
+        return out;
+    }
+
+    function chunk(arr, size) {
+        var out = [], i;
+        for (i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+        return out;
+    }
+
+    // Public entry point. Calls back with a summary object whose .json carries the
+    // refined segments, or with the ORIGINAL summary if anything goes wrong —
+    // refinement is an enhancement and must never cost the user their captions.
+    window.efpRefineCaptions = function(summary, opts, progressCb, cb) {
+        var provider = PROVIDERS[opts.provider];
+        if (!provider) return cb("Unknown provider: " + opts.provider, summary);
+
+        var apiKey = provider.key();
+        if (!apiKey) return cb("missing_key", summary);
+
+        var doc;
+        try { doc = JSON.parse(summary.json); }
+        catch (e) { return cb("Could not read the transcription", summary); }
+
+        var segments = doc.segments || [];
+        if (!segments.length) return cb(null, summary);
+
+        var model = (settings.refineModel || "").trim() || provider.defaultModel;
+        var sys = buildSystemPrompt(opts.mode, opts.targetLang);
+        var batches = chunk(segments, BATCH_SIZE);
+        var done = 0, failed = null;
+        var results = {};   // original index -> corrected text
+
+        function runBatch(bi) {
+            if (bi >= batches.length) return finish();
+
+            var batch = batches[bi];
+            var payloadSegs = [];
+            for (var k = 0; k < batch.length; k++) {
+                payloadSegs.push({ i: segments.indexOf(batch[k]), text: batch[k].text || "" });
+            }
+            var userJson = JSON.stringify({ segments: payloadSegs });
+
+            httpJson(provider, apiKey, provider.body(model, sys, userJson), function(err, res) {
+                if (err) { failed = err; return finish(); }
+                var raw = "";
+                try { raw = provider.extract(res); } catch (e) { failed = "Unexpected provider response"; return finish(); }
+                var parsed;
+                try { parsed = JSON.parse(raw); }
+                catch (e2) {
+                    // Some models wrap JSON in prose or a code fence — recover the object.
+                    var m = raw.match(/\{[\s\S]*\}/);
+                    try { parsed = JSON.parse(m ? m[0] : ""); }
+                    catch (e3) { failed = "Provider did not return valid JSON"; return finish(); }
+                }
+                var got = (parsed && parsed.segments) || [];
+                for (var g = 0; g < got.length; g++) {
+                    var item = got[g];
+                    if (typeof item.i === "number" && typeof item.text === "string" && item.text.trim()) {
+                        results[item.i] = item.text.trim();
+                    }
+                }
+                done++;
+                if (progressCb) progressCb(done, batches.length);
+                runBatch(bi + 1);
+            });
+        }
+
+        function finish() {
+            if (failed) return cb(failed, summary);
+
+            var changed = 0, exactTiming = 0;
+            for (var i = 0; i < segments.length; i++) {
+                var fixed = results[i];
+                if (!fixed || fixed === segments[i].text) continue;
+                var before = (segments[i].words || []).length;
+                segments[i].words = remapWords(segments[i], fixed);
+                segments[i].text = fixed;
+                changed++;
+                if (segments[i].words.length === before) exactTiming++;
+            }
+            console.log("[refine] " + changed + "/" + segments.length +
+                        " segments changed, " + exactTiming + " kept exact word timings");
+
+            var refined = {};
+            for (var k in summary) { if (summary.hasOwnProperty(k)) refined[k] = summary[k]; }
+            refined.json = JSON.stringify(doc);
+            cb(null, refined, { changed: changed, total: segments.length });
+        }
+
+        runBatch(0);
+    };
+
+    function el2(id) { return document.getElementById(id); }
+
+    // Show only what applies: the mode row when refinement is on, the target
+    // language only in translate mode, and only the selected provider's key field.
+    window.efpSyncRefineUI = function() {
+        var box = el2("cap-refine"), row = el2("cap-refine-row"), hint = el2("cap-refine-hint");
+        var modeEl = el2("cap-refine-mode"), langEl = el2("cap-refine-lang");
+        var on = !!(box && box.checked);
+        if (row) row.style.display = on ? "flex" : "none";
+        if (hint) hint.style.display = on ? "block" : "none";
+        if (langEl) langEl.style.display = (on && modeEl && modeEl.value === "translate") ? "" : "none";
+
+        var prov = el2("cfg-refine-provider");
+        var pv = prov ? prov.value : (settings.refineProvider || "groq");
+        var aRow = el2("cfg-anthropic-row"), oRow = el2("cfg-openai-row");
+        if (aRow) aRow.style.display = (pv === "anthropic") ? "block" : "none";
+        if (oRow) oRow.style.display = (pv === "openai") ? "block" : "none";
+    };
+
+    function initRefineUI() {
+        var box = el2("cap-refine"), modeEl = el2("cap-refine-mode"), langEl = el2("cap-refine-lang");
+        if (!box) return;
+
+        box.checked = settings.refineEnabled === true;
+        if (modeEl) modeEl.value = settings.refineMode || "fix";
+        if (langEl) langEl.value = settings.refineLang || "English";
+
+        box.addEventListener("change", function() {
+            settings.refineEnabled = box.checked; saveSettings(); window.efpSyncRefineUI();
+        });
+        if (modeEl) modeEl.addEventListener("change", function() {
+            settings.refineMode = modeEl.value; saveSettings(); window.efpSyncRefineUI();
+        });
+        if (langEl) langEl.addEventListener("change", function() {
+            settings.refineLang = langEl.value; saveSettings();
+        });
+        var prov = el2("cfg-refine-provider");
+        if (prov) prov.addEventListener("change", function() {
+            settings.refineProvider = prov.value; saveSettings(); window.efpSyncRefineUI();
+        });
+        window.efpSyncRefineUI();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", function() { setTimeout(initRefineUI, 350); });
+    } else {
+        setTimeout(initRefineUI, 350);
+    }
+
+    // Reads the panel controls; returns null when refinement is switched off.
+    window.efpRefineOptions = function() {
+        var box = document.getElementById("cap-refine");
+        if (!box || !box.checked) return null;
+        var modeEl = document.getElementById("cap-refine-mode");
+        var langEl = document.getElementById("cap-refine-lang");
+        var mode = modeEl ? modeEl.value : "fix";
+        return {
+            provider: settings.refineProvider || "groq",
+            mode: mode,
+            targetLang: (mode === "translate" && langEl) ? langEl.options[langEl.selectedIndex].text : ""
+        };
     };
 })();

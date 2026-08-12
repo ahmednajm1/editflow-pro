@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>EditFlow Pro</title>
-    <link rel="stylesheet" href="css/style.css?v=51">
+    <link rel="stylesheet" href="css/style.css?v=52">
     <script src="js/CSInterface.js"></script>
 </head>
 <body>
@@ -57,12 +57,12 @@
                         </select>
                     </div>
 
-                    <label data-i18n="cfg_show_welcome" class="checkbox-label">
+                    <label class="checkbox-label">
                         <input type="checkbox" id="cfg-show-welcome" checked>
                         <span data-i18n="cfg_show_welcome_text">Show welcome screen on launch</span>
                     </label>
 
-                    <label data-i18n="cfg_auto_refresh" class="checkbox-label">
+                    <label class="checkbox-label">
                         <input type="checkbox" id="cfg-auto-refresh" checked>
                         <span data-i18n="cfg_auto_refresh_text">Auto-refresh clip info every 2 sec</span>
                     </label>
@@ -155,6 +155,40 @@
                         2. Click 'Create API Key' & copy it.<br>
                         3. Paste the key in the box above.
                     </div>
+
+                    <hr style="border-color:var(--border); margin:12px 0;">
+                    <label style="font-weight:600; color:var(--accent);" data-i18n="cfg_refine_title">✨ AI Text Refinement</label>
+                    <div style="font-size:10px; color:var(--text-mute); margin:4px 0 8px; line-height:1.4;" data-i18n="cfg_refine_desc">
+                        Which model cleans up and translates the transcript. Groq uses the free key above.
+                    </div>
+                    <div class="settings-row">
+                        <select id="cfg-refine-provider" style="flex:1;">
+                            <option value="groq" data-i18n="cfg_refine_groq">Groq · free (uses the key above)</option>
+                            <option value="anthropic" data-i18n="cfg_refine_claude">Claude · best for Arabic</option>
+                            <option value="openai" data-i18n="cfg_refine_gpt">GPT</option>
+                        </select>
+                    </div>
+
+                    <div id="cfg-anthropic-row" style="display:none;">
+                        <label data-i18n="cfg_anthropic_key">Anthropic API Key</label>
+                        <div class="settings-row" style="gap:6px;">
+                            <input type="password" id="cfg-anthropic-key" placeholder="sk-ant-..." style="flex:1; font-family:monospace; font-size:11px;">
+                            <button style="width:auto; padding:6px 10px;" title="Show Key" onclick="var f=document.getElementById('cfg-anthropic-key'); f.type=f.type==='password'?'text':'password'; return false;">👁</button>
+                        </div>
+                    </div>
+
+                    <div id="cfg-openai-row" style="display:none;">
+                        <label data-i18n="cfg_openai_key">OpenAI API Key</label>
+                        <div class="settings-row" style="gap:6px;">
+                            <input type="password" id="cfg-openai-key" placeholder="sk-..." style="flex:1; font-family:monospace; font-size:11px;">
+                            <button style="width:auto; padding:6px 10px;" title="Show Key" onclick="var f=document.getElementById('cfg-openai-key'); f.type=f.type==='password'?'text':'password'; return false;">👁</button>
+                        </div>
+                    </div>
+
+                    <label data-i18n="cfg_refine_model">Model (optional override)</label>
+                    <div class="settings-row">
+                        <input type="text" id="cfg-refine-model" data-i18n-placeholder="cfg_refine_model_ph" placeholder="leave empty for the recommended model" style="flex:1; font-family:monospace; font-size:11px;">
+                    </div>
                 </div>
 
 
@@ -168,6 +202,11 @@
                     <div class="settings-row">
                         <input type="text" id="cfg-export-path" placeholder="Desktop/EditFlowPro_Exports" style="flex:1;">
                         <button id="btn-cfg-browse-path" style="width:auto; padding:6px 12px;" data-i18n="export_browse">Browse</button>
+                    </div>
+
+                    <label data-i18n="cfg_download_path">Downloads Folder</label>
+                    <div class="settings-row">
+                        <input type="text" id="cfg-download-path" data-i18n-placeholder="cfg_download_path_ph" placeholder="Movies/EditFlow Downloads" style="flex:1;">
                     </div>
 
                     <label data-i18n="cfg_filename_pattern">Default Filename Pattern</label>
@@ -188,7 +227,7 @@
                             <img src="img/ef_logo.png" style="width: 140px; height: auto; object-fit: contain; margin-bottom: 12px;">
                         </div>
                         <h3>EditFlow Pro</h3>
-                        <p class="about-version" id="about-version">Version 1.3.22</p>
+                        <p class="about-version" id="about-version">Version 1.3.30</p>
                         <p class="about-tagline" data-i18n="about_tagline">Professional one-click editing tools for Adobe Premiere Pro</p>
                         <hr class="about-divider">
                         <p class="about-developer-label" data-i18n="about_developer">Developer</p>
@@ -315,7 +354,7 @@
     <div class="header">
         <div class="header-left" style="display: flex; align-items: center; gap: 12px; margin-left: 4px;">
             <h1 style="margin: 0; white-space: nowrap; font-size: 18px; font-weight: 700; letter-spacing: -0.02em;">EditFlow Pro</h1>
-            <div class="badge badge-pro" id="version-badge" style="margin-left: 4px;">v1.3.22</div>
+            <div class="badge badge-pro" id="version-badge" style="margin-left: 4px;">v1.3.30</div>
             <div class="pro-badge unlicensed" id="proBadge" style="margin-left: 2px;">🔒 Unlicensed</div>
         </div>
         <div class="header-right" style="display: flex; gap: 10px; align-items: center;">
@@ -502,6 +541,82 @@
             </div>
         </div>
 
+        <!-- IMPORT FROM LINK — YouTube / Instagram straight to the timeline -->
+        <div class="action-group dl-group">
+            <h3>
+                <span class="icon"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
+                <span data-i18n="dl_title">Import from Link</span>
+            </h3>
+            <p class="description" data-i18n="dl_desc">Paste a YouTube or Instagram link to bring your own or licensed footage straight onto the timeline.</p>
+
+            <div class="input-row">
+                <input type="text" id="dl-url" data-i18n-placeholder="dl_url_ph" placeholder="Paste a video link…" style="flex:1;">
+                <button id="btn-dl-paste" style="width:auto; padding:6px 10px;" data-i18n="dl_paste">Paste</button>
+                <button id="btn-dl-fetch" style="width:auto; padding:6px 10px;" data-i18n="dl_fetch">Fetch</button>
+            </div>
+
+            <!-- Metadata preview, filled in after Fetch -->
+            <div id="dl-info" class="dl-info hidden">
+                <img id="dl-thumb" class="dl-thumb" alt="">
+                <div class="dl-info-text">
+                    <div id="dl-title" class="dl-info-title"></div>
+                    <div id="dl-meta" class="dl-info-meta"></div>
+                </div>
+            </div>
+
+            <div class="input-row">
+                <span style="font-size:10px; color:var(--text-mute); width:52px;" data-i18n="dl_quality">Quality</span>
+                <select id="dl-quality" style="flex:1;">
+                    <option value="1080" data-i18n="dl_q_1080">1080p · instant, Premiere-ready</option>
+                    <option value="max" data-i18n="dl_q_max">Highest available · converts, slower</option>
+                </select>
+            </div>
+
+            <div class="input-row">
+                <span style="font-size:10px; color:var(--text-mute); width:52px;" data-i18n="dl_trim">Clip range</span>
+                <input type="text" id="dl-from" data-i18n-placeholder="dl_from_ph" placeholder="from 0:30" style="flex:1;">
+                <input type="text" id="dl-to" data-i18n-placeholder="dl_to_ph" placeholder="to 1:45" style="flex:1;">
+            </div>
+            <p style="font-size:10px; color:var(--text-mute); margin:2px 0 8px;" data-i18n="dl_trim_hint">Grabs only this part of the video instead of the whole file.</p>
+
+            <div class="input-row">
+                <span style="font-size:10px; color:var(--text-mute); width:52px;" data-i18n="dl_cookies">Sign-in</span>
+                <select id="dl-cookies" style="flex:1;">
+                    <option value="none" data-i18n="dl_cookies_none">No sign-in</option>
+                    <option value="safari">Safari</option>
+                    <option value="chrome">Chrome</option>
+                    <option value="firefox">Firefox</option>
+                    <option value="edge">Edge</option>
+                    <option value="brave">Brave</option>
+                </select>
+            </div>
+
+            <div class="input-row">
+                <span style="font-size:10px; color:var(--text-mute); width:52px;" data-i18n="dl_place">Place</span>
+                <select id="dl-placement" style="flex:1;">
+                    <option value="timeline" data-i18n="dl_place_timeline">Current sequence, at the playhead</option>
+                    <option value="newseq" data-i18n="dl_place_newseq">New sequence matching the video</option>
+                    <option value="bin" data-i18n="dl_place_bin">Project bin only</option>
+                </select>
+            </div>
+
+            <div class="input-row">
+                <span style="font-size:10px; color:var(--text-mute); width:52px;" data-i18n="dl_saveto">Save to</span>
+                <input type="text" id="dl-path" data-i18n-placeholder="dl_path_ph" placeholder="Movies/EditFlow Downloads" style="flex:1;">
+                <button id="btn-dl-browse" style="width:auto; padding:6px 10px;" data-i18n="export_browse">Browse</button>
+                <button id="btn-dl-open" class="secondary" style="width:auto; padding:6px 10px;" data-i18n-title="dl_open_folder" title="Open folder">📂</button>
+            </div>
+
+            <button id="btn-dl-download" class="paste-btn" style="margin-top:8px;">
+                <svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:middle; margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span data-i18n="dl_btn">Download &amp; Import</span>
+            </button>
+            <div style="display:flex; flex-direction:column; align-items:center; margin-top:6px;">
+                <p id="dl-status" style="font-size:11px; color:var(--text-mute); margin:0; text-align:center;"></p>
+                <button id="btn-dl-cancel" class="secondary hidden" style="margin-top:4px; padding:2px 8px; font-size:10px; width:auto;" data-i18n="btn_stop">Stop</button>
+            </div>
+        </div>
+
         <!-- 4. FAST CAPTIONS — brand-feature highlight -->
         <div class="action-group brand-feature">
             <h3>
@@ -548,6 +663,31 @@
                 <input type="number" id="cap-words-max" value="5" min="1" max="15" style="width:46px; text-align:center;" title="Maximum words per caption group">
                 <span style="font-size:10px; color:var(--text-mute);" data-i18n="cap_words_range_hint">words · smart split at pauses</span>
             </div>
+
+            <!-- AI REFINEMENT — stronger model cleans up (and optionally translates) the transcript -->
+            <label class="checkbox-label" style="margin-top:6px;">
+                <input type="checkbox" id="cap-refine">
+                <span data-i18n="cap_refine">Refine with a stronger AI</span>
+            </label>
+            <div class="input-row" id="cap-refine-row" style="display:none; margin-top:4px;">
+                <select id="cap-refine-mode" style="flex:1;">
+                    <option value="fix" data-i18n="cap_refine_fix">Fix errors and wording</option>
+                    <option value="translate" data-i18n="cap_refine_translate">Fix, then translate to…</option>
+                </select>
+                <select id="cap-refine-lang" style="flex:1; display:none;">
+                    <option value="Arabic">العربية</option>
+                    <option value="English" selected>English</option>
+                    <option value="Spanish">Español</option>
+                    <option value="French">Français</option>
+                    <option value="German">Deutsch</option>
+                    <option value="Turkish">Türkçe</option>
+                    <option value="Hindi">हिन्दी</option>
+                    <option value="Urdu">اردو</option>
+                    <option value="Chinese">中文</option>
+                    <option value="Japanese">日本語</option>
+                </select>
+            </div>
+            <p id="cap-refine-hint" style="display:none; font-size:10px; color:var(--text-mute); margin:4px 0 0;" data-i18n="cap_refine_hint">Timings are preserved. Set the provider under Settings → Captions.</p>
 
             <button id="btn-generate-captions" data-tooltip="Generate captions and place them on the timeline." style="margin-top:8px;" data-i18n="cap_generate">
                 ⚡ Generate Editable Subtitles
@@ -624,7 +764,7 @@
     <div id="licenseOverlay" class="license-overlay hidden"></div>
 
     <script src="js/dspTools.js"></script>
-    <script src="js/main.js?v=51"></script>
-    <script src="js/license.js?v=51"></script>
+    <script src="js/main.js?v=52"></script>
+    <script src="js/license.js?v=52"></script>
 </body>
 </html>
