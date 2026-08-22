@@ -2139,6 +2139,33 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
     var color      = cfg.color || "#FFFFFF";
     var highlight  = cfg.highlight || "#A855F7";
     var offsetSecs = parseFloat(cfg.offsetSecs) || 0;
+    // Which caption track to land on. 0 keeps the original single-track behaviour;
+    // 1 is used for the second (translated) subtitle layer so both languages can
+    // sit stacked on the timeline instead of one replacing the other.
+    var capTrackIdx = parseInt(cfg.captionTrackIndex, 10);
+    if (isNaN(capTrackIdx) || capTrackIdx < 0) capTrackIdx = 0;
+
+    // A second subtitle layer needs a second caption track to live on. Most
+    // sequences ship with exactly one, so without this the `numTracks > 1` guard
+    // below fails silently and the translation lands on track 1 — overwriting the
+    // original instead of stacking above it. Add the track via QE when missing.
+    if (capTrackIdx > 0) {
+        try {
+            var seqForTracks = this.getSeq();
+            if (seqForTracks && seqForTracks.captionTracks &&
+                seqForTracks.captionTracks.numTracks <= capTrackIdx) {
+                app.enableQE();
+                var qeSeqCap = qe.project.getActiveSequence();
+                var needed = capTrackIdx + 1 - seqForTracks.captionTracks.numTracks;
+                for (var addI = 0; addI < needed; addI++) {
+                    // Caption tracks ride on video tracks in Premiere's model, so
+                    // adding a video track is what creates room for another one.
+                    try { qeSeqCap.addTracks(1, seqForTracks.videoTracks.numTracks, 0, 0); } catch(eAdd) {}
+                }
+                this.log("placeAnimatedCaptions: added " + needed + " track(s) for caption layer " + capTrackIdx);
+            }
+        } catch(eTrk) { this.log("caption track add failed: " + eTrk.message); }
+    }
 
     // ---- Build groups based on style
     var groups = [];   // each group: {start, end, text}
@@ -2218,7 +2245,94 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
     }
 
     if (groupStyle === "line") {
-        for (var i = 0; i < segs.length; i++) pushGroup(segs[i].start, segs[i].end, segs[i].text);
+        // Cinema/streaming subtitle convention: one caption per natural sentence,
+        // capped to roughly two subtitle lines (~90 characters, the same ballpark
+        // Netflix-style guides use). Whisper's raw segment boundaries (the old
+        // behaviour here) carry no length control at all — a segment can span
+        // several sentences or be a lone fragment, whatever the model happened to
+        // chunk on a pause. This closes on real sentence-ending punctuation first,
+        // and only falls back to a comma/clause/pause boundary — never a mid-word
+        // cut — when speech runs on with no punctuation at all.
+        var SENT_MIN_CHARS = 12;
+        var SENT_MAX_CHARS = 90;
+
+        // Flatten all words across segments (same de-dup as "phrase": a word
+        // repeating the previous one at nearly the same time is a Whisper
+        // stutter/segment-overlap artefact, not real speech).
+        var allS = [];
+        for (var siL = 0; siL < segs.length; siL++) {
+            var itsL = segItems(segs[siL]);
+            for (var aiL = 0; aiL < itsL.length; aiL++) {
+                var wdL = itsL[aiL];
+                var prevWL = allS.length ? allS[allS.length - 1] : null;
+                if (prevWL && prevWL.text === wdL.text && wdL.start < prevWL.end + 0.12) {
+                    if (wdL.end > prevWL.end) prevWL.end = wdL.end;
+                    continue;
+                }
+                allS.push(wdL);
+            }
+        }
+
+        // Sentence-end punctuation ONLY (. ! ? Arabic question mark, ellipsis) —
+        // deliberately excludes the comma, colon and semicolon that endsWithBreak()
+        // treats as clause-level breaks. Those are still valid fallback boundaries
+        // below (via endsWithBreak), but they must never CLOSE a "full sentence"
+        // caption on their own or a single clause-comma sentence gets chopped in two.
+        function isSentenceEnd(t) {
+            return /[\.\!\?\u2026\u061F]$/.test(t || "");
+        }
+
+        var chunksS = [];
+        var acc = [];
+        var accChars = 0;
+        for (var wi = 0; wi < allS.length; wi++) {
+            var w = allS[wi];
+            accChars += w.text.length + (acc.length ? 1 : 0);
+            acc.push(w);
+
+            var isLastWord = (wi === allS.length - 1);
+            var closedByPunct = isSentenceEnd(w.text) && accChars >= SENT_MIN_CHARS;
+
+            if (isLastWord) {
+                chunksS.push(acc); acc = []; accChars = 0;
+            } else if (closedByPunct) {
+                chunksS.push(acc); acc = []; accChars = 0;
+            } else if (accChars >= SENT_MAX_CHARS) {
+                // Run-on speech with no sentence-ending punctuation yet: find the
+                // best secondary boundary inside what we've accumulated (a clause
+                // end, a clause-starter word next, or a speech pause) instead of
+                // cutting mid-clause at the raw character limit.
+                // >= (not >): when nothing beats a 0 score (no punctuation, no
+                // clause-starter, no pause — pure run-on speech with even word
+                // spacing), ties must favour the LATEST candidate so the caption
+                // fills up toward the cap instead of collapsing to a single word
+                // at the very first position that ever tied the initial score.
+                var bestJ = -1, bestScore = -1;
+                for (var j = 0; j < acc.length - 1; j++) {
+                    var sc = 0;
+                    if (endsWithBreak(acc[j].text)) sc += 1000;
+                    if (isClauseStarter(acc[j + 1].text)) sc += 400;
+                    var gap = acc[j + 1].start - acc[j].end;
+                    if (gap < 0) gap = 0;
+                    sc += gap * 1200;
+                    if (sc >= bestScore) { bestScore = sc; bestJ = j; }
+                }
+                if (bestJ < 0) bestJ = acc.length - 2; // hard cut at the cap, at a word boundary
+                if (bestJ < 0) bestJ = 0;
+                var closedChunk = acc.slice(0, bestJ + 1);
+                var leftover = acc.slice(bestJ + 1);
+                chunksS.push(closedChunk);
+                acc = leftover;
+                accChars = 0;
+                for (var k = 0; k < acc.length; k++) accChars += acc[k].text.length + (k ? 1 : 0);
+            }
+        }
+        if (acc.length) chunksS.push(acc);
+
+        for (var gx3 = 0; gx3 < chunksS.length; gx3++) {
+            var ck3 = chunksS[gx3];
+            if (ck3.length) pushGroup(ck3[0].start, ck3[ck3.length - 1].end, chunkText(ck3));
+        }
     } else if (groupStyle === "word") {
         // Use actual word-level timestamps from Groq for precise timing
         for (var i = 0; i < segs.length; i++) {
@@ -2503,8 +2617,8 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
     // Attempt 4: insert on existing captions track
     if (!placed && imported) {
         try {
-            if (seq.captionTracks && seq.captionTracks.numTracks > 0) {
-                var ct = seq.captionTracks[0];
+            if (seq.captionTracks && seq.captionTracks.numTracks > capTrackIdx) {
+                var ct = seq.captionTracks[capTrackIdx];
                 if (typeof ct.insertClip === "function") {
                     ct.insertClip(imported, 0);
                     placed = true; placedHow = "captionTracks.insertClip";
@@ -2517,8 +2631,8 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
     // Attempt 5: overwriteClip on captions track
     if (!placed && imported) {
         try {
-            if (seq.captionTracks && seq.captionTracks.numTracks > 0) {
-                var ct2 = seq.captionTracks[0];
+            if (seq.captionTracks && seq.captionTracks.numTracks > capTrackIdx) {
+                var ct2 = seq.captionTracks[capTrackIdx];
                 if (typeof ct2.overwriteClip === "function") {
                     ct2.overwriteClip(imported, 0);
                     placed = true; placedHow = "captionTracks.overwriteClip";
@@ -2526,6 +2640,14 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
                 }
             }
         } catch(e) { this.log("captionTracks overwriteClip err: " + e.message); }
+    }
+
+    // For a stacked second layer, refuse the generic fallbacks below. They target
+    // the same destination the first layer already used, so "falling back" would
+    // silently replace the original subtitle rather than sit above it — report the
+    // failure instead and let the caller surface it.
+    if (!placed && capTrackIdx > 0) {
+        return '{"status":"error","message":"No second caption track available for the translated subtitle.","groups":' + groups.length + '}';
     }
 
     // Attempt 6: Place on the topmost video track as a subtitle clip

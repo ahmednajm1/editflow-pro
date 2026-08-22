@@ -47,7 +47,7 @@ var DEFAULT_SETTINGS = {
     refineProvider: "groq",
     refineModel: "",
     refineEnabled: false,
-    refineMode: "fix",
+    dualSubtitle: false,
     refineLang: "English",
     anthropicApiKey: "",
     openaiApiKey: "",
@@ -162,7 +162,13 @@ var i18n = {
         audio_sfx: "SFX",
         audio_bgm: "BGM",
         dl_title: "Import from Link",
+        cap_refine_provider: "Engine",
         cap_refine: "Refine with a stronger AI",
+        cap_dual: "Also add a second subtitle in",
+        cap_refine_quota: "Free engine quota exceeded. Try Claude, or wait a minute.",
+        cap_dual_working: "Translating a second subtitle ({lang})…",
+        cap_dual_failed: "Second subtitle failed — only the main one was added.",
+        cap_dual_track_hint: "Second subtitle needs a 2nd caption track in your sequence.",
         cap_refine_fix: "Fix errors and wording",
         cap_refine_translate: "Fix, then translate to…",
         cap_refine_hint: "Timings are preserved. Set the provider under Settings → Captions.",
@@ -180,7 +186,7 @@ var i18n = {
         cfg_refine_model: "Model (optional override)",
         cfg_refine_model_ph: "leave empty for the recommended model",
         cfg_cap_accuracy: "Default Accuracy",
-        cap_lang: "Lang",
+        cap_lang: "Spoken",
         cap_style: "Style",
         dl_place: "Place",
         dl_place_timeline: "Current sequence, at the playhead",
@@ -340,7 +346,13 @@ var i18n = {
         audio_sfx: "مؤثرات",
         audio_bgm: "موسيقى",
         dl_title: "\u0627\u0633\u062a\u064a\u0631\u0627\u062f \u0645\u0646 \u0631\u0627\u0628\u0637",
+        cap_refine_provider: "\u0627\u0644\u0645\u062d\u0631\u0643",
         cap_refine: "\u062a\u062d\u0633\u064a\u0646 \u0628\u0630\u0643\u0627\u0621 \u0627\u0635\u0637\u0646\u0627\u0639\u064a \u0623\u0642\u0648\u0649",
+        cap_dual: "\u0623\u0636\u0641 \u062a\u0631\u062c\u0645\u0629 \u062b\u0627\u0646\u064a\u0629 \u0628\u0644\u063a\u0629",
+        cap_refine_quota: "\u062a\u062c\u0627\u0648\u0632\u062a \u062d\u062f \u0627\u0644\u0645\u062d\u0631\u0643 \u0627\u0644\u0645\u062c\u0627\u0646\u064a. \u062c\u0631\u0651\u0628 Claude \u0623\u0648 \u0627\u0646\u062a\u0638\u0631 \u062f\u0642\u064a\u0642\u0629.",
+        cap_dual_working: "\u062c\u0627\u0631\u064a \u062a\u0631\u062c\u0645\u0629 \u0627\u0644\u0637\u0628\u0642\u0629 \u0627\u0644\u062b\u0627\u0646\u064a\u0629 ({lang})\u2026",
+        cap_dual_failed: "\u0641\u0634\u0644\u062a \u0627\u0644\u062a\u0631\u062c\u0645\u0629 \u0627\u0644\u062b\u0627\u0646\u064a\u0629 \u2014 \u0623\u064f\u0636\u064a\u0641\u062a \u0627\u0644\u0623\u0633\u0627\u0633\u064a\u0629 \u0641\u0642\u0637.",
+        cap_dual_track_hint: "\u0627\u0644\u062a\u0631\u062c\u0645\u0629 \u0627\u0644\u062b\u0627\u0646\u064a\u0629 \u062a\u062d\u062a\u0627\u062c \u0645\u0633\u0627\u0631 \u0643\u0627\u0628\u0634\u0646 \u062b\u0627\u0646\u064d \u0641\u064a \u0627\u0644\u0633\u064a\u0643\u0648\u064a\u0646\u0633.",
         cap_refine_fix: "\u062a\u0635\u062d\u064a\u062d \u0627\u0644\u0623\u062e\u0637\u0627\u0621 \u0648\u0627\u0644\u0635\u064a\u0627\u063a\u0629",
         cap_refine_translate: "\u062a\u0635\u062d\u064a\u062d \u062b\u0645 \u062a\u0631\u062c\u0645\u0629 \u0625\u0644\u0649\u2026",
         cap_refine_hint: "\u0627\u0644\u062a\u0648\u0642\u064a\u062a\u0627\u062a \u0645\u062d\u0641\u0648\u0638\u0629. \u0627\u062e\u062a\u0631 \u0627\u0644\u0645\u0632\u0648\u0651\u062f \u0645\u0646 \u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a \u2190 \u0627\u0644\u062a\u0631\u062c\u0645\u0629.",
@@ -1257,29 +1269,192 @@ document.addEventListener("DOMContentLoaded", function() {
 
         // Optional AI refinement between transcription and placement. Failures here
         // are non-fatal by design: the user still gets the raw Whisper captions.
+        // Maps the panel's language codes to the names the refinement prompt uses.
+        // Whisper's full language set — the Spoken dropdown, the mismatch rule and
+        // the no-op guard all resolve codes through this one table, so a language
+        // missing here silently loses translation support.
+        var LANG_CODE_TO_NAME = {
+            af: "Afrikaans", am: "Amharic", ar: "Arabic", as: "Assamese", az: "Azerbaijani",
+            ba: "Bashkir", be: "Belarusian", bg: "Bulgarian", bn: "Bengali", bo: "Tibetan",
+            br: "Breton", bs: "Bosnian", ca: "Catalan", cs: "Czech", cy: "Welsh",
+            da: "Danish", de: "German", el: "Greek", en: "English", es: "Spanish",
+            et: "Estonian", eu: "Basque", fa: "Persian", fi: "Finnish", fo: "Faroese",
+            fr: "French", gl: "Galician", gu: "Gujarati", ha: "Hausa", haw: "Hawaiian",
+            he: "Hebrew", hi: "Hindi", hr: "Croatian", ht: "Haitian creole", hu: "Hungarian",
+            hy: "Armenian", id: "Indonesian", is: "Icelandic", it: "Italian", ja: "Japanese",
+            jw: "Javanese", ka: "Georgian", kk: "Kazakh", km: "Khmer", kn: "Kannada",
+            ko: "Korean", la: "Latin", lb: "Luxembourgish", ln: "Lingala", lo: "Lao",
+            lt: "Lithuanian", lv: "Latvian", mg: "Malagasy", mi: "Maori", mk: "Macedonian",
+            ml: "Malayalam", mn: "Mongolian", mr: "Marathi", ms: "Malay", mt: "Maltese",
+            my: "Myanmar", ne: "Nepali", nl: "Dutch", nn: "Nynorsk", no: "Norwegian",
+            oc: "Occitan", pa: "Punjabi", pl: "Polish", ps: "Pashto", pt: "Portuguese",
+            ro: "Romanian", ru: "Russian", sa: "Sanskrit", sd: "Sindhi", si: "Sinhala",
+            sk: "Slovak", sl: "Slovenian", sn: "Shona", so: "Somali", sq: "Albanian",
+            sr: "Serbian", su: "Sundanese", sv: "Swedish", sw: "Swahili", ta: "Tamil",
+            te: "Telugu", tg: "Tajik", th: "Thai", tk: "Turkmen", tl: "Tagalog",
+            tr: "Turkish", tt: "Tatar", uk: "Ukrainian", ur: "Urdu", uz: "Uzbek",
+            vi: "Vietnamese", yi: "Yiddish", yo: "Yoruba", zh: "Chinese"
+        };
+
         function withRefinement(summary, setStatus, next) {
-            var opts = (typeof window.efpRefineOptions === "function") ? window.efpRefineOptions() : null;
+            // Refinement is an optional enhancement: every step is guarded so a bug
+            // in here can never strand the user on a frozen progress bar. A thrown
+            // error once killed the whole chain silently (the callback that places
+            // captions simply never ran) — always fall through to `next`.
+            var opts = null;
+            try {
+                opts = (typeof window.efpRefineOptions === "function") ? window.efpRefineOptions() : null;
+            } catch (eOpts) {
+                console.error("[refine] reading options failed: " + eOpts.message);
+                return next(summary);
+            }
             if (!opts || typeof window.efpRefineCaptions !== "function") return next(summary);
+
+            // The spoken language differed from the one the user picked. They chose it
+            // for a reason: honour that as a translation target rather than silently
+            // handing back the spoken language, which reads as the setting being
+            // ignored. An explicit "Translate into" choice still wins.
+            // ── One rule decides the output language ──────────────────────────
+            // "Spoken" doubles as the output choice: pick the language actually
+            // being spoken and you get a clean transcript; pick a different one and
+            // you get a translation into it. An explicit "Translate the subtitle
+            // into" always wins over both.
+            //
+            // The spoken language must come from the DETECTED value, never from
+            // summary.language: when a language is forced, summary.language echoes
+            // that choice back, so comparing against it is circular and silently
+            // cancels the very translation the user asked for.
+            var spokenCode = summary.detectedLang ||
+                             (summary.langMismatch && summary.langMismatch.detected) || "";
+            var requestedCode = summary.requestedLang ||
+                                (summary.langMismatch && summary.langMismatch.requested) || "";
+
+            if (!opts.targetLang && spokenCode && requestedCode &&
+                requestedCode !== "auto" && requestedCode !== spokenCode) {
+                var wantName = LANG_CODE_TO_NAME[requestedCode];
+                if (wantName) {
+                    opts.mode = "translate";
+                    opts.targetLang = wantName;
+                    console.log("[refine] spoken=" + spokenCode + " requested=" + requestedCode +
+                                " → translating to " + wantName);
+                }
+            }
+
+            // Translating into the language already spoken is a no-op that burns a
+            // pass and returns the text unchanged. Compare against the detected
+            // language only — it is the one value that is never echoed back.
+            if (opts.targetLang && spokenCode) {
+                var spokenName = LANG_CODE_TO_NAME[spokenCode];
+                if (spokenName && spokenName.toLowerCase() === opts.targetLang.toLowerCase()) {
+                    console.log("[refine] target equals the spoken language — correcting only");
+                    opts.mode = "fix";
+                    opts.targetLang = "";
+                }
+            }
+            if (opts.secondLang && spokenCode) {
+                var spokenName2 = LANG_CODE_TO_NAME[spokenCode];
+                if (spokenName2 && spokenName2.toLowerCase() === opts.secondLang.toLowerCase()) {
+                    console.log("[refine] second layer equals the spoken language — skipping it");
+                    opts.secondLang = "";
+                }
+            }
+
+            var handedOff = false;
+            function proceed(s2) {
+                if (handedOff) return;   // guard against a double callback
+                handedOff = true;
+                next(s2 || summary);
+            }
+
+            function report(stats) {
+                if (!stats) return;
+                setStatus(t_refine("cap_refine_done").replace("{n}", stats.changed) + " · " + stats.provider);
+                console.log("[refine] provider used: " + stats.provider);
+            }
 
             showProgress(t_refine("cap_refine_working"), 78, false);
             setStatus(t_refine("cap_refine_working"));
-            window.efpRefineCaptions(summary, opts,
-                function(doneN, totalN) {
-                    var pct = 78 + Math.round((doneN / Math.max(totalN, 1)) * 4);
-                    showProgress(t_refine("cap_refine_working") + "  " + doneN + "/" + totalN, pct, false);
-                },
-                function(err, result, stats) {
-                    if (err === "missing_key") {
-                        showStatus(t_refine("cap_refine_err_key"), "orange");
-                    } else if (err) {
-                        console.error("[refine] " + err);
-                        showStatus(t_refine("cap_refine_failed") + " " + err, "orange");
-                    } else if (stats) {
-                        setStatus(t_refine("cap_refine_done").replace("{n}", stats.changed));
+            try {
+                // Pass 1 — correct the transcript in its original language.
+                window.efpRefineCaptions(summary, opts,
+                    function(doneN, totalN) {
+                        var pct = 78 + Math.round((doneN / Math.max(totalN, 1)) * 3);
+                        showProgress(t_refine("cap_refine_working") + "  " + doneN + "/" + totalN, pct, false);
+                    },
+                    function(err, result, stats) {
+                        if (err === "missing_key") {
+                            showStatus(t_refine("cap_refine_err_key"), "orange");
+                        } else if (err && err.indexOf("RATE_LIMIT:") === 0) {
+                            console.error("[refine] " + err);
+                            showStatus(t_refine("cap_refine_quota"), "orange");
+                        } else if (err) {
+                            console.error("[refine] " + err);
+                            showStatus(t_refine("cap_refine_failed") + " " + err, "orange");
+                        } else {
+                            report(stats);
+                        }
+                        var corrected = result || summary;
+
+                        // Pass 2 — a SECOND subtitle in another language, placed on
+                        // its own caption track so both appear stacked. Built from
+                        // the corrected text, so the translation inherits the fixes.
+                        if (!opts.secondLang) return proceed(corrected);
+
+                        showProgress(t_refine("cap_dual_working").replace("{lang}", opts.secondLang), 82, false);
+                        setStatus(t_refine("cap_dual_working").replace("{lang}", opts.secondLang));
+                        window.efpRefineCaptions(corrected,
+                            { provider: opts.provider, mode: "translate", targetLang: opts.secondLang },
+                            function() {},
+                            function(err2, translated, stats2) {
+                                if (err2 || !translated) {
+                                    console.error("[refine] second subtitle failed: " + err2);
+                                    showStatus(t_refine("cap_dual_failed"), "orange");
+                                    return proceed(corrected);
+                                }
+                                // Place the translation on caption track 2 first, then
+                                // hand the original back so it lands on track 1.
+                                placeSecondSubtitle(translated, opts.secondLang, function() {
+                                    proceed(corrected);
+                                });
+                            }
+                        );
                     }
-                    next(result || summary);
-                }
-            );
+                );
+            } catch (eRun) {
+                console.error("[refine] crashed: " + eRun.message);
+                showStatus(t_refine("cap_refine_failed"), "orange");
+                proceed(summary);
+            }
+        }
+
+        // Places a translated caption set on the SECOND caption track. Failure here
+        // is non-fatal: the primary subtitle still goes down either way.
+        function placeSecondSubtitle(translatedSummary, langName, done) {
+            try {
+                var cfg2 = {
+                    style: style, animation: "none", font: "Arial",
+                    size: 72, color: "#FFFFFF", highlight: "#FFFFFF",
+                    offsetSecs: 0,
+                    wordsPerCaption: wordsPerCaption, wordsMin: wordsMin, wordsMax: wordsMax,
+                    captionTrackIndex: 1
+                };
+                var cfgStr2 = JSON.stringify(cfg2).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+                var jsonEsc2 = translatedSummary.json.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+                csInterface.evalScript(
+                    '$._editflow.placeAnimatedCaptions("' + jsonEsc2 + '","' + cfgStr2 + '")',
+                    function(res2) {
+                        console.log("[refine] second subtitle (" + langName + "):", res2);
+                        var r2 = safeParse(res2);
+                        if (!r2 || r2.status === "error") {
+                            showStatus(t_refine("cap_dual_track_hint"), "orange");
+                        }
+                        done();
+                    }
+                );
+            } catch (e) {
+                console.error("[refine] placeSecondSubtitle crashed: " + e.message);
+                done();
+            }
         }
         function shq(s) {
             var isWin = (osModule && osModule.platform() === "win32");
@@ -1405,7 +1580,24 @@ document.addEventListener("DOMContentLoaded", function() {
                                 showStatus("Caption error: " + (summary.message || "unknown").slice(0, 120), "red");
                                 return;
                             }
-                            setStatus("Detected " + summary.language + " · " + summary.words + " words · " + summary.segments + " segments");
+                            if (summary.langWarning) {
+                    // The spoken language differed from the one selected. Say so loudly:
+                    // a forced-wrong language yields fluent-looking invented words, not
+                    // an obvious failure, so silence here costs the user a whole pass.
+                    var msg = summary.langWarning;
+                    if (summary.langMismatch) {
+                        var want = LANG_CODE_TO_NAME[summary.langMismatch.requested];
+                        var box = document.getElementById("cap-refine");
+                        if (want && box && box.checked) {
+                            msg += " Translating to " + want + ".";
+                        } else if (want) {
+                            msg += " Tick \u201cRefine with a stronger AI\u201d to translate it to " + want + ".";
+                        }
+                    }
+                    showStatus(msg, "orange");
+                    console.warn("[Captions] " + msg);
+                }
+                setStatus("Detected " + summary.language + " · " + summary.words + " words · " + summary.segments + " segments");
                             console.log("[Captions] placing synced editable captions");
                             showProgress("Syncing captions to timeline…", 75);
                             setStatus("Building timeline-synced captions…");
@@ -1456,6 +1648,23 @@ document.addEventListener("DOMContentLoaded", function() {
                     return;
                 }
 
+                if (summary.langWarning) {
+                    // The spoken language differed from the one selected. Say so loudly:
+                    // a forced-wrong language yields fluent-looking invented words, not
+                    // an obvious failure, so silence here costs the user a whole pass.
+                    var msg = summary.langWarning;
+                    if (summary.langMismatch) {
+                        var want = LANG_CODE_TO_NAME[summary.langMismatch.requested];
+                        var box = document.getElementById("cap-refine");
+                        if (want && box && box.checked) {
+                            msg += " Translating to " + want + ".";
+                        } else if (want) {
+                            msg += " Tick \u201cRefine with a stronger AI\u201d to translate it to " + want + ".";
+                        }
+                    }
+                    showStatus(msg, "orange");
+                    console.warn("[Captions] " + msg);
+                }
                 setStatus("Detected " + summary.language + " · " + summary.words + " words · " + summary.segments + " segments");
 
                 // ── SRT MODE ONLY: generate synced captions directly ──
@@ -2419,7 +2628,7 @@ function loadSettings() {
             if (typeof d.refineProvider === "string") settings.refineProvider = d.refineProvider;
             if (typeof d.refineModel === "string") settings.refineModel = d.refineModel;
             if (typeof d.refineEnabled === "boolean") settings.refineEnabled = d.refineEnabled;
-            if (typeof d.refineMode === "string") settings.refineMode = d.refineMode;
+            if (typeof d.dualSubtitle === "boolean") settings.dualSubtitle = d.dualSubtitle;
             if (typeof d.refineLang === "string") settings.refineLang = d.refineLang;
             if (typeof d.anthropicApiKey === "string") settings.anthropicApiKey = d.anthropicApiKey;
             if (typeof d.openaiApiKey === "string") settings.openaiApiKey = d.openaiApiKey;
@@ -3957,17 +4166,28 @@ function importBlob(blob) {
 // against real Arabic output), proportionally otherwise.
 // =========================================================
 (function() {
-    var BATCH_SIZE = 40;          // segments per API call
+    // Groq's free tier caps at 8,000 tokens per minute — a 40-segment batch blew
+    // straight past it with a 413. 12 keeps each request comfortably inside the
+    // free limit while still being few enough calls to stay fast. Verified.
+    var BATCH_SIZE = 12;          // segments per API call
     var REQ_TIMEOUT = 180000;     // 3 min per call
     // Groq rejects some default client User-Agents with a 403 — send an explicit
     // one rather than relying on whatever the runtime sets. Verified.
     var UA = "EditFlowPro/1.0";
 
+    var PROVIDER_LABELS = { groq: "Groq", anthropic: "Claude", openai: "GPT" };
+
     var PROVIDERS = {
         groq: {
             host: "api.groq.com",
             path: "/openai/v1/chat/completions",
-            defaultModel: "llama-3.3-70b-versatile",
+            // Groq's free-tier catalog rotates fast (llama-3.3-70b-versatile went
+            // 404 mid-session). Model choice here is driven by the free-tier TPM
+            // cap, not just quality: gpt-oss-120b allows only 8,000 tokens/min and
+            // rejected even a single-segment request with a 413, while
+            // compound-mini allows 70,000 and produced an equally clean Arabic
+            // correction + German translation. Verified 2026-08-22.
+            defaultModel: "groq/compound-mini",
             key: function() { return settings.groqApiKey || ""; },
             headers: function(k) { return { "Authorization": "Bearer " + k }; },
             body: function(model, sys, userJson) {
@@ -3980,7 +4200,12 @@ function importBlob(blob) {
                     ]
                 };
             },
-            extract: function(res) { return res.choices[0].message.content; }
+            extract: function(res) { return res.choices[0].message.content; },
+            receipt: function(res) {
+                var u = res.usage || {};
+                return { model: res.model || "?", id: res.id || "?",
+                         tokens: (u.prompt_tokens || 0) + "in/" + (u.completion_tokens || 0) + "out" };
+            }
         },
         openai: {
             host: "api.openai.com",
@@ -3998,7 +4223,12 @@ function importBlob(blob) {
                     ]
                 };
             },
-            extract: function(res) { return res.choices[0].message.content; }
+            extract: function(res) { return res.choices[0].message.content; },
+            receipt: function(res) {
+                var u = res.usage || {};
+                return { model: res.model || "?", id: res.id || "?",
+                         tokens: (u.prompt_tokens || 0) + "in/" + (u.completion_tokens || 0) + "out" };
+            }
         },
         anthropic: {
             host: "api.anthropic.com",
@@ -4047,6 +4277,14 @@ function importBlob(blob) {
                     if (blocks[i].type === "text") return blocks[i].text;
                 }
                 return "";
+            },
+            // The server echoes the model that actually served the request, plus a
+            // request id. Logging it is the only way to prove which provider ran —
+            // the request we SEND proves nothing on its own.
+            receipt: function(res) {
+                var u = res.usage || {};
+                return { model: res.model || "?", id: res.id || "?",
+                         tokens: (u.input_tokens || 0) + "in/" + (u.output_tokens || 0) + "out" };
             }
         }
     };
@@ -4054,9 +4292,18 @@ function importBlob(blob) {
     function buildSystemPrompt(mode, targetLang) {
         var base =
             "You are correcting raw speech-to-text output that will become video subtitles.\n" +
+            "The transcriber is unreliable: it mishears words, invents foreign-looking " +
+            "terms, and produces phrases that are grammatically shaped but meaningless.\n" +
             "Rules:\n" +
             "- Fix transcription errors, spelling, punctuation, and (for Arabic) hamza, " +
             "ta-marbuta and madda.\n" +
+            "- When a segment does not make sense, it is almost always a mishearing, not " +
+            "something the speaker actually said. Use the surrounding segments as context " +
+            "and recover the word that was most likely spoken. A stray foreign or " +
+            "transliterated word in otherwise ordinary Arabic is a classic mishearing — " +
+            "replace it with the Arabic word it was mistaken for.\n" +
+            "- Never translate or carry forward a phrase you know is nonsense. Repair it " +
+            "first; a plausible reading always beats a faithful copy of garbage.\n" +
             "- Preserve the speaker's meaning, tone and dialect. Do not summarise, " +
             "rephrase for style, or add content.\n" +
             "- Keep each segment's word count as close to the original as possible. " +
@@ -4099,6 +4346,11 @@ function importBlob(blob) {
                         var errJson = JSON.parse(body);
                         if (errJson.error && errJson.error.message) detail = errJson.error.message;
                     } catch (e2) {}
+                    // A quota/size rejection is not a bug — say so plainly so the
+                    // user reaches for a different engine instead of filing it as one.
+                    if (res.statusCode === 413 || res.statusCode === 429) {
+                        return cb("RATE_LIMIT:" + detail);
+                    }
                     return cb("HTTP " + res.statusCode + ": " + detail);
                 }
                 var parsed;
@@ -4183,6 +4435,7 @@ function importBlob(blob) {
         var sys = buildSystemPrompt(opts.mode, opts.targetLang);
         var batches = chunk(segments, BATCH_SIZE);
         var done = 0, failed = null;
+        var serverReceipt = null;   // what the provider's server reported back
         var results = {};   // original index -> corrected text
 
         function runBatch(bi) {
@@ -4197,6 +4450,15 @@ function importBlob(blob) {
 
             httpJson(provider, apiKey, provider.body(model, sys, userJson), function(err, res) {
                 if (err) { failed = err; return finish(); }
+                // Record what the SERVER said served this call, not what we asked for.
+                try {
+                    if (provider.receipt) {
+                        var rc = provider.receipt(res);
+                        serverReceipt = rc;
+                        console.log("[refine] SERVER RECEIPT · host=" + provider.host +
+                                    " · model=" + rc.model + " · id=" + rc.id + " · tokens=" + rc.tokens);
+                    }
+                } catch (eRc) {}
                 var raw = "";
                 try { raw = provider.extract(res); } catch (e) { failed = "Unexpected provider response"; return finish(); }
                 var parsed;
@@ -4222,6 +4484,11 @@ function importBlob(blob) {
 
         function finish() {
             if (failed) return cb(failed, summary);
+            // Prefer the server-reported model over the one we requested — if these
+            // ever disagree, that disagreement is exactly what you want surfaced.
+            var servedModel = (serverReceipt && serverReceipt.model) ? serverReceipt.model : model;
+            var usedLabel = (PROVIDER_LABELS[opts.provider] || opts.provider) + " (" + servedModel + ")";
+            if (serverReceipt) usedLabel += " · " + serverReceipt.tokens;
 
             var changed = 0, exactTiming = 0;
             for (var i = 0; i < segments.length; i++) {
@@ -4239,7 +4506,7 @@ function importBlob(blob) {
             var refined = {};
             for (var k in summary) { if (summary.hasOwnProperty(k)) refined[k] = summary[k]; }
             refined.json = JSON.stringify(doc);
-            cb(null, refined, { changed: changed, total: segments.length });
+            cb(null, refined, { changed: changed, total: segments.length, provider: usedLabel });
         }
 
         runBatch(0);
@@ -4251,32 +4518,48 @@ function importBlob(blob) {
     // language only in translate mode, and only the selected provider's key field.
     window.efpSyncRefineUI = function() {
         var box = el2("cap-refine"), row = el2("cap-refine-row"), hint = el2("cap-refine-hint");
-        var modeEl = el2("cap-refine-mode"), langEl = el2("cap-refine-lang");
+        var dualEl = el2("cap-dual"), langEl = el2("cap-refine-lang");
         var on = !!(box && box.checked);
         if (row) row.style.display = on ? "flex" : "none";
+        var provRow = el2("cap-refine-provider-row");
+        if (provRow) provRow.style.display = on ? "flex" : "none";
         if (hint) hint.style.display = on ? "block" : "none";
-        if (langEl) langEl.style.display = (on && modeEl && modeEl.value === "translate") ? "" : "none";
+        // The language picker only makes sense once a second subtitle is requested.
+        if (langEl) langEl.style.display = (on && dualEl && dualEl.checked) ? "" : "none";
 
         var prov = el2("cfg-refine-provider");
         var pv = prov ? prov.value : (settings.refineProvider || "groq");
         var aRow = el2("cfg-anthropic-row"), oRow = el2("cfg-openai-row");
         if (aRow) aRow.style.display = (pv === "anthropic") ? "block" : "none";
         if (oRow) oRow.style.display = (pv === "openai") ? "block" : "none";
+        var mainProv = el2("cap-refine-provider");
+        if (mainProv && mainProv.value !== pv) mainProv.value = pv;
     };
 
     function initRefineUI() {
-        var box = el2("cap-refine"), modeEl = el2("cap-refine-mode"), langEl = el2("cap-refine-lang");
+        var box = el2("cap-refine"), dualEl = el2("cap-dual"), langEl = el2("cap-refine-lang");
+        var mainProvEl = el2("cap-refine-provider");
         if (!box) return;
 
         box.checked = settings.refineEnabled === true;
-        if (modeEl) modeEl.value = settings.refineMode || "fix";
+        if (dualEl) dualEl.checked = settings.dualSubtitle === true;
         if (langEl) langEl.value = settings.refineLang || "English";
+        if (mainProvEl) mainProvEl.value = settings.refineProvider || "groq";
+
+        if (mainProvEl) mainProvEl.addEventListener("change", function() {
+            settings.refineProvider = mainProvEl.value; saveSettings();
+            // Keep the Settings-panel dropdown in sync so both controls always
+            // agree — the split between them is the exact bug this fixes.
+            var settingsProvEl = el2("cfg-refine-provider");
+            if (settingsProvEl) settingsProvEl.value = mainProvEl.value;
+            window.efpSyncRefineUI();
+        });
 
         box.addEventListener("change", function() {
             settings.refineEnabled = box.checked; saveSettings(); window.efpSyncRefineUI();
         });
-        if (modeEl) modeEl.addEventListener("change", function() {
-            settings.refineMode = modeEl.value; saveSettings(); window.efpSyncRefineUI();
+        if (dualEl) dualEl.addEventListener("change", function() {
+            settings.dualSubtitle = dualEl.checked; saveSettings(); window.efpSyncRefineUI();
         });
         if (langEl) langEl.addEventListener("change", function() {
             settings.refineLang = langEl.value; saveSettings();
@@ -4298,13 +4581,24 @@ function importBlob(blob) {
     window.efpRefineOptions = function() {
         var box = document.getElementById("cap-refine");
         if (!box || !box.checked) return null;
-        var modeEl = document.getElementById("cap-refine-mode");
+        var dualEl = document.getElementById("cap-dual");
         var langEl = document.getElementById("cap-refine-lang");
-        var mode = modeEl ? modeEl.value : "fix";
+        var provEl = el2("cap-refine-provider");
+        var provider = (provEl && provEl.value) ? provEl.value : (settings.refineProvider || "groq");
+        var wantsSecond = !!(dualEl && dualEl.checked && langEl);
+        // "Spoken" tells Whisper what language to LISTEN for; it is not an output
+        // choice. Translating the main subtitle is a separate, explicit request —
+        // conflating the two silently gave the user the spoken language back and
+        // looked like the setting was ignored.
         return {
-            provider: settings.refineProvider || "groq",
-            mode: mode,
-            targetLang: (mode === "translate" && langEl) ? langEl.options[langEl.selectedIndex].text : ""
+            provider: provider,
+            // The output language is decided by the "Spoken" dropdown alone (see the
+            // rule in withRefinement): pick the spoken language for a transcript,
+            // pick a different one for a translation. A separate "translate into"
+            // control duplicated that exactly, so it was removed.
+            mode: "fix",
+            targetLang: "",
+            secondLang: wantsSecond ? langEl.options[langEl.selectedIndex].text : ""
         };
     };
 })();

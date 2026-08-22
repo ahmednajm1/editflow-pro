@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>EditFlow Pro</title>
-    <link rel="stylesheet" href="css/style.css?v=52">
+    <link rel="stylesheet" href="css/style.css?v=53">
     <script src="js/CSInterface.js"></script>
 </head>
 <body>
@@ -102,14 +102,41 @@
                     <label data-i18n="cfg_cap_lang">Default Language</label>
                     <div class="settings-row">
                         <select id="cfg-cap-language" style="flex:1;">
-                            <option value="auto">Auto-detect</option>
+                            <option value="auto" selected>Auto-detect</option>
                             <option value="ar">Arabic</option>
                             <option value="en">English</option>
                             <option value="es">Spanish</option>
                             <option value="fr">French</option>
                             <option value="de">German</option>
+                            <option value="it">Italian</option>
+                            <option value="pt">Portuguese</option>
+                            <option value="nl">Dutch</option>
+                            <option value="ru">Russian</option>
+                            <option value="pl">Polish</option>
+                            <option value="uk">Ukrainian</option>
                             <option value="tr">Turkish</option>
+                            <option value="fa">Persian</option>
+                            <option value="he">Hebrew</option>
+                            <option value="ur">Urdu</option>
+                            <option value="hi">Hindi</option>
+                            <option value="bn">Bengali</option>
+                            <option value="ta">Tamil</option>
+                            <option value="id">Indonesian</option>
+                            <option value="ms">Malay</option>
+                            <option value="vi">Vietnamese</option>
+                            <option value="th">Thai</option>
+                            <option value="zh">Chinese</option>
                             <option value="ja">Japanese</option>
+                            <option value="ko">Korean</option>
+                            <option value="sv">Swedish</option>
+                            <option value="da">Danish</option>
+                            <option value="no">Norwegian</option>
+                            <option value="fi">Finnish</option>
+                            <option value="cs">Czech</option>
+                            <option value="el">Greek</option>
+                            <option value="ro">Romanian</option>
+                            <option value="hu">Hungarian</option>
+                            <option value="sw">Swahili</option>
                         </select>
                     </div>
 
@@ -126,7 +153,7 @@
                         <select id="cfg-cap-style" style="flex:1;">
                             <option value="word">Word-by-word</option>
                             <option value="phrase">Short phrases</option>
-                            <option value="line">Full lines</option>
+                            <option value="line">Full Sentence</option>
                         </select>
                     </div>
 
@@ -626,7 +653,7 @@
             <p class="description" data-i18n="captions_desc">Lightning-fast, studio-grade transcription. Auto-detect any language and get perfectly synced editable subtitles in seconds.</p>
 
             <div class="input-row">
-                <span style="font-size:10px; color:var(--text-mute); width:42px;" data-i18n="cap_lang">Lang</span>
+                <span style="font-size:10px; color:var(--text-mute); width:42px;" data-i18n="cap_lang" title="The language SPOKEN in the video">Spoken</span>
                 <select id="cap-language" style="flex:1;">
                     <option value="auto" selected>Auto-detect</option>
                     <option value="ar">Arabic</option>
@@ -636,20 +663,40 @@
                     <option value="de">German</option>
                     <option value="it">Italian</option>
                     <option value="pt">Portuguese</option>
-                    <option value="tr">Turkish</option>
+                    <option value="nl">Dutch</option>
                     <option value="ru">Russian</option>
+                    <option value="pl">Polish</option>
+                    <option value="uk">Ukrainian</option>
+                    <option value="tr">Turkish</option>
+                    <option value="fa">Persian</option>
+                    <option value="he">Hebrew</option>
+                    <option value="ur">Urdu</option>
+                    <option value="hi">Hindi</option>
+                    <option value="bn">Bengali</option>
+                    <option value="ta">Tamil</option>
+                    <option value="id">Indonesian</option>
+                    <option value="ms">Malay</option>
+                    <option value="vi">Vietnamese</option>
+                    <option value="th">Thai</option>
+                    <option value="zh">Chinese</option>
                     <option value="ja">Japanese</option>
                     <option value="ko">Korean</option>
-                    <option value="zh">Chinese</option>
-                    <option value="hi">Hindi</option>
-                    <option value="ur">Urdu</option>
+                    <option value="sv">Swedish</option>
+                    <option value="da">Danish</option>
+                    <option value="no">Norwegian</option>
+                    <option value="fi">Finnish</option>
+                    <option value="cs">Czech</option>
+                    <option value="el">Greek</option>
+                    <option value="ro">Romanian</option>
+                    <option value="hu">Hungarian</option>
+                    <option value="sw">Swahili</option>
                 </select>
                 
                 <span style="font-size:10px; color:var(--text-mute); width:42px;" data-i18n="cap_style">Style</span>
                 <select id="cap-style" style="flex:1;">
                     <option value="word">Word-by-word</option>
                     <option value="phrase" selected>Short phrases</option>
-                    <option value="line">Full lines</option>
+                    <option value="line">Full Sentence</option>
                 </select>
 
                 <!-- Hidden Accuracy input to keep JS from breaking -->
@@ -670,21 +717,53 @@
                 <span data-i18n="cap_refine">Refine with a stronger AI</span>
             </label>
             <div class="input-row" id="cap-refine-row" style="display:none; margin-top:4px;">
-                <select id="cap-refine-mode" style="flex:1;">
-                    <option value="fix" data-i18n="cap_refine_fix">Fix errors and wording</option>
-                    <option value="translate" data-i18n="cap_refine_translate">Fix, then translate to…</option>
-                </select>
+                <label class="checkbox-label" style="margin:0; flex:1;">
+                    <input type="checkbox" id="cap-dual">
+                    <span data-i18n="cap_dual">Also add a second subtitle in</span>
+                </label>
                 <select id="cap-refine-lang" style="flex:1; display:none;">
                     <option value="Arabic">العربية</option>
                     <option value="English" selected>English</option>
                     <option value="Spanish">Español</option>
                     <option value="French">Français</option>
                     <option value="German">Deutsch</option>
+                    <option value="Italian">Italiano</option>
+                    <option value="Portuguese">Português</option>
+                    <option value="Dutch">Nederlands</option>
+                    <option value="Russian">Русский</option>
+                    <option value="Polish">Polski</option>
+                    <option value="Ukrainian">Українська</option>
                     <option value="Turkish">Türkçe</option>
-                    <option value="Hindi">हिन्दी</option>
+                    <option value="Persian">فارسی</option>
+                    <option value="Hebrew">עברית</option>
                     <option value="Urdu">اردو</option>
+                    <option value="Hindi">हिन्दी</option>
+                    <option value="Bengali">বাংলা</option>
+                    <option value="Tamil">தமிழ்</option>
+                    <option value="Indonesian">Indonesia</option>
+                    <option value="Malay">Melayu</option>
+                    <option value="Vietnamese">Tiếng Việt</option>
+                    <option value="Thai">ไทย</option>
                     <option value="Chinese">中文</option>
                     <option value="Japanese">日本語</option>
+                    <option value="Korean">한국어</option>
+                    <option value="Swedish">Svenska</option>
+                    <option value="Danish">Dansk</option>
+                    <option value="Norwegian">Norsk</option>
+                    <option value="Finnish">Suomi</option>
+                    <option value="Czech">Čeština</option>
+                    <option value="Greek">Ελληνικά</option>
+                    <option value="Romanian">Română</option>
+                    <option value="Hungarian">Magyar</option>
+                    <option value="Swahili">Kiswahili</option>
+                </select>
+            </div>
+            <div class="input-row" id="cap-refine-provider-row" style="display:none; margin-top:4px;">
+                <span style="font-size:10px; color:var(--text-mute); width:52px;" data-i18n="cap_refine_provider">Engine</span>
+                <select id="cap-refine-provider" style="flex:1;">
+                    <option value="groq" data-i18n="cfg_refine_groq">Groq · free (uses the key above)</option>
+                    <option value="anthropic" data-i18n="cfg_refine_claude">Claude · best for Arabic</option>
+                    <option value="openai" data-i18n="cfg_refine_gpt">GPT</option>
                 </select>
             </div>
             <p id="cap-refine-hint" style="display:none; font-size:10px; color:var(--text-mute); margin:4px 0 0;" data-i18n="cap_refine_hint">Timings are preserved. Set the provider under Settings → Captions.</p>
@@ -764,7 +843,7 @@
     <div id="licenseOverlay" class="license-overlay hidden"></div>
 
     <script src="js/dspTools.js"></script>
-    <script src="js/main.js?v=52"></script>
-    <script src="js/license.js?v=52"></script>
+    <script src="js/main.js?v=53"></script>
+    <script src="js/license.js?v=53"></script>
 </body>
 </html>

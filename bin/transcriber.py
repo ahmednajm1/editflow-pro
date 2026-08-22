@@ -171,6 +171,136 @@ def groq_call(path, api_key, language, _attempt=1):
         raise Exception(f"Groq request failed: {str(e)}")
 
 
+def detect_language(ffmpeg, mp3, api_key):
+    """Probe the real spoken language from a short sample.
+
+    Forcing the wrong `language` is far more damaging than leaving it unset:
+    Whisper will dutifully render the audio in the requested script, producing
+    fluent-looking nonsense (German speech written in Arabic letters gave us
+    "الديسكورس" for Diskurs and "جروبات" for Gruppen). A 60s probe costs one
+    cheap call and removes that entire failure mode.
+    """
+    probe = None
+    try:
+        base, ext = os.path.splitext(mp3)
+        probe = f"{base}_probe{ext}"
+        subprocess.run([ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
+                        "-i", mp3, "-t", "60", "-c", "copy", probe], check=True)
+        res = groq_call(probe, api_key, "auto")   # "auto" omits the language field
+        return (res.get("language") or "").strip().lower()
+    except Exception as e:
+        log(f"language probe failed ({e}); continuing without it")
+        return ""
+    finally:
+        if probe and os.path.exists(probe):
+            try: os.unlink(probe)
+            except Exception: pass
+
+
+# Whisper reports languages by English name; map the ones we expose to their codes.
+LANG_NAME_TO_CODE = {
+    "afrikaans": "af",
+    "amharic": "am",
+    "arabic": "ar",
+    "assamese": "as",
+    "azerbaijani": "az",
+    "bashkir": "ba",
+    "belarusian": "be",
+    "bulgarian": "bg",
+    "bengali": "bn",
+    "tibetan": "bo",
+    "breton": "br",
+    "bosnian": "bs",
+    "catalan": "ca",
+    "czech": "cs",
+    "welsh": "cy",
+    "danish": "da",
+    "german": "de",
+    "greek": "el",
+    "english": "en",
+    "spanish": "es",
+    "estonian": "et",
+    "basque": "eu",
+    "persian": "fa",
+    "finnish": "fi",
+    "faroese": "fo",
+    "french": "fr",
+    "galician": "gl",
+    "gujarati": "gu",
+    "hausa": "ha",
+    "hawaiian": "haw",
+    "hebrew": "he",
+    "hindi": "hi",
+    "croatian": "hr",
+    "haitian creole": "ht",
+    "hungarian": "hu",
+    "armenian": "hy",
+    "indonesian": "id",
+    "icelandic": "is",
+    "italian": "it",
+    "japanese": "ja",
+    "javanese": "jw",
+    "georgian": "ka",
+    "kazakh": "kk",
+    "khmer": "km",
+    "kannada": "kn",
+    "korean": "ko",
+    "latin": "la",
+    "luxembourgish": "lb",
+    "lingala": "ln",
+    "lao": "lo",
+    "lithuanian": "lt",
+    "latvian": "lv",
+    "malagasy": "mg",
+    "maori": "mi",
+    "macedonian": "mk",
+    "malayalam": "ml",
+    "mongolian": "mn",
+    "marathi": "mr",
+    "malay": "ms",
+    "maltese": "mt",
+    "myanmar": "my",
+    "nepali": "ne",
+    "dutch": "nl",
+    "nynorsk": "nn",
+    "norwegian": "no",
+    "occitan": "oc",
+    "punjabi": "pa",
+    "polish": "pl",
+    "pashto": "ps",
+    "portuguese": "pt",
+    "romanian": "ro",
+    "russian": "ru",
+    "sanskrit": "sa",
+    "sindhi": "sd",
+    "sinhala": "si",
+    "slovak": "sk",
+    "slovenian": "sl",
+    "shona": "sn",
+    "somali": "so",
+    "albanian": "sq",
+    "serbian": "sr",
+    "sundanese": "su",
+    "swedish": "sv",
+    "swahili": "sw",
+    "tamil": "ta",
+    "telugu": "te",
+    "tajik": "tg",
+    "thai": "th",
+    "turkmen": "tk",
+    "tagalog": "tl",
+    "turkish": "tr",
+    "tatar": "tt",
+    "ukrainian": "uk",
+    "urdu": "ur",
+    "uzbek": "uz",
+    "vietnamese": "vi",
+    "yiddish": "yi",
+    "yoruba": "yo",
+    "chinese": "zh",
+}
+
+
 def transcribe(ffmpeg, mp3, api_key, language):
     is_english = (language == "en")
     dur = audio_duration(ffmpeg, mp3)
@@ -306,8 +436,37 @@ def main():
     try: extract_audio(ffmpeg, args.input, mp3, args.start, args.end)
     except subprocess.CalledProcessError: err("Audio extraction failed")
 
+    # Verify the requested language against what is actually spoken. Forcing the
+    # wrong one makes Whisper transliterate rather than fail, which reads as a
+    # working transcript full of invented words — the worst kind of silent error.
+    effective_lang = args.lang
+    lang_warning = ""
+    lang_mismatch = None
+    detected_code = ""
+    detected_name = ""
+    if args.lang and args.lang != "auto":
+        detected_name = detect_language(ffmpeg, mp3, api_key)
+        detected_code = LANG_NAME_TO_CODE.get(detected_name, "")
+        if not detected_code:
+            # The probe could not identify the audio. Forcing the requested language
+            # here is the dangerous option: Whisper would transliterate rather than
+            # fail, and downstream we could no longer tell the requested language
+            # apart from the spoken one. Let Whisper decide instead.
+            effective_lang = "auto"
+            log("language probe inconclusive → transcribing with auto-detect")
+        elif detected_code != args.lang:
+            # Transcribe in the language actually spoken — forcing the requested one
+            # makes Whisper transliterate and invent words. But the user picked their
+            # language for a reason, so report the mismatch with BOTH codes: the panel
+            # turns this into an automatic translation into what they asked for.
+            effective_lang = detected_code
+            lang_warning = (f"Audio is {detected_name.title()}, not the selected language.")
+            lang_mismatch = {"detected": detected_code, "detectedName": detected_name.title(),
+                             "requested": args.lang}
+            log(f"LANGUAGE MISMATCH: requested={args.lang} detected={detected_code} → using detected")
+
     try:
-        results = transcribe(ffmpeg, mp3, api_key, args.lang)
+        results = transcribe(ffmpeg, mp3, api_key, effective_lang)
     except Exception as e:
         err(str(e))
     finally:
@@ -319,7 +478,10 @@ def main():
     total_words = sum(len(s.get("words",[])) for s in segs)
 
     json.dump({"status": "success", "segments": len(segs), "words": total_words,
-               "language": lang, "duration": dur,
+               "language": lang, "duration": dur, "langWarning": lang_warning,
+               "langMismatch": lang_mismatch,
+               "requestedLang": args.lang, "detectedLang": detected_code or "",
+               "detectedName": detected_name.title() if detected_name else "",
                "json": json_path, "srt": srt_path}, sys.stdout, ensure_ascii=False)
 
 
