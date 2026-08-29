@@ -4,7 +4,7 @@ transcriber.py — EditFlow Pro
 Cloud transcription via Groq Whisper API (whisper-large-v3).
 No local model. Works on any machine with internet.
 """
-import sys, os, json, argparse, subprocess, shutil, math
+import sys, os, json, argparse, subprocess, shutil, math, re
 
 import platform
 if platform.system() == "Windows":
@@ -345,7 +345,8 @@ def build_efp(results, out_base):
         lang = r.get("language", lang) or lang
         dur  = max(dur, r.get("duration") or 0)
         words = r.get("words") or []
-        for g in (r.get("segments") or []):
+        groups = r.get("segments") or []
+        for gi, g in enumerate(groups):
             gs, ge = g.get("start",0), g.get("end",0)
             raw_wlist = [{"start": round(w["start"],3), "end": round(w["end"],3),
                        "text": w.get("word","").strip()}
@@ -382,8 +383,33 @@ def build_efp(results, out_base):
                 word_count = len(g.get("text","").split())
                 if word_count <= 3 and (ge - gs) > 8.0:
                     ge = actual_end
+            # Some Whisper/Groq responses contain a segment with an empty `text`
+            # field even though its timestamped word list contains real speech.
+            # Preserve that speech at the top level too, otherwise downstream AI
+            # refinement receives an empty string and leaves this interval in the
+            # source language.
+            segment_text = g.get("text", "").strip()
+            if not segment_text and w_list:
+                fallback_words = [w["text"] for w in w_list if w.get("text")]
+                # Overlapping Whisper boundaries can assign the first word of the
+                # next segment to this word list too. Strip a short suffix/prefix
+                # overlap so "جوب" + "جوب سنتر" does not become "Job Jobcenter".
+                next_text = (groups[gi + 1].get("text", "").strip()
+                             if gi + 1 < len(groups) else "")
+                next_words = next_text.split()
+                def token_key(token):
+                    return re.sub(r'^[\s.,!?;:\u060c\u061b\u061f\"\'()\[\]{}-]+|'
+                                  r'[\s.,!?;:\u060c\u061b\u061f\"\'()\[\]{}-]+$',
+                                  '', token.lower())
+                for overlap in range(min(3, len(fallback_words), len(next_words)), 0, -1):
+                    tail = [token_key(x) for x in fallback_words[-overlap:]]
+                    head = [token_key(x) for x in next_words[:overlap]]
+                    if all(tail) and tail == head:
+                        del fallback_words[-overlap:]
+                        break
+                segment_text = " ".join(fallback_words)
             segs.append({"start": round(gs,3), "end": round(ge,3),
-                         "text": g.get("text","").strip(), "words": w_list})
+                         "text": segment_text, "words": w_list})
     path = out_base + ".efp.json"
     with open(path, "w", encoding="utf-8") as f:
         json.dump({"language": lang, "duration": round(dur,3), "segments": segs},

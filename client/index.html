@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>EditFlow Pro</title>
-    <link rel="stylesheet" href="css/style.css?v=53">
+    <link rel="stylesheet" href="css/style.css?v=63">
     <script src="js/CSInterface.js"></script>
 </head>
 <body>
@@ -298,6 +298,26 @@
         </div>
     </div>
 
+    <!-- Focused pre-render review. The exported alpha MOV remains a video clip;
+         text is edited here while exact caption timings are still available. -->
+    <div id="cap-editor-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="cap-editor-title">
+        <div class="modal-content cap-editor-content">
+            <div class="cap-editor-header">
+                <div>
+                    <h2 id="cap-editor-title" data-i18n="cap_editor_title">Review animated captions</h2>
+                    <p data-i18n="cap_editor_hint">Timing is preserved. If the word count changes, timing is redistributed inside that caption.</p>
+                </div>
+                <span id="cap-editor-count" class="cap-editor-count"></span>
+            </div>
+            <div id="cap-editor-list" class="cap-editor-list"></div>
+            <p id="cap-editor-error" class="cap-editor-error" role="alert"></p>
+            <div class="modal-actions cap-editor-actions">
+                <button type="button" id="btn-cap-editor-cancel" class="secondary" data-i18n="btn_cancel">Cancel</button>
+                <button type="button" id="btn-cap-editor-render" class="primary" data-i18n="cap_editor_render">Apply edits &amp; render</button>
+            </div>
+        </div>
+    </div>
+
     <!-- WELCOME MODAL -->
     <div id="welcome-modal" class="modal-overlay hidden">
         <div class="modal-content welcome-content">
@@ -416,39 +436,7 @@
 
     <div class="panel-content">
 
-        <!-- 1. AUDIO LEVEL -->
-        <div class="action-group">
-            <h3>
-                <span class="icon"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></span>
-                <span data-i18n="audio_title">Audio Level</span>
-            </h3>
-            <p class="description" data-i18n="audio_desc">Select an audio clip → Nudge ±1 dB or set a quick preset level.</p>
-
-            <div class="audio-wave-indicator" aria-hidden="true">
-                <span class="wave-bar"></span>
-                <span class="wave-bar"></span>
-                <span class="wave-bar"></span>
-                <span class="wave-bar"></span>
-                <span class="wave-bar"></span>
-            </div>
-
-            <div class="input-row" style="gap: 12px; margin-bottom: 20px;">
-                <button id="btn-audio-down" title="Decrease 1 dB" style="border-radius: 6px; padding: 12px 0; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.2s;"><span data-i18n="audio_down" style="font-weight: 500; color: var(--danger); font-size: 13px;">▼ −1 dB</span></button>
-                <button id="btn-audio-up"   title="Increase 1 dB" style="border-radius: 6px; padding: 12px 0; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.2s;"><span data-i18n="audio_up" style="font-weight: 500; color: var(--success); font-size: 13px;">▲ +1 dB</span></button>
-            </div>
-
-            <!-- Quick Audio Levels -->
-            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 24px;">
-                <span class="preset-label" data-i18n="audio_quick" style="opacity: 0.5; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px;">Quick Presets</span>
-                <div class="preset-chips" id="audio-quick-chips">
-                    <button class="chip audio-level-chip" data-db="-6"  data-tooltip="Voice / Dialogue standard (-6 dB)">🎙 <span data-i18n="audio_voice">Voice</span></button>
-                    <button class="chip audio-level-chip" data-db="-12" data-tooltip="Sound effects level (-12 dB)">🔊 <span data-i18n="audio_sfx">SFX</span></button>
-                    <button class="chip audio-level-chip" data-db="-25" data-tooltip="Background music level (-25 dB)">🎵 <span data-i18n="audio_bgm">BGM</span></button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 2. TRANSFORM & TOOLS (UNIFIED) -->
+        <!-- 1. TRANSFORM & TOOLS (UNIFIED) -->
         <div class="transform-section" style="margin-top:12px; margin-bottom:12px;">
             <div class="section-header">
                 <span class="section-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></span>
@@ -512,6 +500,22 @@
                 <button class="btn-tool tool-chip" id="btn-fit-frame" data-i18n-title="transform_fit_tip" title="Scale clip to fit inside the sequence frame">⊞ <span data-i18n="transform_fit">Fit</span></button>
                 <button class="btn-tool tool-chip" id="btn-center-anchor" data-i18n-title="transform_anchor_tip" title="Reset anchor point to center of frame">◎ <span data-i18n="transform_anchor">Anchor</span></button>
             </div>
+        </div>
+
+        <!-- 2. SYNC PREP — keeps multi-source syncing clean and reversible -->
+        <div class="action-group sync-prep-group">
+            <h3>
+                <span class="icon"><svg viewBox="0 0 24 24"><path d="M7 7h11"/><path d="M7 17h11"/><circle cx="5" cy="7" r="1.5"/><circle cx="5" cy="17" r="1.5"/><path d="M13 4v16"/><path d="m10 10 3 3 3-3"/></svg></span>
+                <span data-i18n="sync_prep_title">Sync Prep</span>
+            </h3>
+            <p class="description" data-i18n="sync_prep_desc">Select the clips you want to sync. Each selected video/audio clip moves to its own lane at the same time.</p>
+            <div class="sync-prep-flow" aria-hidden="true">
+                <span data-i18n="sync_prep_select">Select clips</span><i></i><span data-i18n="sync_prep_separate">Separate lanes</span><i></i><span data-i18n="sync_prep_synchronize">Synchronize</span>
+            </div>
+            <button id="btn-sync-prep" class="sync-prep-primary" data-i18n="sync_prep_prepare">Prepare Sync Lanes</button>
+            <button id="btn-sync-prep-undo" class="secondary sync-prep-undo" data-i18n="sync_prep_undo">Undo last prep</button>
+            <p class="sync-prep-safe" data-i18n="sync_prep_safe">Only selected clips move. Nothing is trimmed, duplicated or deleted.</p>
+            <p id="sync-prep-status" class="sync-prep-status" aria-live="polite"></p>
         </div>
 
         <!-- 3. SFX LIBRARY — 1-Click Sound Effects -->
@@ -768,6 +772,108 @@
             </div>
             <p id="cap-refine-hint" style="display:none; font-size:10px; color:var(--text-mute); margin:4px 0 0;" data-i18n="cap_refine_hint">Timings are preserved. Set the provider under Settings → Captions.</p>
 
+            <!-- Optional pre-rendered animated captions. The normal editable-caption
+                 path remains the default and is untouched when this is disabled. -->
+            <label class="checkbox-label cap-animated-toggle" style="margin-top:8px;">
+                <input type="checkbox" id="cap-animated">
+                <span data-i18n="cap_animated">Animated caption styles</span>
+                <span class="cap-beta-badge">BETA</span>
+            </label>
+            <div id="cap-animated-options" class="cap-animated-options" style="display:none;">
+                <div class="cap-style-heading">
+                    <span data-i18n="cap_choose_style">Choose a style</span>
+                    <span data-i18n="cap_choose_style_hint">Click once — the look is ready</span>
+                </div>
+                <div class="cap-style-grid" role="radiogroup" aria-label="Animated caption style">
+                    <button type="button" class="cap-style-card selected" data-cap-preset="clean-film" role="radio" aria-checked="true">
+                        <span class="cap-style-check" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.2 8.4 6.5 11.5 12.8 4.8"/></svg></span>
+                        <span class="cap-style-preview cap-preview-clean"><span>Clean film caption</span></span>
+                        <span class="cap-style-name" data-i18n="cap_style_clean">Clean Film</span>
+                    </button>
+                    <button type="button" class="cap-style-card" data-cap-preset="viral-pop" role="radio" aria-checked="false">
+                        <span class="cap-style-check" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.2 8.4 6.5 11.5 12.8 4.8"/></svg></span>
+                        <span class="cap-style-preview cap-preview-pop"><b>TIKTOK</b> POP</span>
+                        <span class="cap-style-name" data-i18n="cap_style_pop">TikTok Pop</span>
+                    </button>
+                    <button type="button" class="cap-style-card" data-cap-preset="reels-cyan" role="radio" aria-checked="false">
+                        <span class="cap-style-check" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.2 8.4 6.5 11.5 12.8 4.8"/></svg></span>
+                        <span class="cap-style-preview cap-preview-reels">REELS <b>FLOW</b></span>
+                        <span class="cap-style-name" data-i18n="cap_style_reels">Reels Cyan</span>
+                    </button>
+                    <button type="button" class="cap-style-card" data-cap-preset="yellow-box" role="radio" aria-checked="false">
+                        <span class="cap-style-check" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.2 8.4 6.5 11.5 12.8 4.8"/></svg></span>
+                        <span class="cap-style-preview cap-preview-box">BOLD <b>BOX</b></span>
+                        <span class="cap-style-name" data-i18n="cap_style_box">Yellow Box</span>
+                    </button>
+                    <button type="button" class="cap-style-card" data-cap-preset="karaoke-build" role="radio" aria-checked="false">
+                        <span class="cap-style-check" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.2 8.4 6.5 11.5 12.8 4.8"/></svg></span>
+                        <span class="cap-style-preview cap-preview-karaoke"><span>BUILD</span> <b>WORD</b> <i>NEXT</i></span>
+                        <span class="cap-style-name" data-i18n="cap_style_karaoke">Karaoke Build</span>
+                    </button>
+                    <button type="button" class="cap-style-card" data-cap-preset="focus-word" role="radio" aria-checked="false">
+                        <span class="cap-style-check" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.2 8.4 6.5 11.5 12.8 4.8"/></svg></span>
+                        <span class="cap-style-preview cap-preview-focus">FOCUS</span>
+                        <span class="cap-style-name" data-i18n="cap_style_focus">One Word</span>
+                    </button>
+                    <button type="button" class="cap-style-card" data-cap-preset="drop-bounce" role="radio" aria-checked="false">
+                        <span class="cap-style-check" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.2 8.4 6.5 11.5 12.8 4.8"/></svg></span>
+                        <span class="cap-style-preview cap-preview-drop">DROP DOWN</span>
+                        <span class="cap-style-name" data-i18n="cap_style_drop">Drop Bounce</span>
+                    </button>
+                    <button type="button" class="cap-style-card" data-cap-preset="neon-karaoke" role="radio" aria-checked="false">
+                        <span class="cap-style-check" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.2 8.4 6.5 11.5 12.8 4.8"/></svg></span>
+                        <span class="cap-style-preview cap-preview-neon">NEON FLOW</span>
+                        <span class="cap-style-name" data-i18n="cap_style_neon">Neon Glow</span>
+                    </button>
+                </div>
+                <input type="hidden" id="cap-animated-preset" value="clean-film">
+                <details class="cap-customizer" id="cap-customizer-details">
+                    <summary>
+                        <span data-i18n="cap_customize">Fine tune</span>
+                        <span data-i18n="cap_customize_hint">Optional</span>
+                    </summary>
+                    <div class="cap-control-grid">
+                        <label class="cap-control cap-control-wide">
+                            <span data-i18n="cap_font">Font</span>
+                            <input type="text" id="cap-animated-font" value="" list="cap-animated-font-list" maxlength="80" autocomplete="off" data-i18n-placeholder="cap_font_preset" placeholder="Use preset font">
+                            <datalist id="cap-animated-font-list">
+                                <option value="Arial"></option><option value="Arial Black"></option>
+                                <option value="Helvetica Neue"></option><option value="Inter"></option>
+                                <option value="Montserrat"></option><option value="Poppins"></option>
+                                <option value="Bebas Neue"></option><option value="Noto Sans Arabic"></option>
+                            </datalist>
+                        </label>
+                        <label class="cap-control">
+                            <span><span data-i18n="cap_size">Size</span> <output id="cap-animated-size-value">100%</output></span>
+                            <input type="range" id="cap-animated-size" min="60" max="150" step="5" value="100">
+                        </label>
+                        <label class="cap-control">
+                            <span data-i18n="cap_position">Position</span>
+                            <select id="cap-animated-position">
+                                <option value="preset" data-i18n="cap_position_preset">Preset position</option>
+                                <option value="low" data-i18n="cap_position_low">Low</option>
+                                <option value="middle" data-i18n="cap_position_middle">Middle</option>
+                                <option value="high" data-i18n="cap_position_high">High</option>
+                            </select>
+                        </label>
+                        <label class="cap-control">
+                            <span data-i18n="cap_background">Background</span>
+                            <select id="cap-animated-background-mode">
+                                <option value="preset" data-i18n="cap_background_preset">Style default</option>
+                                <option value="none" data-i18n="cap_background_none">None</option>
+                                <option value="black" data-i18n="cap_background_black">Black box</option>
+                            </select>
+                        </label>
+                    </div>
+                </details>
+                <label class="checkbox-label cap-review-toggle">
+                    <input type="checkbox" id="cap-animated-review">
+                    <span data-i18n="cap_review_before_render">Review text before rendering</span>
+                </label>
+                <p class="cap-animated-note" data-i18n="cap_animated_note">Renders a transparent overlay. Turn off for editable subtitles.</p>
+                <button type="button" id="btn-remove-animated" class="secondary cap-remove-animated" data-i18n="cap_animated_remove">Remove generated animation</button>
+            </div>
+
             <button id="btn-generate-captions" data-tooltip="Generate captions and place them on the timeline." style="margin-top:8px;" data-i18n="cap_generate">
                 ⚡ Generate Editable Subtitles
             </button>
@@ -780,18 +886,30 @@
             <p id="cap-status"></p>
         </div>
 
-        <!-- 5. EXPORT ENGINE -->
+        <!-- 4. EXPORT ENGINE -->
         <div class="action-group">
             <h3>
                 <span class="icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
                 <span data-i18n="export_title">Export Engine</span>
             </h3>
 
-            <div class="input-row">
+            <div class="input-row export-file-row">
                 <span style="font-size:10px; color:var(--text-mute); white-space:nowrap;" data-i18n="export_file">File</span>
                 <input type="text" id="export-filename" data-i18n-placeholder="export_file_ph" placeholder="sequence name">
-                <span style="font-size:10px; color:var(--text-mute);">Mbps</span>
-                <input type="number" id="batch-bitrate-input" value="10" min="1" max="100" style="width:60px;">
+            </div>
+
+            <div class="input-row export-format-row">
+                <span class="export-field-label" data-i18n="export_format">Format</span>
+                <select id="export-format" aria-label="Export format">
+                    <option value="video" data-i18n="export_format_video">Video · MP4</option>
+                    <option value="mp3" data-i18n="export_format_mp3">Audio · MP3</option>
+                    <option value="wav" data-i18n="export_format_wav">Audio · WAV</option>
+                </select>
+                <div id="export-video-quality" class="export-quality-control">
+                    <span>Mbps</span>
+                    <input type="number" id="batch-bitrate-input" value="10" min="1" max="100" aria-label="Video bitrate in Mbps">
+                </div>
+                <div id="export-audio-quality" class="export-quality-summary hidden" aria-live="polite"></div>
             </div>
 
             <div class="input-row">
@@ -843,7 +961,7 @@
     <div id="licenseOverlay" class="license-overlay hidden"></div>
 
     <script src="js/dspTools.js"></script>
-    <script src="js/main.js?v=53"></script>
-    <script src="js/license.js?v=53"></script>
+    <script src="js/main.js?v=64"></script>
+    <script src="js/license.js?v=62"></script>
 </body>
 </html>

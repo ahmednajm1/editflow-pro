@@ -463,6 +463,289 @@ $._editflow = {
     },
 
     // =========================================================
+    // SYNC PREP — put every selected source on its own lane
+    //
+    // Premiere's public DOM cannot move an existing TrackItem vertically. QE's
+    // moveToTrack is the only practical route that keeps the original timeline
+    // instance intact (including clip trims/effects) instead of re-inserting a
+    // clean ProjectItem. Treat it narrowly: selected clips only, no ripple,
+    // and retain a one-step undo manifest.
+    // =========================================================
+    _syncPrepUndoFile: function() {
+        var folder = new Folder(Folder.userData.fsName + "/.editflowpro");
+        if (!folder.exists) folder.create();
+        return new File(folder.fsName + "/sync_prep_undo.json");
+    },
+
+    // QE moves happen inside Premiere's host process, so keep a same-session
+    // copy as well as the file. Some CEP/ExtendScript builds create the File but
+    // silently leave it empty; without this fallback a successful Prepare could
+    // immediately claim that there was nothing to undo.
+    _syncPrepUndoMemory: null,
+
+    _syncPrepEscape: function(value) {
+        return String(value === undefined || value === null ? "" : value)
+            .replace(/\\/g, "\\\\").replace(/\"/g, "\\\"")
+            .replace(/\r/g, "\\r").replace(/\n/g, "\\n");
+    },
+
+    _syncPrepReadUndo: function() {
+        var file = this._syncPrepUndoFile();
+        if (file.exists) {
+            try {
+                file.encoding = "UTF-8";
+                if (file.open("r")) {
+                    var raw = file.read();
+                    file.close();
+                    if (raw) {
+                        var parsed = null;
+                        try { parsed = JSON.parse(raw); } catch(jsonErr) { parsed = eval("(" + raw + ")"); }
+                        if (parsed && parsed.items && parsed.items.length) {
+                            this._syncPrepUndoMemory = parsed;
+                            return parsed;
+                        }
+                    }
+                }
+            } catch(e) {
+                try { file.close(); } catch(closeErr) {}
+            }
+        }
+        return this._syncPrepUndoMemory;
+    },
+
+    _syncPrepMakeUndo: function(seq, items) {
+        var sid = "";
+        try { sid = seq.sequenceID || ""; } catch(e) {}
+        return {
+            sequenceName: String(seq.name || ""),
+            sequenceId: String(sid),
+            items: items || []
+        };
+    },
+
+    _syncPrepSerializeUndo: function(undo) {
+        var raw = '{"sequenceName":"' + this._syncPrepEscape(undo.sequenceName) + '","sequenceId":"' +
+            this._syncPrepEscape(undo.sequenceId) + '","items":[';
+        for (var i = 0; i < undo.items.length; i++) {
+            var item = undo.items[i];
+            if (i) raw += ",";
+            raw += '{"type":"' + item.type + '","sourceTrack":' + item.sourceTrack +
+                ',"targetTrack":' + item.targetTrack + ',"startTicks":"' +
+                this._syncPrepEscape(item.startTicks) + '","nodeId":"' +
+                this._syncPrepEscape(item.nodeId) + '","name":"' +
+                this._syncPrepEscape(item.name) + '"}';
+        }
+        return raw + ']}';
+    },
+
+    _syncPrepWriteUndo: function(seq, items) {
+        var file = this._syncPrepUndoFile();
+        var undo = this._syncPrepMakeUndo(seq, items);
+        var raw = this._syncPrepSerializeUndo(undo);
+        // Populate memory before touching disk. It is a safe one-step fallback
+        // for the current Premiere session if ExtendScript file I/O is flaky.
+        this._syncPrepUndoMemory = undo;
+        try {
+            file.encoding = "UTF-8";
+            if (!file.open("w")) {
+                this.log("Sync Prep undo file could not be opened; using session fallback.");
+                return true;
+            }
+            file.write(raw);
+            file.close();
+
+            // Do not trust File.write() alone: the affected CEP runtime returned
+            // success after creating a zero-byte file. Re-open and parse it.
+            var verify = new File(file.fsName);
+            verify.encoding = "UTF-8";
+            if (!verify.open("r")) {
+                this.log("Sync Prep undo file could not be verified; using session fallback.");
+                return true;
+            }
+            var written = verify.read();
+            verify.close();
+            var confirmed = null;
+            try { confirmed = JSON.parse(written); } catch(eParse) {}
+            if (confirmed && confirmed.items && confirmed.items.length === items.length) {
+                this._syncPrepUndoMemory = confirmed;
+            } else {
+                this.log("Sync Prep undo file was empty/invalid; using session fallback.");
+            }
+            return true;
+        } catch(e) {
+            try { file.close(); } catch(closeErr) {}
+            this.log("Sync Prep undo file write failed; using session fallback: " + e.message);
+            return true;
+        }
+    },
+
+    _syncPrepTrackIndex: function(clip, tracks) {
+        for (var ti = 0; ti < tracks.numTracks; ti++) {
+            var track = tracks[ti];
+            for (var ci = 0; ci < track.clips.numItems; ci++) {
+                try {
+                    var candidate = track.clips[ci];
+                    if (clip.nodeId && candidate.nodeId && String(clip.nodeId) === String(candidate.nodeId)) return ti;
+                    if (candidate.name === clip.name && String(candidate.start.ticks) === String(clip.start.ticks)) return ti;
+                } catch(e) {}
+            }
+        }
+        return -1;
+    },
+
+    _syncPrepFindQEItem: function(entry, currentTrack, seq, qeSeq) {
+        var tracks = entry.type === "Video" ? seq.videoTracks : seq.audioTracks;
+        var qeTrack = null;
+        try {
+            qeTrack = entry.type === "Video" ? qeSeq.getVideoTrackAt(currentTrack) : qeSeq.getAudioTrackAt(currentTrack);
+        } catch(eTrack) { return null; }
+        if (!qeTrack || !tracks[currentTrack]) return null;
+        for (var ci = 0; ci < tracks[currentTrack].clips.numItems; ci++) {
+            try {
+                var clip = tracks[currentTrack].clips[ci];
+                var nodeMatches = entry.nodeId && clip.nodeId && String(entry.nodeId) === String(clip.nodeId);
+                var fallbackMatches = clip.name === entry.name && String(clip.start.ticks) === String(entry.startTicks);
+                if (nodeMatches || fallbackMatches) return qeTrack.getItemAt(ci);
+            } catch(eItem) {}
+        }
+        return null;
+    },
+
+    _syncPrepMove: function(entry, currentTrack, trackDelta, seq, qeSeq) {
+        var qeItem = this._syncPrepFindQEItem(entry, currentTrack, seq, qeSeq);
+        if (!qeItem || typeof qeItem.moveToTrack !== "function") return false;
+        try {
+            if (entry.type === "Video") qeItem.moveToTrack(trackDelta, 0, "", false);
+            else qeItem.moveToTrack(0, trackDelta, "", false);
+            return true;
+        } catch(e) {
+            this.log("Sync Prep move failed: " + e.message);
+            return false;
+        }
+    },
+
+    getSyncPrepUndoState: function() {
+        var undo = this._syncPrepReadUndo();
+        var available = !!(undo && undo.items && undo.items.length);
+        return '{"status":"success","available":' + available + '}';
+    },
+
+    prepareSyncLanes: function() {
+        var seq = this.getSeq();
+        if (!seq) return '{"status":"error","message":"Open an active sequence first."}';
+        var selection = this.getSel();
+        if (!selection || selection.length < 2) {
+            return '{"status":"error","message":"Select at least two video or audio clips to prepare sync lanes."}';
+        }
+
+        var video = [], audio = [];
+        var originalVideoTracks = seq.videoTracks.numTracks;
+        var originalAudioTracks = seq.audioTracks.numTracks;
+        for (var i = 0; i < selection.length; i++) {
+            var selected = selection[i];
+            var type = "";
+            try { type = selected.mediaType || ""; } catch(eType) {}
+            if (type !== "Video" && type !== "Audio") continue;
+            var tracks = type === "Video" ? seq.videoTracks : seq.audioTracks;
+            var sourceTrack = this._syncPrepTrackIndex(selected, tracks);
+            if (sourceTrack < 0) continue;
+            var entry = {
+                type: type,
+                sourceTrack: sourceTrack,
+                targetTrack: -1,
+                startTicks: String(selected.start.ticks),
+                nodeId: "",
+                name: selected.name || ""
+            };
+            try { entry.nodeId = selected.nodeId || ""; } catch(eNode) {}
+            if (type === "Video") video.push(entry); else audio.push(entry);
+        }
+        if (video.length + audio.length < 2) {
+            return '{"status":"error","message":"Select at least two supported video or audio clips."}';
+        }
+
+        try { app.enableQE(); } catch(eQEEnable) {}
+        var qeSeq = null;
+        try { qeSeq = qe.project.getActiveSequence(); } catch(eQE) {}
+        if (!qeSeq || typeof qeSeq.addTracks !== "function") {
+            return '{"status":"error","message":"Premiere could not prepare the required timeline lanes."}';
+        }
+
+        // Append new lanes only; all existing track indices stay stable.
+        try {
+            qeSeq.addTracks(video.length, originalVideoTracks, audio.length, originalAudioTracks);
+        } catch(eAdd) {
+            return '{"status":"error","message":"Could not add the empty sync lanes: ' + this._syncPrepEscape(eAdd.message) + '"}';
+        }
+
+        var moved = [], failed = [];
+        for (var vi = 0; vi < video.length; vi++) {
+            var v = video[vi];
+            v.targetTrack = originalVideoTracks + vi;
+            if (this._syncPrepMove(v, v.sourceTrack, v.targetTrack - v.sourceTrack, seq, qeSeq)) moved.push(v);
+            else failed.push(v);
+        }
+        for (var ai = 0; ai < audio.length; ai++) {
+            var a = audio[ai];
+            a.targetTrack = originalAudioTracks + ai;
+            if (this._syncPrepMove(a, a.sourceTrack, a.targetTrack - a.sourceTrack, seq, qeSeq)) moved.push(a);
+            else failed.push(a);
+        }
+
+        // Do not leave a partly-prepared clip layout behind. Attempt to put every
+        // moved item back if Premiere rejected even one selected item.
+        if (failed.length) {
+            for (var ri = moved.length - 1; ri >= 0; ri--) {
+                var restore = moved[ri];
+                this._syncPrepMove(restore, restore.targetTrack, restore.sourceTrack - restore.targetTrack, seq, qeSeq);
+            }
+            return '{"status":"error","message":"Premiere could not move every selected clip. Selected clips were restored; empty lanes may remain."}';
+        }
+
+        if (!this._syncPrepWriteUndo(seq, moved)) {
+            for (var wi = moved.length - 1; wi >= 0; wi--) {
+                var writeRestore = moved[wi];
+                this._syncPrepMove(writeRestore, writeRestore.targetTrack, writeRestore.sourceTrack - writeRestore.targetTrack, seq, qeSeq);
+            }
+            return '{"status":"error","message":"Could not save the undo step. Selected clips were restored; empty lanes may remain."}';
+        }
+
+        return '{"status":"success","video":' + video.length + ',"audio":' + audio.length +
+            ',"count":' + moved.length + ',"message":"Prepared ' + moved.length + ' separate sync lanes."}';
+    },
+
+    undoSyncLanes: function() {
+        var undo = this._syncPrepReadUndo();
+        if (!undo || !undo.items || !undo.items.length) {
+            return '{"status":"error","message":"There is no Sync Prep action to undo."}';
+        }
+        var seq = this.getSeq();
+        if (!seq) return '{"status":"error","message":"Open the sequence used for Sync Prep first."}';
+        var savedId = undo.sequenceId || "";
+        var currentId = "";
+        try { currentId = seq.sequenceID || ""; } catch(eId) {}
+        if ((savedId && currentId && savedId !== currentId) || (!savedId && undo.sequenceName !== seq.name)) {
+            return '{"status":"error","message":"Open the same sequence that was prepared before undoing."}';
+        }
+        try { app.enableQE(); } catch(eQEEnable) {}
+        var qeSeq = null;
+        try { qeSeq = qe.project.getActiveSequence(); } catch(eQE) {}
+        if (!qeSeq) return '{"status":"error","message":"Premiere could not access the sync lanes for undo."}';
+
+        var restored = 0;
+        for (var i = undo.items.length - 1; i >= 0; i--) {
+            var entry = undo.items[i];
+            if (this._syncPrepMove(entry, entry.targetTrack, entry.sourceTrack - entry.targetTrack, seq, qeSeq)) restored++;
+        }
+        if (restored !== undo.items.length) {
+            return '{"status":"error","message":"Could not restore every clip. The remaining lanes were left untouched."}';
+        }
+        try { this._syncPrepUndoFile().remove(); } catch(eRemove) {}
+        this._syncPrepUndoMemory = null;
+        return '{"status":"success","count":' + restored + ',"message":"Restored ' + restored + ' clip(s) to their original lanes."}';
+    },
+
+    // =========================================================
     // SILENCE / EXPORT / BEATS / CLIPBOARD (unchanged)
     // =========================================================
     executeSilenceCuts: function(silenceSegmentsStr) {
@@ -551,10 +834,13 @@ $._editflow = {
             if (!clipIn  && clip.inPoint  && clip.inPoint.ticks)  clipIn  = me.ticksToSec(clip.inPoint.ticks);
             if (!clipOut && clip.outPoint && clip.outPoint.ticks) clipOut = me.ticksToSec(clip.outPoint.ticks);
 
-            var tlStart = 0;
+            var tlStart = 0, tlEnd = 0;
             try { tlStart = me.ticksToSec(clip.start.ticks) || 0; } catch(e) {}
+            try { tlEnd = me.ticksToSec(clip.end.ticks) || 0; } catch(e) {}
 
             var dur = (clipOut > clipIn) ? (clipOut - clipIn) : 0;
+            var tlDur = (tlEnd > tlStart) ? (tlEnd - tlStart) : dur;
+            if (dur <= 0 && tlDur > 0) dur = tlDur;
             var name = "";
             try { name = clip.projectItem.name || ""; } catch(e) {}
 
@@ -564,6 +850,8 @@ $._editflow = {
                 '"clipOut":'       + clipOut + ',' +
                 '"duration":'      + dur     + ',' +
                 '"timelineStart":' + tlStart + ',' +
+                '"timelineEnd":'   + tlEnd   + ',' +
+                '"timelineDuration":' + tlDur + ',' +
                 '"clipName":"'     + name.replace(/"/g, '\\"') + '"}';
         }
 
@@ -2048,8 +2336,9 @@ $._editflow.debugQEClip = function() {
     } catch(e) { return '{"status":"error","message":"' + e.message + '"}'; }
 };
 
-// Custom export with user-defined filename and path
-$._editflow.exportCustom = function(presetPath, fileName, folderPath) {
+// Custom video/audio export with user-defined filename and path.
+// outputFormat is optional for backward compatibility: video | mp3 | wav.
+$._editflow.exportCustom = function(presetPath, fileName, folderPath, outputFormat) {
     try {
         var seq = this.getSeq();
         if (!seq) return '{"status":"error","message":"Open a project."}';
@@ -2063,16 +2352,20 @@ $._editflow.exportCustom = function(presetPath, fileName, folderPath) {
         if (!folder.exists) {
             return '{"status":"error","message":"Cannot create export folder: ' + folder.fsName + '"}';
         }
+        var format = String(outputFormat || "video").toLowerCase();
+        if (format !== "mp3" && format !== "wav") format = "video";
+        var extension = format === "mp3" ? ".mp3" : (format === "wav" ? ".wav" : ".mp4");
         var name = (fileName && fileName !== "") ? fileName : seq.name;
         // Sanitize filename
         name = name.replace(/[^a-zA-Z0-9_\-\. ]/g, "_");
-        if (name.indexOf(".mp4") === -1) name += ".mp4";
+        name = name.replace(/\.(mp4|mp3|wav)$/i, "");
+        name += extension;
         
         // Normalise output path using File object to ensure correct platform slashes
         var out = new File(folder.fsName + "/" + name);
         var d = 1;
         while (out.exists) {
-            out = new File(folder.fsName + "/" + name.replace(".mp4", "_v" + d + ".mp4"));
+            out = new File(folder.fsName + "/" + name.substring(0, name.length - extension.length) + "_v" + d + extension);
             d++;
         }
         var outPath = out.fsName;
@@ -2097,7 +2390,7 @@ $._editflow.exportCustom = function(presetPath, fileName, folderPath) {
         // ── Direct background render (always use direct Premiere export to match Mac experience and support systems without AME) ──
         seq.exportAsMediaDirect(outPath, normPresetPath, workAreaType);
         
-        return '{"status":"success","queued":false,"message":"Export started directly","filePath":"' + outPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"}';
+        return '{"status":"success","queued":false,"message":"Export started directly","format":"' + format + '","filePath":"' + outPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"}';
     } catch(e) {
         return '{"status":"error","message":"' + e.message + '"}';
     }
@@ -2168,14 +2461,25 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
     }
 
     // ---- Build groups based on style
-    var groups = [];   // each group: {start, end, text}
+    var groups = [];   // each group: {start, end, text, words[]}
     var segs = data.segments || [];
 
-    function pushGroup(s, e, t) {
+    function pushGroup(s, e, t, sourceWords) {
         t = (t || "").replace(/^\s+|\s+$/g, "");
         if (!t) return;
         if (e <= s) e = s + 0.3;
-        groups.push({start: s, end: e, text: t});
+        var cleanWords = [];
+        sourceWords = sourceWords || [];
+        for (var pw = 0; pw < sourceWords.length; pw++) {
+            var pwt = (sourceWords[pw].text || "").replace(/^\s+|\s+$/g, "");
+            if (!pwt) continue;
+            cleanWords.push({
+                start: parseFloat(sourceWords[pw].start) || s,
+                end: parseFloat(sourceWords[pw].end) || e,
+                text: pwt
+            });
+        }
+        groups.push({start: s, end: e, text: t, words: cleanWords});
     }
 
     // IMPORTANT: We split by the segment TEXT (whitespace) rather than by
@@ -2241,20 +2545,42 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
             var per = (seg.end - seg.start) / ws.length;
             for (var b = 0; b < ws.length; b++) out.push({ start: seg.start + b * per, end: seg.start + (b + 1) * per, text: ws[b] });
         }
+        // AI refinement keeps the source segment count and timing contract. Its
+        // translated segments are therefore valuable SOFT subtitle boundaries even
+        // when the model correctly leaves a continuing sentence without a period.
+        // Keep that structure on the last word while flattening so Full Sentence
+        // can prefer it over an arbitrary character-limit cut.
+        if (out.length) {
+            out[out.length - 1].segmentEnd = true;
+            if (seg.timelineBreak === true) out[out.length - 1].timelineBreak = true;
+        }
         return out;
+    }
+
+    // Only collapse a repeated word when both copies occupy substantially the
+    // same timestamp. Adjacent legitimate repetitions such as German "die die"
+    // have touching, not overlapping, timings and must survive.
+    function sameTimedWord(a, b) {
+        if (!a || !b || a.text !== b.text) return false;
+        var aStart = parseFloat(a.start) || 0, aEnd = parseFloat(a.end) || aStart;
+        var bStart = parseFloat(b.start) || 0, bEnd = parseFloat(b.end) || bStart;
+        if (Math.abs(aStart - bStart) < 0.12) return true;
+        var overlap = Math.min(aEnd, bEnd) - Math.max(aStart, bStart);
+        var shortest = Math.min(aEnd - aStart, bEnd - bStart);
+        return shortest > 0 && overlap > shortest * 0.6;
     }
 
     if (groupStyle === "line") {
         // Cinema/streaming subtitle convention: one caption per natural sentence,
-        // capped to roughly two subtitle lines (~90 characters, the same ballpark
-        // Netflix-style guides use). Whisper's raw segment boundaries (the old
+        // capped to two subtitle lines (~42 characters each). Whisper's raw
+        // segment boundaries (the old
         // behaviour here) carry no length control at all — a segment can span
         // several sentences or be a lone fragment, whatever the model happened to
         // chunk on a pause. This closes on real sentence-ending punctuation first,
         // and only falls back to a comma/clause/pause boundary — never a mid-word
         // cut — when speech runs on with no punctuation at all.
-        var SENT_MIN_CHARS = 12;
-        var SENT_MAX_CHARS = 90;
+        var SENT_MIN_CHARS = 18;
+        var SENT_MAX_CHARS = 84;
 
         // Flatten all words across segments (same de-dup as "phrase": a word
         // repeating the previous one at nearly the same time is a Whisper
@@ -2265,8 +2591,10 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
             for (var aiL = 0; aiL < itsL.length; aiL++) {
                 var wdL = itsL[aiL];
                 var prevWL = allS.length ? allS[allS.length - 1] : null;
-                if (prevWL && prevWL.text === wdL.text && wdL.start < prevWL.end + 0.12) {
+                if (sameTimedWord(prevWL, wdL)) {
                     if (wdL.end > prevWL.end) prevWL.end = wdL.end;
+                    if (wdL.segmentEnd) prevWL.segmentEnd = true;
+                    if (wdL.timelineBreak) prevWL.timelineBreak = true;
                     continue;
                 }
                 allS.push(wdL);
@@ -2282,6 +2610,29 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
             return /[\.\!\?\u2026\u061F]$/.test(t || "");
         }
 
+        // A cinema subtitle must not end on a grammatical hanger such as German
+        // "auf eine", English "in the", or an Arabic conjunction/preposition.
+        // These are deliberately only a penalty: punctuation or a long pause may
+        // still prove that the word genuinely closes the spoken unit.
+        var WEAK_CAPTION_END = {
+            "der":1,"die":1,"den":1,"dem":1,"des":1,
+            "ein":1,"eine":1,"einen":1,"einem":1,"einer":1,"eines":1,
+            "auf":1,"an":1,"in":1,"im":1,"mit":1,"von":1,"zu":1,
+            "zum":1,"zur":1,"für":1,"über":1,"unter":1,"als":1,
+            "und":1,"oder":1,"aber":1,"dass":1,"weil":1,"wenn":1,
+            "a":1,"the":1,"and":1,"or":1,"but":1,"to":1,
+            "of":1,"for":1,"with":1,"from":1,"on":1,"at":1,"by":1,
+            "\u0648":1,"\u0623\u0648":1,"\u0644\u0643\u0646":1,
+            "\u0641\u064A":1,"\u0645\u0646":1,"\u0625\u0644\u0649":1,
+            "\u0639\u0644\u0649":1,"\u0639\u0646":1,"\u0645\u0639":1,
+            "\u0623\u0646":1,"\u0625\u0646":1,"\u0643\u0627\u0646":1,
+            "\u0643\u0627\u0646\u062A":1
+        };
+        function weakCaptionEnd(t) {
+            var clean = (t || "").toLowerCase().replace(/^[^a-z\u00C0-\u024F\u0600-\u06FF]+|[^a-z\u00C0-\u024F\u0600-\u06FF]+$/g, "");
+            return WEAK_CAPTION_END[clean] === 1;
+        }
+
         var chunksS = [];
         var acc = [];
         var accChars = 0;
@@ -2292,8 +2643,13 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
 
             var isLastWord = (wi === allS.length - 1);
             var closedByPunct = isSentenceEnd(w.text) && accChars >= SENT_MIN_CHARS;
+            var closedByTimeline = w.timelineBreak === true;
 
             if (isLastWord) {
+                chunksS.push(acc); acc = []; accChars = 0;
+            } else if (closedByTimeline) {
+                // Selected clips can be minutes apart on the Premiere timeline.
+                // Never let a subtitle sentence bridge that edit/gap.
                 chunksS.push(acc); acc = []; accChars = 0;
             } else if (closedByPunct) {
                 chunksS.push(acc); acc = []; accChars = 0;
@@ -2311,10 +2667,15 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
                 for (var j = 0; j < acc.length - 1; j++) {
                     var sc = 0;
                     if (endsWithBreak(acc[j].text)) sc += 1000;
+                    // Claude often returns punctuation-free but semantically clean
+                    // timed segments. Preserve their boundary before falling back to
+                    // a blind 84-character split.
+                    if (acc[j].segmentEnd) sc += 750;
                     if (isClauseStarter(acc[j + 1].text)) sc += 400;
                     var gap = acc[j + 1].start - acc[j].end;
                     if (gap < 0) gap = 0;
                     sc += gap * 1200;
+                    if (weakCaptionEnd(acc[j].text)) sc -= 900;
                     if (sc >= bestScore) { bestScore = sc; bestJ = j; }
                 }
                 if (bestJ < 0) bestJ = acc.length - 2; // hard cut at the cap, at a word boundary
@@ -2331,7 +2692,7 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
 
         for (var gx3 = 0; gx3 < chunksS.length; gx3++) {
             var ck3 = chunksS[gx3];
-            if (ck3.length) pushGroup(ck3[0].start, ck3[ck3.length - 1].end, chunkText(ck3));
+            if (ck3.length) pushGroup(ck3[0].start, ck3[ck3.length - 1].end, chunkText(ck3), ck3);
         }
     } else if (groupStyle === "word") {
         // Use actual word-level timestamps from Groq for precise timing
@@ -2340,7 +2701,7 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
             var segWords = seg.words || [];
             if (segWords.length > 0) {
                 for (var w = 0; w < segWords.length; w++) {
-                    pushGroup(segWords[w].start, segWords[w].end, segWords[w].text);
+                    pushGroup(segWords[w].start, segWords[w].end, segWords[w].text, [segWords[w]]);
                 }
             } else {
                 // Fallback: split text and divide duration equally
@@ -2348,7 +2709,7 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
                 if (words.length === 0) continue;
                 var per = (seg.end - seg.start) / words.length;
                 for (var w = 0; w < words.length; w++) {
-                    pushGroup(seg.start + w * per, seg.start + (w + 1) * per, words[w]);
+                    pushGroup(seg.start + w * per, seg.start + (w + 1) * per, words[w], [{start:seg.start + w * per, end:seg.start + (w + 1) * per, text:words[w]}]);
                 }
             }
         }
@@ -2376,8 +2737,10 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
             for (var a2 = 0; a2 < its.length; a2++) {
                 var wd = its[a2];
                 var prevW = all.length ? all[all.length - 1] : null;
-                if (prevW && prevW.text === wd.text && wd.start < prevW.end + 0.12) {
+                if (sameTimedWord(prevW, wd)) {
                     if (wd.end > prevW.end) prevW.end = wd.end; // keep the longer span
+                    if (wd.segmentEnd) prevW.segmentEnd = true;
+                    if (wd.timelineBreak) prevW.timelineBreak = true;
                     continue;                                   // skip the duplicate
                 }
                 all.push(wd);
@@ -2393,6 +2756,7 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
         // packing every caption to the maximum.
         function boundaryScore(j) {
             var sc = 0;
+            if (all[j].timelineBreak) sc += 100000; // absolute edit boundary
             if (endsWithBreak(all[j].text)) sc += 1000;
             if (j + 1 < all.length && isClauseStarter(all[j + 1].text)) sc += 400;
             var gap = (j + 1 < all.length) ? (all[j + 1].start - all[j].end) : 999;
@@ -2406,12 +2770,24 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
         while (ii < all.length) {
             var remaining = all.length - ii;
             var endIdx;
-            if (remaining <= minW) {
-                endIdx = all.length - 1;                  // tail: take whatever is left
+            var windowHi = ii + maxW - 1;
+            if (windowHi > all.length - 1) windowHi = all.length - 1;
+            var hardEnd = -1;
+            for (var hb = ii; hb <= windowHi; hb++) {
+                if (all[hb].timelineBreak) { hardEnd = hb; break; }
+            }
+            if (hardEnd >= 0 && hardEnd < ii + minW - 1) {
+                // A clip may contain fewer words than the requested minimum. The
+                // physical timeline boundary wins; merging would create a caption
+                // that remains visible across empty minutes.
+                endIdx = hardEnd;
+            } else if (remaining <= minW) {
+                endIdx = (hardEnd >= 0) ? hardEnd : all.length - 1;
             } else {
                 var lo = ii + minW - 1;                   // shortest allowed (min words)
                 var hi = ii + maxW - 1;                   // longest allowed (max words)
                 if (hi > all.length - 1) hi = all.length - 1;
+                if (hardEnd >= 0 && hardEnd < hi) hi = hardEnd;
                 var bestIdx = lo, bestScore = -1;
                 for (var j = lo; j <= hi; j++) {
                     var sc = boundaryScore(j);
@@ -2429,29 +2805,35 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
         var mi = 0;
         while (mi < chunks.length && chunks.length > 1) {
             if (chunks[mi].length >= minW) { mi++; continue; }
-            var prevFits = (mi > 0) && (chunks[mi - 1].length + chunks[mi].length <= maxW);
-            var nextFits = (mi < chunks.length - 1) && (chunks[mi].length + chunks[mi + 1].length <= maxW);
+            var mayMergePrev = (mi > 0) && !chunks[mi - 1][chunks[mi - 1].length - 1].timelineBreak;
+            var mayMergeNext = (mi < chunks.length - 1) && !chunks[mi][chunks[mi].length - 1].timelineBreak;
+            var prevFits = mayMergePrev && (chunks[mi - 1].length + chunks[mi].length <= maxW);
+            var nextFits = mayMergeNext && (chunks[mi].length + chunks[mi + 1].length <= maxW);
             if (prevFits) {
                 chunks[mi - 1] = chunks[mi - 1].concat(chunks[mi]);
                 chunks.splice(mi, 1);            // recheck shifted element at mi
             } else if (nextFits) {
                 chunks[mi] = chunks[mi].concat(chunks[mi + 1]);
                 chunks.splice(mi + 1, 1);        // recheck the now-larger chunk
-            } else if (mi > 0) {
+            } else if (mayMergePrev) {
                 // No neighbour stays within max — prefer a slightly-over-max
                 // caption to a lonely 1–2 word one.
                 chunks[mi - 1] = chunks[mi - 1].concat(chunks[mi]);
                 chunks.splice(mi, 1);
-            } else if (mi < chunks.length - 1) {
+            } else if (mayMergeNext) {
                 chunks[mi] = chunks[mi].concat(chunks[mi + 1]);
                 chunks.splice(mi + 1, 1);
-            } else { mi++; }
+            } else {
+                // Both neighbours are separated by physical clip boundaries.
+                // Keep the short caption rather than bridge an edit/gap.
+                mi++;
+            }
         }
 
         // Emit
         for (var gx = 0; gx < chunks.length; gx++) {
             var ck = chunks[gx];
-            pushGroup(ck[0].start, ck[ck.length - 1].end, chunkText(ck));
+            pushGroup(ck[0].start, ck[ck.length - 1].end, chunkText(ck), ck);
         }
     }
 
@@ -2468,6 +2850,10 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
         for (var gi = 0; gi < groups.length; gi++) {
             groups[gi].start += offsetSecs;
             groups[gi].end   += offsetSecs;
+            for (var gwi = 0; gwi < groups[gi].words.length; gwi++) {
+                groups[gi].words[gwi].start += offsetSecs;
+                groups[gi].words[gwi].end += offsetSecs;
+            }
         }
     }
 
@@ -2487,6 +2873,31 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
             // cap at the next start so we never re-introduce an overlap.
             groups[oi].end = Math.min(groups[oi].start + MIN_DUR, groups[oi + 1].start);
             if (groups[oi].end <= groups[oi].start) groups[oi].end = groups[oi].start + 0.04;
+        }
+    }
+
+    // Animated-overlay mode uses the exact same grouping and timing logic as
+    // editable captions, but asks the panel to render transparent clips instead
+    // of importing an SRT. Returning a plan keeps the feature optional and avoids
+    // duplicating the hard-won language/timeline-boundary rules in JavaScript.
+    if (cfg.planOnly === true || cfg.planOnly === "true") {
+        var planPath = cfg.planPath || efpJsonPath.replace(/\.efp\.json$/, "") + ".animated-plan.json";
+        try {
+            var planFile = new File(planPath);
+            planFile.encoding = "UTF-8";
+            planFile.open("w");
+            planFile.write(JSON.stringify({
+                version: 1,
+                style: groupStyle,
+                animation: anim,
+                groups: groups
+            }));
+            planFile.close();
+            return '{"status":"success","planOnly":true,"groups":' + groups.length +
+                   ',"plan":"' + planPath.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '"}';
+        } catch(ePlan) {
+            return '{"status":"error","message":"Could not write animated caption plan: ' +
+                   ePlan.message.replace(/"/g,'\\"') + '"}';
         }
     }
 
@@ -2777,7 +3188,7 @@ $._editflow.placeRenderedCaptions = function(manifestPath, configJSON) {
     }
 
     // Create a bin so caption clips are organized
-    var binName = "EFP_Captions";
+    var binName = "EFP_Animated_Captions";
     var bin = null;
     try {
         // Reuse existing bin if present
@@ -2804,9 +3215,32 @@ $._editflow.placeRenderedCaptions = function(manifestPath, configJSON) {
         }
     } catch(e) {}
 
-    // Pick the topmost video track for captions overlay
+    // Always use an empty top video track. Overwriting user footage is never an
+    // acceptable fallback for an optional visual feature. Create one through QE
+    // when the current top track contains clips; otherwise fail with a clear hint.
     var trackIdx = seq.videoTracks.numTracks - 1;
     var track = seq.videoTracks[trackIdx];
+    var topBusy = false;
+    try { topBusy = !!(track && track.clips && track.clips.numItems > 0); } catch(eBusy) { topBusy = true; }
+    if (topBusy) {
+        try {
+            app.enableQE();
+            var qeSeqAnim = qe.project.getActiveSequence();
+            if (qeSeqAnim && typeof qeSeqAnim.addTracks === "function") {
+                qeSeqAnim.addTracks(1, seq.videoTracks.numTracks, 0, 0);
+                seq = this.getSeq();
+                trackIdx = seq.videoTracks.numTracks - 1;
+                track = seq.videoTracks[trackIdx];
+                topBusy = !!(track && track.clips && track.clips.numItems > 0);
+            }
+        } catch(eAddTrack) {
+            this.log("placeRenderedCaptions: could not create empty track: " + eAddTrack.message);
+        }
+    }
+    if (!track || topBusy) {
+        return '{"status":"error","message":"Add one empty video track above the footage, then generate animated captions again."}';
+    }
+    try { track.name = "EFP Animated Captions"; } catch(eTrackName) {}
 
     var placedCount = 0;
     for (var i = 0; i < clips.length; i++) {
@@ -2845,6 +3279,29 @@ $._editflow.placeRenderedCaptions = function(manifestPath, configJSON) {
     msg += " (" + fontName + ", " + anim + " animation).";
 
     return '{"status":"success","message":"' + msg.replace(/"/g, '\\"') + '","placed":' + placedCount + ',"total":' + clips.length + '}';
+};
+
+// Remove only EditFlow's generated animation clips from the timeline. Source
+// media stays in EFP_Animated_Captions so Undo/regeneration never creates
+// offline files. This is the explicit rollback path exposed by the panel.
+$._editflow.removeRenderedCaptions = function() {
+    var seq = this.getSeq();
+    if (!seq) return '{"status":"error","message":"Open a sequence."}';
+    var removed = 0;
+    for (var ti = seq.videoTracks.numTracks - 1; ti >= 0; ti--) {
+        var tr = seq.videoTracks[ti];
+        if (!tr || !tr.clips) continue;
+        for (var ci = tr.clips.numItems - 1; ci >= 0; ci--) {
+            var clip = tr.clips[ci];
+            var nm = "";
+            try { nm = clip.name || ""; } catch(eName) {}
+            if (!/^efp_anim_/i.test(nm)) continue;
+            try { clip.remove(0, 1); removed++; } catch(eRemove) {
+                this.log("removeRenderedCaptions: " + eRemove.message);
+            }
+        }
+    }
+    return '{"status":"success","removed":' + removed + ',"message":"Removed ' + removed + ' animated caption clip(s)."}';
 };
 
 // =========================================================
@@ -3487,6 +3944,23 @@ $._editflow.applyDefaultAudioTransition = function() {
         return '{"status":"error","message":"Could not apply audio transition. Set a default transition in Premiere preferences."}';
     } catch(e) {
         return '{"status":"error","message":"' + e.message + '"}';
+    }
+};
+
+// Caption QA uses this only as a review convenience. It moves the playhead to
+// a reported time; it never changes tracks, clips, captions or sequence state.
+$._editflow.jumpToTimelineTime = function(seconds) {
+    try {
+        var seq = app.project.activeSequence;
+        if (!seq) return '{"status":"error","message":"No active sequence"}';
+        var value = parseFloat(seconds);
+        if (isNaN(value) || value < 0) return '{"status":"error","message":"Invalid timeline time"}';
+        var time = new Time();
+        time.seconds = value;
+        seq.setPlayerPosition(time.ticks);
+        return '{"status":"success","seconds":' + value + '}';
+    } catch(e) {
+        return '{"status":"error","message":"' + String(e.message).replace(/"/g, '\\"') + '"}';
     }
 };
 

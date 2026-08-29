@@ -8,10 +8,10 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.30";
+var CURRENT_VERSION = "1.3.31";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null, spawnModule = null;
-var foundPresetPath = null, extensionPath = "", configPath = "";
+var foundPresetPath = null, foundAudioPresetPaths = {mp3:null, wav:null}, extensionPath = "", configPath = "";
 var operationRunning = false, statusTimer = null;
 var activeCaptionProcess = null, activeClipboardProcess = null;
 var EFP_BIN_DIR = "";
@@ -34,9 +34,26 @@ var DEFAULT_SETTINGS = {
         font: "Inter",
         size: "72",
         color: "#ffffff",
-        highlight: "#1F8FFF"
+        highlight: "#1F8FFF",
+        animated: false,
+        animatedPreset: "clean-film",
+        animatedUiVersion: 2,
+        animatedFont: "",
+        animatedSize: 100,
+        animatedPosition: "preset",
+        animatedBackgroundMode: "preset",
+        animatedReview: false
+    },
+    captionQa: {
+        lastSummaryPath: "",
+        targetCode: "auto",
+        style: "phrase",
+        wordsMin: 3,
+        wordsMax: 5,
+        timelineOffset: 0
     },
     bitrate: 10,
+    exportFormat: "video",
     exportPath: "",
     filenamePattern: "sequence",
     groqApiKey: "",
@@ -81,19 +98,39 @@ var i18n = {
         transform_anchor: "Anchor",
         audio_quick: "Quick",
         transform_set: "Set",
+        sync_prep_title: "Sync Prep",
+        sync_prep_desc: "Select the clips you want to sync. Each selected video/audio clip moves to its own lane at the same time.",
+        sync_prep_select: "Select clips",
+        sync_prep_separate: "Separate lanes",
+        sync_prep_synchronize: "Synchronize",
+        sync_prep_prepare: "Prepare Sync Lanes",
+        sync_prep_undo: "Undo last prep",
+        sync_prep_safe: "Only selected clips move. Nothing is trimmed, duplicated or deleted.",
+        sync_prep_working: "Preparing separate sync lanes…",
+        sync_prep_ready: "{video} video + {audio} audio lane(s) ready. Now use Premiere's Synchronize.",
+        sync_prep_undo_done: "Restored {n} clip(s) to their original lanes.",
         paste_title: "Paste from Web",
         paste_desc: "Copy any image from a browser → click Paste. Added to your Project bin ready to drag in.",
         paste_btn: "Paste Image from Internet",
         export_title: "Export Engine",
         export_file: "File",
         export_file_ph: "sequence name",
+        export_format: "Format",
+        export_format_video: "Video · MP4",
+        export_format_mp3: "Audio · MP3",
+        export_format_wav: "Audio · WAV",
+        export_audio_quality_mp3: "{bitrate} kbps · stereo",
+        export_audio_quality_wav: "48 kHz · 16-bit",
         export_saveto: "Save to",
         export_browse: "Browse",
         export_selected: "Export Selected Clip",
+        export_selected_audio: "Export Selected Audio",
+        export_audio_preset_missing: "Adobe audio preset was not found. Repair or reinstall Premiere Pro, then try again.",
         export_capture: "📷 Capture Frame",
         captions_title: "Fast Captions",
         captions_desc: "Lightning-fast, studio-grade transcription. Auto-detect any language and get perfectly synced editable subtitles in seconds.",
         cap_generate: "⚡ Generate Editable Subtitles",
+        cap_generate_animated: "✨ Generate Animated Captions",
         settings_title: "Settings",
         tab_general: "General",
         tab_presets: "Presets",
@@ -172,10 +209,65 @@ var i18n = {
         cap_refine_fix: "Fix errors and wording",
         cap_refine_translate: "Fix, then translate to…",
         cap_refine_hint: "Timings are preserved. Set the provider under Settings → Captions.",
+        cap_animated: "Animated caption styles",
+        cap_animated_note: "Renders a transparent overlay. Turn off for editable subtitles.",
+        cap_animated_remove: "Remove generated animation",
+        cap_choose_style: "Choose a style",
+        cap_choose_style_hint: "Click once — the look is ready",
+        cap_style_clean: "Clean Film",
+        cap_style_pop: "TikTok Pop",
+        cap_style_reels: "Reels Cyan",
+        cap_style_box: "Yellow Box",
+        cap_style_karaoke: "Karaoke Build",
+        cap_style_focus: "One Word",
+        cap_style_drop: "Drop Bounce",
+        cap_style_neon: "Neon Glow",
+        cap_customize: "Fine tune",
+        cap_customize_hint: "Optional",
+        cap_font: "Font",
+        cap_font_preset: "Use preset font",
+        cap_size: "Size",
+        cap_position: "Position",
+        cap_position_preset: "Preset position",
+        cap_position_low: "Low",
+        cap_position_middle: "Middle",
+        cap_position_high: "High",
+        cap_background: "Background",
+        cap_background_preset: "Style default",
+        cap_background_none: "None",
+        cap_background_black: "Black box",
+        cap_background_custom: "Custom",
+        cap_text_color: "Text",
+        cap_active_color: "Active word",
+        cap_outline_color: "Outline",
+        cap_background_color: "Background color",
+        cap_background_opacity: "Background opacity",
+        cap_review_before_render: "Review text before rendering",
+        cap_editor_title: "Review animated captions",
+        cap_editor_hint: "Timing is preserved. If the word count changes, timing is redistributed inside that caption.",
+        cap_editor_render: "Apply edits & render",
+        cap_editor_count: "{n} captions",
+        cap_editor_empty: "Caption text cannot be empty.",
         cap_refine_working: "Refining the transcript…",
         cap_refine_done: "Refined {n} segments ✓",
         cap_refine_failed: "Refinement skipped — using the raw transcript.",
         cap_refine_err_key: "No API key for the selected refinement provider. Add it under Settings → Captions.",
+        cap_qa_title: "Caption QA",
+        cap_qa_local: "LOCAL",
+        cap_qa_desc: "Scan the last generated captions for timing, readability, language and edit-boundary risks.",
+        cap_qa_run: "Run Caption QA",
+        cap_qa_note: "Local QA is instant and never edits your captions. Click a finding to jump to its time.",
+        cap_qa_need_caption: "Generate captions first, then run Caption QA.",
+        cap_qa_missing_file: "The last caption transcript is no longer available. Generate captions again, then run QA.",
+        cap_qa_scanning: "Checking the final caption plan…",
+        cap_qa_clean: "Looks clean",
+        cap_qa_clean_detail: "{n} captions checked. No timing or readability risks found.",
+        cap_qa_found: "{n} item(s) to review",
+        cap_qa_error_count: "{n} critical",
+        cap_qa_warning_count: "{n} warning",
+        cap_qa_review_count: "{n} review",
+        cap_qa_more: "+{n} more findings — refine the source or review nearby captions.",
+        cap_qa_plan_failed: "Could not build a caption QA plan. Generate captions again, then retry.",
         cfg_refine_title: "✨ AI Text Refinement",
         cfg_refine_desc: "Which model cleans up and translates the transcript. Groq uses the free key above.",
         cfg_refine_groq: "Groq · free (uses the key above)",
@@ -235,7 +327,23 @@ var i18n = {
         dl_err_folder: "That save folder cannot be used. Pick another one.",
         dl_err_ffmpeg: "FFmpeg is required for downloads. Install it, then try again.",
         cfg_download_path: "Downloads Folder",
-        cfg_download_path_ph: "Movies/EditFlow Downloads"
+        cfg_download_path_ph: "Movies/EditFlow Downloads",
+        cap_qa_title: "فحص الكابشنات",
+        cap_qa_local: "محلي",
+        cap_qa_desc: "يفحص آخر كابشنات مولدة بحثاً عن مخاطر التوقيت والقراءة واللغة وحدود القص.",
+        cap_qa_run: "تشغيل فحص الكابشنات",
+        cap_qa_note: "الفحص المحلي فوري ولا يغيّر كابشناتك. اضغط على الملاحظة للقفز إلى توقيتها.",
+        cap_qa_need_caption: "أنشئ الكابشنات أولاً ثم شغّل الفحص.",
+        cap_qa_missing_file: "ملف آخر ترجمة لم يعد متاحاً. أنشئ الكابشنات مجدداً ثم شغّل الفحص.",
+        cap_qa_scanning: "يجري فحص خطة الكابشن النهائية…",
+        cap_qa_clean: "النتيجة سليمة",
+        cap_qa_clean_detail: "تم فحص {n} كابشن. لا توجد مخاطر توقيت أو قابلية قراءة.",
+        cap_qa_found: "{n} ملاحظة للمراجعة",
+        cap_qa_error_count: "{n} حرجة",
+        cap_qa_warning_count: "{n} تحذير",
+        cap_qa_review_count: "{n} للمراجعة",
+        cap_qa_more: "+{n} ملاحظات إضافية — حسّن المصدر أو راجع الكابشنات القريبة.",
+        cap_qa_plan_failed: "تعذّر بناء خطة فحص الكابشنات. أنشئ الكابشنات مجدداً ثم أعد المحاولة."
     },
     ar: {
         audio_title: "مستوى الصوت",
@@ -261,15 +369,34 @@ var i18n = {
         transform_anchor: "Anchor",
         audio_quick: "سريع",
         transform_set: "تطبيق",
+        sync_prep_title: "تجهيز المزامنة",
+        sync_prep_desc: "حدّد المقاطع التي تريد مزامنتها. ينتقل كل فيديو أو صوت محدد إلى مسار مستقل مع بقاء توقيته كما هو.",
+        sync_prep_select: "حدّد المقاطع",
+        sync_prep_separate: "مسارات مستقلة",
+        sync_prep_synchronize: "Synchronize",
+        sync_prep_prepare: "تجهيز مسارات المزامنة",
+        sync_prep_undo: "استرجاع آخر تجهيز",
+        sync_prep_safe: "تتحرك المقاطع المحددة فقط. لا قصّ ولا نسخ ولا حذف.",
+        sync_prep_working: "جارٍ تجهيز مسارات المزامنة…",
+        sync_prep_ready: "أصبحت {video} فيديو و{audio} صوت في مسارات مستقلة. استخدم Synchronize من Premiere الآن.",
+        sync_prep_undo_done: "تمت إعادة {n} مقطعاً إلى مساراته الأصلية.",
         paste_title: "لصق من الويب",
         paste_desc: "انسخ أي صورة من المتصفح → اضغط لصق. تضاف إلى ملفات المشروع جاهزة للسحب.",
         paste_btn: "لصق صورة من الإنترنت",
         export_title: "محرك التصدير",
         export_file: "الملف",
         export_file_ph: "اسم التسلسل",
+        export_format: "الصيغة",
+        export_format_video: "فيديو · MP4",
+        export_format_mp3: "صوت · MP3",
+        export_format_wav: "صوت · WAV",
+        export_audio_quality_mp3: "{bitrate} kbps · ستيريو",
+        export_audio_quality_wav: "48 kHz · 16-bit",
         export_saveto: "حفظ في",
         export_browse: "استعراض",
         export_selected: "تصدير المقطع المحدد",
+        export_selected_audio: "تصدير صوت المقطع المحدد",
+        export_audio_preset_missing: "تعذّر العثور على إعداد تصدير الصوت من Adobe. أصلح تثبيت Premiere Pro أو أعد تثبيته ثم حاول مجددًا.",
         export_capture: "📷 التقاط إطار",
         captions_title: "ترجمة سريعة",
         captions_desc: "تفريغ صوتي فائق السرعة بدقة استوديو احترافية. كشف تلقائي لأي لغة وترجمة متزامنة قابلة للتعديل في ثوانٍ.",
@@ -277,6 +404,7 @@ var i18n = {
         cap_accuracy: "الدقة",
         cap_style: "النمط",
         cap_generate_srt: "⚡ إنشاء ترجمة قابلة للتعديل",
+        cap_generate_animated: "✨ إنشاء كابشن متحرك",
         settings_title: "الإعدادات",
         tab_general: "عام",
         tab_presets: "القيم المسبقة",
@@ -356,6 +484,45 @@ var i18n = {
         cap_refine_fix: "\u062a\u0635\u062d\u064a\u062d \u0627\u0644\u0623\u062e\u0637\u0627\u0621 \u0648\u0627\u0644\u0635\u064a\u0627\u063a\u0629",
         cap_refine_translate: "\u062a\u0635\u062d\u064a\u062d \u062b\u0645 \u062a\u0631\u062c\u0645\u0629 \u0625\u0644\u0649\u2026",
         cap_refine_hint: "\u0627\u0644\u062a\u0648\u0642\u064a\u062a\u0627\u062a \u0645\u062d\u0641\u0648\u0638\u0629. \u0627\u062e\u062a\u0631 \u0627\u0644\u0645\u0632\u0648\u0651\u062f \u0645\u0646 \u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a \u2190 \u0627\u0644\u062a\u0631\u062c\u0645\u0629.",
+        cap_animated: "\u0623\u0646\u0645\u0627\u0637 \u0643\u0627\u0628\u0634\u0646 \u0645\u062a\u062d\u0631\u0643",
+        cap_animated_note: "\u064a\u0631\u0646\u062f\u0631 \u0637\u0628\u0642\u0629 \u0634\u0641\u0627\u0641\u0629. \u0623\u0648\u0642\u0641\u0647 \u0644\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u062a\u0631\u062c\u0645\u0629 \u0627\u0644\u0642\u0627\u0628\u0644\u0629 \u0644\u0644\u062a\u0639\u062f\u064a\u0644.",
+        cap_animated_remove: "\u062d\u0630\u0641 \u0627\u0644\u0623\u0646\u064a\u0645\u0634\u0646 \u0627\u0644\u0645\u0648\u0644\u0651\u062f",
+        cap_choose_style: "اختر الشكل",
+        cap_choose_style_hint: "ضغطة واحدة والشكل جاهز",
+        cap_style_clean: "وثائقي نظيف",
+        cap_style_pop: "بوب تيك توك",
+        cap_style_reels: "ريلز سماوي",
+        cap_style_box: "مربع أصفر",
+        cap_style_karaoke: "بناء كاريوكي",
+        cap_style_focus: "كلمة واحدة",
+        cap_style_drop: "نزول مرن",
+        cap_style_neon: "نيون متوهج",
+        cap_customize: "ضبط إضافي",
+        cap_customize_hint: "اختياري",
+        cap_font: "الخط",
+        cap_font_preset: "استخدم خط النمط",
+        cap_size: "الحجم",
+        cap_position: "الموضع",
+        cap_position_preset: "موضع النمط",
+        cap_position_low: "أسفل",
+        cap_position_middle: "الوسط",
+        cap_position_high: "أعلى",
+        cap_background: "الخلفية",
+        cap_background_preset: "افتراضي للنمط",
+        cap_background_none: "بدون",
+        cap_background_black: "مربع أسود",
+        cap_background_custom: "مخصصة",
+        cap_text_color: "لون النص",
+        cap_active_color: "الكلمة النشطة",
+        cap_outline_color: "الحد الخارجي",
+        cap_background_color: "لون الخلفية",
+        cap_background_opacity: "شفافية الخلفية",
+        cap_review_before_render: "مراجعة النص قبل الرندر",
+        cap_editor_title: "مراجعة الكابشنات المتحركة",
+        cap_editor_hint: "يُحفظ التوقيت. إذا تغير عدد الكلمات يُعاد توزيع التوقيت داخل الكابشن نفسه.",
+        cap_editor_render: "تطبيق التعديلات والرندر",
+        cap_editor_count: "{n} كابشن",
+        cap_editor_empty: "لا يمكن ترك نص الكابشن فارغًا.",
         cap_refine_working: "\u062c\u0627\u0631\u064a \u062a\u062d\u0633\u064a\u0646 \u0627\u0644\u0646\u0635\u2026",
         cap_refine_done: "\u062a\u0645 \u062a\u062d\u0633\u064a\u0646 {n} \u0645\u0642\u0637\u0639\u0627\u064b \u2713",
         cap_refine_failed: "\u062a\u064f\u062e\u0637\u0651\u064a \u0627\u0644\u062a\u062d\u0633\u064a\u0646 \u2014 \u0627\u0633\u062a\u064f\u062e\u062f\u0645 \u0627\u0644\u0646\u0635 \u0627\u0644\u0623\u0635\u0644\u064a.",
@@ -466,7 +633,7 @@ document.addEventListener("DOMContentLoaded", function() {
             configPath = extensionPath + "/editflow_config.json"; // fallback
             EFP_BIN_DIR = extensionPath + "/bin";
         }
-        if (fsModule) { loadSettings(); findExportPreset(); }
+        if (fsModule) { loadSettings(); findExportPreset(); findAudioExportPresets(); }
         try { dsp = new DSPTools(); } catch(e) {}
 
         // Bind progress cancel button
@@ -1015,6 +1182,84 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     // ============================================================
+    // SYNC PREP — separate selected sources into clean lanes before
+    // calling Premiere's native Synchronize command. The JSX route keeps
+    // an undo manifest, so this panel control never strands an edit.
+    // ============================================================
+    (function() {
+        var prepareBtn = document.getElementById("btn-sync-prep");
+        var undoBtn = document.getElementById("btn-sync-prep-undo");
+        var statusEl = document.getElementById("sync-prep-status");
+        var busy = false;
+        if (!prepareBtn || !undoBtn || !statusEl) return;
+
+        function replaceTokens(text, values) {
+            for (var key in values) {
+                if (values.hasOwnProperty(key)) text = text.replace(new RegExp("\\{" + key + "\\}", "g"), values[key]);
+            }
+            return text;
+        }
+        function setSyncStatus(text, isError) {
+            statusEl.textContent = text || "";
+            statusEl.className = "sync-prep-status" + (isError ? " is-error" : "");
+        }
+        function setBusy(nextBusy) {
+            busy = nextBusy;
+            prepareBtn.disabled = nextBusy;
+            prepareBtn.setAttribute("aria-busy", nextBusy ? "true" : "false");
+            if (nextBusy) prepareBtn.classList.add("is-working");
+            else prepareBtn.classList.remove("is-working");
+        }
+        function refreshUndoAvailability() {
+            undoBtn.disabled = true;
+            if (!csInterface) return;
+            csInterface.evalScript('$._editflow.getSyncPrepUndoState()', function(raw) {
+                var state = safeParse(raw);
+                undoBtn.disabled = !(state && state.status === "success" && state.available);
+            });
+        }
+        function run(method, isUndo) {
+            if (busy || !csInterface) {
+                if (!csInterface) setSyncStatus("Premiere connection is unavailable.", true);
+                return;
+            }
+            setBusy(true);
+            if (isUndo) {
+                undoBtn.disabled = true;
+                setSyncStatus("");
+            } else {
+                setSyncStatus(t_refine("sync_prep_working"));
+            }
+            csInterface.evalScript('$._editflow.' + method + '()', function(raw) {
+                setBusy(false);
+                var result = safeParse(raw);
+                if (!result || result.status !== "success") {
+                    setSyncStatus((result && result.message) || "Premiere could not prepare sync lanes.", true);
+                    refreshUndoAvailability();
+                    return;
+                }
+                var message;
+                if (isUndo) {
+                    message = replaceTokens(t_refine("sync_prep_undo_done"), {n: result.count || 0});
+                    undoBtn.disabled = true;
+                } else {
+                    message = replaceTokens(t_refine("sync_prep_ready"), {
+                        video: result.video || 0,
+                        audio: result.audio || 0
+                    });
+                    undoBtn.disabled = false;
+                }
+                setSyncStatus(message, false);
+                showStatus(message, "green");
+            });
+        }
+
+        prepareBtn.addEventListener("click", function() { run("prepareSyncLanes", false); });
+        undoBtn.addEventListener("click", function() { run("undoSyncLanes", true); });
+        setTimeout(refreshUndoAvailability, 800);
+    })();
+
+    // ============================================================
     // EXPORT PATH BROWSER
     // ============================================================
     (function() {
@@ -1252,6 +1497,9 @@ document.addEventListener("DOMContentLoaded", function() {
         var lang  = document.getElementById("cap-language").value;
         var model = document.getElementById("cap-model").value;
         var style = document.getElementById("cap-style").value;
+        var animatedEnabled = !!(document.getElementById("cap-animated") || {}).checked;
+        var animatedPreset = (document.getElementById("cap-animated-preset") || {value:"clean-film"}).value || "clean-film";
+        var animatedOptions = animatedCaptionOptionsFromUI();
         var wordsMin = parseInt((document.getElementById("cap-words-per") || {value: "3"}).value, 10) || 3;
         var wordsMax = parseInt((document.getElementById("cap-words-max") || {value: "5"}).value, 10) || 5;
         if (wordsMin < 1) wordsMin = 1;
@@ -1261,11 +1509,498 @@ document.addEventListener("DOMContentLoaded", function() {
         settings.captions.wordsMin = wordsMin;
         settings.captions.wordsMax = wordsMax;
         settings.captions.wordsPerCaption = wordsMin; // back-compat mirror
+        settings.captions.language = lang;
+        settings.captions.model = model;
+        settings.captions.style = style;
+        settings.captions.animated = animatedEnabled;
+        settings.captions.animatedPreset = animatedPreset;
+        settings.captions.animatedUiVersion = 2;
+        settings.captions.animatedFont = animatedOptions.font;
+        settings.captions.animatedSize = animatedOptions.size;
+        settings.captions.animatedPosition = animatedOptions.position;
+        settings.captions.animatedBackgroundMode = animatedOptions.backgroundMode;
+        settings.captions.animatedReview = animatedOptions.review;
         saveSettings();
         var wordsPerCaption = wordsMin; // legacy var still used by jsTranscribe fallback path
 
         var statusLine = document.getElementById("cap-status");
         function setStatus(t) { if (statusLine) statusLine.textContent = t; }
+
+        function jsxArg(value) {
+            return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+        }
+
+        function ensureLocalDir(dir) {
+            if (!dir || fsModule.existsSync(dir)) return;
+            var parent = pathModule.dirname(dir);
+            if (parent && parent !== dir) ensureLocalDir(parent);
+            try { fsModule.mkdirSync(dir); } catch(e) {
+                if (!fsModule.existsSync(dir)) throw e;
+            }
+        }
+
+        function removeDirFiles(dir) {
+            try {
+                var names = fsModule.readdirSync(dir);
+                for (var i = 0; i < names.length; i++) {
+                    try { fsModule.unlinkSync(pathModule.join(dir, names[i])); } catch(eFile) {}
+                }
+                try { fsModule.rmdirSync(dir); } catch(eDir) {}
+            } catch(e) {}
+        }
+
+        function clamp01(v) { return Math.max(0, Math.min(1, v)); }
+        function padInt(v, width) {
+            var out = String(v);
+            while (out.length < width) out = "0" + out;
+            return out;
+        }
+        function easeOutCubic(v) { v = clamp01(v); return 1 - Math.pow(1 - v, 3); }
+        function easeOutBack(v) {
+            v = clamp01(v);
+            var c1 = 1.70158, c3 = c1 + 1;
+            return 1 + c3 * Math.pow(v - 1, 3) + c1 * Math.pow(v - 1, 2);
+        }
+        function containsArabic(text) { return /[\u0600-\u06FF]/.test(text || ""); }
+
+        function captionPreset(id, custom) {
+            var all = {
+                "clean-film": {
+                    font: "Helvetica Neue", weight: 700, fill: "#FFFFFF", active: "#FFFFFF",
+                    stroke: "#080808", strokeWidth: 5, shadow: "rgba(0,0,0,.52)",
+                    animation: "fade", background: null, highlight: false,
+                    sizeScale: 0.82, position: "low"
+                },
+                "viral-pop": {
+                    font: "Arial Black", weight: 900, fill: "#FFFFFF", active: "#FFD43B",
+                    stroke: "#080808", strokeWidth: 9, shadow: "rgba(0,0,0,.55)",
+                    animation: "pop", background: null, sizeScale: 1, position: "low"
+                },
+                "reels-cyan": {
+                    font: "Arial", weight: 900, fill: "#FFFFFF", active: "#26E6FF",
+                    stroke: "#071014", strokeWidth: 8, shadow: "rgba(0,0,0,.58)",
+                    animation: "slide", background: null, sizeScale: 0.94, position: "low"
+                },
+                "yellow-box": {
+                    font: "Arial Black", weight: 900, fill: "#FFFFFF", active: "#111111",
+                    stroke: "#070707", strokeWidth: 8, shadow: "rgba(0,0,0,.54)",
+                    animation: "punch", background: null, activeBox: "#FFD83D",
+                    sizeScale: 0.96, position: "low"
+                },
+                "karaoke-build": {
+                    font: "Arial", weight: 800, fill: "#FFFFFF", active: "#43F58A",
+                    stroke: "#07100A", strokeWidth: 7, shadow: "rgba(0,0,0,.56)",
+                    animation: "fade", background: "rgba(0,0,0,.28)", revealMode: "build",
+                    sizeScale: 0.92, position: "low"
+                },
+                "focus-word": {
+                    font: "Arial Black", weight: 900, fill: "#FFFFFF", active: "#FFFFFF",
+                    stroke: "#070707", strokeWidth: 10, shadow: "rgba(0,0,0,.62)",
+                    animation: "focus", background: null, singleWord: true,
+                    sizeScale: 1.30, position: "middle"
+                },
+                "drop-bounce": {
+                    font: "Arial", weight: 900, fill: "#FFFFFF", active: "#64FF9E",
+                    stroke: "#070707", strokeWidth: 8, shadow: "rgba(0,0,0,.58)",
+                    animation: "drop", background: "rgba(0,0,0,.34)",
+                    sizeScale: 0.95, position: "low"
+                },
+                "neon-karaoke": {
+                    font: "Arial", weight: 800, fill: "#F7FAFF", active: "#5CF2FF",
+                    stroke: "#071014", strokeWidth: 7, shadow: "rgba(92,242,255,.70)",
+                    animation: "neon", background: "rgba(2,10,14,.50)",
+                    sizeScale: 0.94, position: "low"
+                }
+            };
+            var source = all[id] || all["clean-film"];
+            var preset = {};
+            for (var key in source) if (source.hasOwnProperty(key)) preset[key] = source[key];
+            custom = custom || {};
+            var customFont = String(custom.font || "").replace(/[\r\n'\\]/g, "").slice(0, 80);
+            preset.font = customFont || preset.font || "Arial";
+            preset.fontCss = "'" + preset.font + "', sans-serif";
+            preset.sizeScale = (preset.sizeScale || 1) * Math.max(0.6, Math.min(1.5, (Number(custom.size) || 100) / 100));
+            if (custom.position && custom.position !== "preset") preset.position = custom.position;
+            if (custom.backgroundMode === "none") preset.background = null;
+            else if (custom.backgroundMode === "black") preset.background = "rgba(0,0,0,.58)";
+            return preset;
+        }
+
+        // Frame renderer shared by the live visual style and the exported MOV.
+        // It is deterministic: frame time alone controls every transform, so the
+        // same transcript always renders exactly the same animation.
+        function drawAnimatedCaptionFrame(canvas, group, elapsed, presetId, custom) {
+            var ctx = canvas.getContext("2d", {alpha:true});
+            var width = canvas.width, height = canvas.height;
+            var preset = captionPreset(presetId, custom);
+            var duration = Math.max(0.25, group.end - group.start);
+            var sourceWords = (group.words || []).slice(0);
+            if (!sourceWords.length) {
+                var pieces = String(group.text || "").split(/\s+/);
+                var per = duration / Math.max(1, pieces.length);
+                for (var pi = 0; pi < pieces.length; pi++) {
+                    sourceWords.push({text:pieces[pi], start:group.start + pi * per, end:group.start + (pi + 1) * per});
+                }
+            }
+
+            var absoluteTime = group.start + elapsed;
+            var activeIndex = 0;
+            for (var aw = 0; aw < sourceWords.length; aw++) {
+                if (absoluteTime >= sourceWords[aw].start) activeIndex = aw;
+                if (absoluteTime >= sourceWords[aw].start && absoluteTime < sourceWords[aw].end) {
+                    activeIndex = aw;
+                    break;
+                }
+            }
+            var words = sourceWords;
+            if (preset.singleWord) {
+                words = [sourceWords[Math.max(0, Math.min(sourceWords.length - 1, activeIndex))]];
+                activeIndex = 0;
+            } else if (preset.revealMode === "build") {
+                words = sourceWords.slice(0, activeIndex + 1);
+                activeIndex = words.length - 1;
+            }
+
+            ctx.clearRect(0, 0, width, height);
+            var entry = easeOutBack(elapsed / 0.24);
+            var entrySmooth = easeOutCubic(elapsed / 0.24);
+            var exit = easeOutCubic((duration - elapsed) / 0.14);
+            var opacity = Math.min(clamp01(elapsed / 0.09), exit);
+            var scale = 1, yOffset = 0;
+            if (preset.animation === "pop") scale = 0.68 + 0.32 * entry;
+            if (preset.animation === "drop") yOffset = -72 * (1 - entry);
+            if (preset.animation === "fade") yOffset = 12 * (1 - entrySmooth);
+            if (preset.animation === "slide") yOffset = 30 * (1 - entrySmooth);
+            if (preset.animation === "punch") scale = 0.90 + 0.10 * entrySmooth;
+            if (preset.animation === "focus") scale = 0.84 + 0.16 * entrySmooth;
+            if (preset.animation === "neon") {
+                scale = 0.94 + 0.06 * easeOutCubic(elapsed / 0.20);
+                yOffset = 18 * (1 - easeOutCubic(elapsed / 0.20));
+            }
+
+            var fontSize = Math.round(Math.max(32, Math.min(width * 0.072, height * 0.088) * preset.sizeScale));
+            var maxWidth = width * 0.86;
+            var lines = null;
+            function makeLines(size) {
+                ctx.font = preset.weight + " " + size + "px " + preset.fontCss;
+                var out = [], current = [], currentWidth = 0;
+                var space = ctx.measureText(" ").width;
+                for (var wi = 0; wi < words.length; wi++) {
+                    var wordWidth = ctx.measureText(words[wi].text).width;
+                    if (current.length && currentWidth + space + wordWidth > maxWidth) {
+                        out.push({words:current, width:currentWidth});
+                        current = []; currentWidth = 0;
+                    }
+                    if (current.length) currentWidth += space;
+                    current.push({word:words[wi], width:wordWidth});
+                    currentWidth += wordWidth;
+                }
+                if (current.length) out.push({words:current, width:currentWidth});
+                return out;
+            }
+            lines = makeLines(fontSize);
+            while (lines.length > 2 && fontSize > 42) {
+                fontSize -= 4;
+                lines = makeLines(fontSize);
+            }
+
+            var lineGap = Math.round(fontSize * 1.22);
+            var positionRatio = preset.position === "high" ? 0.48 : (preset.position === "middle" ? 0.66 : (height > width ? 0.76 : 0.82));
+            var centerY = Math.round(height * positionRatio);
+            var blockHeight = Math.max(fontSize, lines.length * lineGap);
+            var blockTop = centerY - blockHeight / 2;
+            ctx.save();
+            ctx.globalAlpha = opacity;
+            ctx.translate(width / 2, centerY + yOffset);
+            ctx.scale(scale, scale);
+            ctx.translate(-width / 2, -centerY);
+
+            if (preset.background) {
+                var widest = 0;
+                for (var li0 = 0; li0 < lines.length; li0++) widest = Math.max(widest, lines[li0].width);
+                var padX = fontSize * 0.28, padY = fontSize * 0.18;
+                var bx = width / 2 - widest / 2 - padX;
+                var by = blockTop - padY;
+                var bw = widest + padX * 2, bh = blockHeight + padY * 2;
+                var radius = fontSize * 0.20;
+                ctx.beginPath();
+                ctx.moveTo(bx + radius, by);
+                ctx.lineTo(bx + bw - radius, by);
+                ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + radius);
+                ctx.lineTo(bx + bw, by + bh - radius);
+                ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - radius, by + bh);
+                ctx.lineTo(bx + radius, by + bh);
+                ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - radius);
+                ctx.lineTo(bx, by + radius);
+                ctx.quadraticCurveTo(bx, by, bx + radius, by);
+                ctx.closePath();
+                ctx.fillStyle = preset.background;
+                ctx.fill();
+            }
+
+            ctx.font = preset.weight + " " + fontSize + "px " + preset.fontCss;
+            ctx.textBaseline = "middle";
+            ctx.textAlign = "left";
+            ctx.lineJoin = "round";
+            var wordCounter = 0;
+            var rtl = containsArabic(group.text);
+            for (var li = 0; li < lines.length; li++) {
+                var line = lines[li];
+                var x = rtl ? width / 2 + line.width / 2 : width / 2 - line.width / 2;
+                var y = blockTop + fontSize / 2 + li * lineGap;
+                var spaceWidth = ctx.measureText(" ").width;
+                for (var lw = 0; lw < line.words.length; lw++, wordCounter++) {
+                    var info = line.words[lw];
+                    if (rtl) x -= info.width;
+                    var active = preset.highlight !== false && wordCounter === activeIndex;
+                    var wordScale = 1;
+                    if (active && (preset.animation === "pop" || preset.animation === "drop" || preset.animation === "punch")) {
+                        var wDur = Math.max(0.05, info.word.end - info.word.start);
+                        var wProg = clamp01((absoluteTime - info.word.start) / Math.min(0.16, wDur));
+                        wordScale = 0.78 + 0.22 * easeOutBack(wProg);
+                    }
+                    ctx.save();
+                    if (wordScale !== 1) {
+                        ctx.translate(x + info.width / 2, y);
+                        ctx.scale(wordScale, wordScale);
+                        ctx.translate(-(x + info.width / 2), -y);
+                    }
+                    if (active && preset.activeBox) {
+                        var activePadX = fontSize * 0.13;
+                        var activePadY = fontSize * 0.10;
+                        var activeRadius = fontSize * 0.10;
+                        var ax = x - activePadX;
+                        var ay = y - fontSize * 0.52 - activePadY;
+                        var awidth = info.width + activePadX * 2;
+                        var aheight = fontSize * 1.04 + activePadY * 2;
+                        ctx.beginPath();
+                        ctx.moveTo(ax + activeRadius, ay);
+                        ctx.lineTo(ax + awidth - activeRadius, ay);
+                        ctx.quadraticCurveTo(ax + awidth, ay, ax + awidth, ay + activeRadius);
+                        ctx.lineTo(ax + awidth, ay + aheight - activeRadius);
+                        ctx.quadraticCurveTo(ax + awidth, ay + aheight, ax + awidth - activeRadius, ay + aheight);
+                        ctx.lineTo(ax + activeRadius, ay + aheight);
+                        ctx.quadraticCurveTo(ax, ay + aheight, ax, ay + aheight - activeRadius);
+                        ctx.lineTo(ax, ay + activeRadius);
+                        ctx.quadraticCurveTo(ax, ay, ax + activeRadius, ay);
+                        ctx.closePath();
+                        ctx.fillStyle = preset.activeBox;
+                        ctx.shadowColor = "rgba(0,0,0,.38)";
+                        ctx.shadowBlur = 8;
+                        ctx.shadowOffsetY = 3;
+                        ctx.fill();
+                    }
+                    ctx.shadowColor = active ? preset.shadow : "rgba(0,0,0,.48)";
+                    ctx.shadowBlur = (preset.animation === "neon" && active) ? 22 : 10;
+                    ctx.shadowOffsetY = 3;
+                    ctx.strokeStyle = preset.stroke;
+                    ctx.lineWidth = preset.strokeWidth * 2;
+                    if (!(active && preset.activeBox)) ctx.strokeText(info.word.text, x, y);
+                    ctx.shadowBlur = (preset.animation === "neon" && active) ? 18 : 5;
+                    ctx.fillStyle = active ? preset.active : preset.fill;
+                    ctx.fillText(info.word.text, x, y);
+                    ctx.restore();
+                    if (rtl) x -= spaceWidth;
+                    else x += info.width + spaceWidth;
+                }
+            }
+            ctx.restore();
+        }
+
+        function renderAnimatedCaptions(summary, timelineStart) {
+            showProgress("Preparing animated caption plan…", 76, true);
+            setStatus("Building CapCut-style animation plan…");
+            var planPath = pathModule.join(osModule.tmpdir(), "efp_anim_plan_" + Date.now() + ".json");
+            var planCfg = {
+                style: style,
+                animation: animatedPreset,
+                offsetSecs: timelineStart,
+                wordsPerCaption: wordsPerCaption,
+                wordsMin: wordsMin,
+                wordsMax: wordsMax,
+                planOnly: true,
+                planPath: planPath
+            };
+            var planCfgEsc = jsxArg(JSON.stringify(planCfg));
+            csInterface.evalScript(
+                '$._editflow.placeAnimatedCaptions("' + jsxArg(summary.json) + '","' + planCfgEsc + '")',
+                function(planRes) {
+                    var planResult = safeParse(planRes);
+                    if (!planResult || planResult.status !== "success" || !planResult.plan) {
+                        hideProgress();
+                        showStatus("Animated captions could not build a timing plan. Editable captions were used instead.", "orange");
+                        return fallbackSRT(summary, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", timelineStart, setStatus, wordsPerCaption, wordsMin, wordsMax);
+                    }
+                    var plan;
+                    try { plan = JSON.parse(fsModule.readFileSync(planResult.plan, "utf8")); }
+                    catch(ePlanRead) {
+                        hideProgress();
+                        showStatus("Could not read the animation plan. Editable captions were used instead.", "orange");
+                        return fallbackSRT(summary, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", timelineStart, setStatus, wordsPerCaption, wordsMin, wordsMax);
+                    }
+                    var groups = plan.groups || [];
+                    if (!groups.length) {
+                        hideProgress();
+                        showStatus("No animated caption groups were produced.", "red");
+                        return;
+                    }
+
+                    function beginAnimatedRender(reviewedGroups) {
+                    groups = reviewedGroups || groups;
+                    showProgress("Preparing animated caption render…", 78, true);
+                    csInterface.evalScript('$._editflow.getSequenceInfo()', function(seqRaw) {
+                        var seqInfo = safeParse(seqRaw) || {};
+                        var frameW = parseInt(seqInfo.width, 10) || 1920;
+                        var frameH = parseInt(seqInfo.height, 10) || 1080;
+                        var fps = 30;
+                        ensureFFmpegGlobal(function(msg, pct) {
+                            showProgress(msg, Math.min(80, pct), true);
+                        }, function(ffErr, ffmpegBin) {
+                            if (ffErr) {
+                                hideProgress();
+                                showStatus("Animated captions need FFmpeg. Editable captions were used instead.", "orange");
+                                return fallbackSRT(summary, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", timelineStart, setStatus, wordsPerCaption, wordsMin, wordsMax);
+                            }
+                            var runId = String(Date.now());
+                            var baseRoot = pathModule.join(pathModule.dirname(configPath || summary.json), "animated_captions");
+                            var outputDir = pathModule.join(baseRoot, "run_" + runId);
+                            try { ensureLocalDir(outputDir); }
+                            catch(eDir) {
+                                hideProgress();
+                                showStatus("Could not create the animation output folder: " + eDir.message, "red");
+                                return;
+                            }
+                            var canvas = document.createElement("canvas");
+                            canvas.width = frameW;
+                            canvas.height = frameH;
+                            var clips = [];
+                            var index = 0;
+
+                            function failRender(message) {
+                                hideProgress();
+                                activeCaptionProcess = null;
+                                setStatus("Animated render stopped.");
+                                showStatus(message, "red");
+                            }
+
+                            function renderNext() {
+                                if (index >= groups.length) {
+                                    var manifestPath = pathModule.join(outputDir, "manifest.json");
+                                    var manifest = {
+                                        version: 1,
+                                        animation: animatedPreset,
+                                        font: animatedOptions.font,
+                                        appearance: animatedOptions,
+                                        clips: clips
+                                    };
+                                    fsModule.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
+                                    showProgress("Placing animated captions on timeline…", 96, true);
+                                    setStatus("Importing " + clips.length + " transparent animation clips…");
+                                    csInterface.evalScript(
+                                        '$._editflow.placeRenderedCaptions("' + jsxArg(manifestPath) + '","{}")',
+                                        function(placeRes) {
+                                            showProgress("Done!", 100);
+                                            setTimeout(hideProgress, 2200);
+                                            var placed = safeParse(placeRes);
+                                            handleJSXResult(placeRes);
+                                            if (placed && placed.status === "success" && placed.placed > 0) {
+                                                setStatus("✅ " + placed.placed + " animated captions · " + animatedPreset + " · removable anytime");
+                                            } else {
+                                                setStatus("Animated clips rendered, but Premiere could not place them automatically.");
+                                                showStatus((placed && placed.message) || "Add an empty video track and try again.", "orange");
+                                            }
+                                        }
+                                    );
+                                    return;
+                                }
+
+                                var group = groups[index];
+                                var duration = Math.max(0.25, Math.min(15, group.end - group.start));
+                                // Floor to the frame grid so the encoded MOV can
+                                // never extend into the next caption by a rounded-up
+                                // frame and trigger Premiere's insert/split behaviour.
+                                var frameCount = Math.max(2, Math.floor(duration * fps + 0.000001));
+                                var frameDir = pathModule.join(outputDir, "frames_" + String(index));
+                                ensureLocalDir(frameDir);
+                                for (var frame = 0; frame < frameCount; frame++) {
+                                    var elapsed = Math.min(duration, frame / fps);
+                                    drawAnimatedCaptionFrame(canvas, group, elapsed, animatedPreset, animatedOptions);
+                                    var png = canvas.toDataURL("image/png").split(",")[1];
+                                    var frameName = "frame_" + padInt(frame, 5) + ".png";
+                                    fsModule.writeFileSync(pathModule.join(frameDir, frameName), Buffer.from(png, "base64"));
+                                }
+                                var movName = "efp_anim_" + runId + "_" + padInt(index, 4) + ".mov";
+                                var movPath = pathModule.join(outputDir, movName);
+                                var inputPattern = pathModule.join(frameDir, "frame_%05d.png");
+                                var ffArgs = ["-y", "-hide_banner", "-loglevel", "error", "-framerate", String(fps), "-i", inputPattern,
+                                              "-c:v", "qtrle", "-pix_fmt", "argb", "-an", movPath];
+                                var pct = 80 + Math.round((index / groups.length) * 15);
+                                showProgress("Rendering animated caption " + (index + 1) + "/" + groups.length + "…", pct, true);
+                                setStatus("Rendering " + animatedPreset + " · " + (index + 1) + "/" + groups.length);
+                                activeCaptionProcess = execFileModule(ffmpegBin, ffArgs, {timeout:180000, maxBuffer:8 * 1024 * 1024}, function(encErr) {
+                                    activeCaptionProcess = null;
+                                    removeDirFiles(frameDir);
+                                    if (encErr || !fsModule.existsSync(movPath)) {
+                                        return failRender("FFmpeg could not encode animated caption " + (index + 1) + ": " + ((encErr && encErr.message) || "unknown error"));
+                                    }
+                                    clips.push({path:movPath, start:group.start, end:group.end});
+                                    index++;
+                                    setTimeout(renderNext, 0);
+                                });
+                            }
+                            renderNext();
+                        });
+                    });
+                    }
+
+                    if (animatedOptions.review) {
+                        hideProgress();
+                        setStatus("Review caption text, then apply edits to render.");
+                        reviewAnimatedCaptionGroups(groups, function(reviewedGroups) {
+                            if (!reviewedGroups) {
+                                hideProgress();
+                                setStatus("Animated caption render cancelled. No timeline clips were changed.");
+                                return;
+                            }
+                            beginAnimatedRender(reviewedGroups);
+                        });
+                    } else {
+                        beginAnimatedRender(groups);
+                    }
+                }
+            );
+        }
+
+        function rememberCaptionQaSource(summary, timelineStart) {
+            if (!summary || !summary.json) return;
+            var mapped = false;
+            try {
+                if (fsModule && fsModule.existsSync(summary.json)) {
+                    mapped = !!(JSON.parse(fsModule.readFileSync(summary.json, "utf8")) || {}).timelineMapped;
+                }
+            } catch(eRead) {
+                console.warn("[Caption QA] could not inspect summary metadata:", eRead.message);
+            }
+            settings.captionQa = {
+                lastSummaryPath: String(summary.json),
+                targetCode: String(summary.requestedLang || settings.captions.language || "auto"),
+                style: String(style || settings.captions.style || "phrase"),
+                wordsMin: parseInt(wordsMin, 10) || 3,
+                wordsMax: parseInt(wordsMax, 10) || 5,
+                // A multi-clip transcript has already been restored to absolute
+                // timeline seconds. A single source remains relative to its clip.
+                timelineOffset: mapped ? 0 : (parseFloat(timelineStart) || 0)
+            };
+            saveSettings();
+        }
+
+        function placeCaptionResult(summary, timelineStart) {
+            // Remember the final (possibly AI-refined) transcript, not Whisper's
+            // raw result, so QA always reviews precisely what reaches Premiere.
+            rememberCaptionQaSource(summary, timelineStart);
+            if (animatedEnabled) return renderAnimatedCaptions(summary, timelineStart);
+            return fallbackSRT(summary, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", timelineStart, setStatus, wordsPerCaption, wordsMin, wordsMax);
+        }
 
         // Optional AI refinement between transcription and placement. Failures here
         // are non-fatal by design: the user still gets the raw Whisper captions.
@@ -1296,11 +2031,26 @@ document.addEventListener("DOMContentLoaded", function() {
             vi: "Vietnamese", yi: "Yiddish", yo: "Yoruba", zh: "Chinese"
         };
 
-        function withRefinement(summary, setStatus, next) {
+        // Reverse lookup, built once. Whisper reports the spoken language as a NAME
+        // ("Arabic"); every decision here is made on CODES. Without this map a run
+        // where the language probe came back inconclusive had no spoken language at
+        // all, so the translate rule could never fire.
+        var LANG_NAME_TO_CODE = (function() {
+            var m = {};
+            for (var c in LANG_CODE_TO_NAME) {
+                if (LANG_CODE_TO_NAME.hasOwnProperty(c)) {
+                    m[LANG_CODE_TO_NAME[c].toLowerCase()] = c;
+                }
+            }
+            return m;
+        })();
+
+        function withRefinement(summary, setStatus, next, placementOffset) {
             // Refinement is an optional enhancement: every step is guarded so a bug
             // in here can never strand the user on a frozen progress bar. A thrown
             // error once killed the whole chain silently (the callback that places
             // captions simply never ran) — always fall through to `next`.
+            window._efpRefineError = null;
             var opts = null;
             try {
                 opts = (typeof window.efpRefineOptions === "function") ? window.efpRefineOptions() : null;
@@ -1308,7 +2058,14 @@ document.addEventListener("DOMContentLoaded", function() {
                 console.error("[refine] reading options failed: " + eOpts.message);
                 return next(summary);
             }
-            if (!opts || typeof window.efpRefineCaptions !== "function") return next(summary);
+            if (!opts) {
+                console.log("[refine] SKIP: opts null (checkbox off?)");
+                return next(summary);
+            }
+            if (typeof window.efpRefineCaptions !== "function") {
+                console.log("[refine] SKIP: module missing");
+                return next(summary);
+            }
 
             // The spoken language differed from the one the user picked. They chose it
             // for a reason: honour that as a translation target rather than silently
@@ -1328,6 +2085,18 @@ document.addEventListener("DOMContentLoaded", function() {
                              (summary.langMismatch && summary.langMismatch.detected) || "";
             var requestedCode = summary.requestedLang ||
                                 (summary.langMismatch && summary.langMismatch.requested) || "";
+
+            // Last resort for the spoken language: the name Whisper itself reported.
+            // Only safe when there is no detected code, because that state means the
+            // probe was inconclusive and the transcriber fell back to auto-detect —
+            // so summary.language is a genuine detection, not the forced choice being
+            // echoed back. With a detected code present we never look at it.
+            if (!spokenCode && summary.language) {
+                spokenCode = LANG_NAME_TO_CODE[String(summary.language).toLowerCase()] || "";
+                if (spokenCode) console.log("[refine] spoken language taken from Whisper's own report: " + summary.language + " → " + spokenCode);
+            }
+            console.log("[refine] spoken=" + (spokenCode || "?") + " requested=" + (requestedCode || "?") +
+                        " reported=" + (summary.language || "?"));
 
             if (!opts.targetLang && spokenCode && requestedCode &&
                 requestedCode !== "auto" && requestedCode !== spokenCode) {
@@ -1368,7 +2137,14 @@ document.addEventListener("DOMContentLoaded", function() {
 
             function report(stats) {
                 if (!stats) return;
-                setStatus(t_refine("cap_refine_done").replace("{n}", stats.changed) + " · " + stats.provider);
+                var line = t_refine("cap_refine_done").replace("{n}", stats.changed) + " · " + stats.provider;
+                // Say so when part of the transcript was left alone. Silence here is
+                // what made half-translated subtitles look like a working run.
+                if (stats.untouched) {
+                    line += "  ⚠ " + stats.untouched + " segment(s) left unchanged";
+                    window._efpRefineError = stats.untouched + " segment(s) could not be refined — try the Claude engine";
+                }
+                setStatus(line);
                 console.log("[refine] provider used: " + stats.provider);
             }
 
@@ -1377,11 +2153,20 @@ document.addEventListener("DOMContentLoaded", function() {
             try {
                 // Pass 1 — correct the transcript in its original language.
                 window.efpRefineCaptions(summary, opts,
-                    function(doneN, totalN) {
+                    function(doneN, totalN, note) {
                         var pct = 78 + Math.round((doneN / Math.max(totalN, 1)) * 3);
-                        showProgress(t_refine("cap_refine_working") + "  " + doneN + "/" + totalN, pct, false);
+                        var label = t_refine("cap_refine_working") + "  " + doneN + "/" + totalN +
+                                    (note ? " · " + note : "");
+                        showProgress(label, pct, false);
+                        setStatus(label);
                     },
                     function(err, result, stats) {
+                        // showStatus's banner clears itself after 5 seconds, and
+                        // placing captions takes far longer than that — every
+                        // refinement failure so far was wiped off screen before the
+                        // user could read it, and the run ended on a green success
+                        // line. Record it so the FINAL status line has to carry it.
+                        window._efpRefineError = err || null;
                         if (err === "missing_key") {
                             showStatus(t_refine("cap_refine_err_key"), "orange");
                         } else if (err && err.indexOf("RATE_LIMIT:") === 0) {
@@ -1413,7 +2198,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                 }
                                 // Place the translation on caption track 2 first, then
                                 // hand the original back so it lands on track 1.
-                                placeSecondSubtitle(translated, opts.secondLang, function() {
+                                placeSecondSubtitle(translated, opts.secondLang, placementOffset, function() {
                                     proceed(corrected);
                                 });
                             }
@@ -1429,12 +2214,12 @@ document.addEventListener("DOMContentLoaded", function() {
 
         // Places a translated caption set on the SECOND caption track. Failure here
         // is non-fatal: the primary subtitle still goes down either way.
-        function placeSecondSubtitle(translatedSummary, langName, done) {
+        function placeSecondSubtitle(translatedSummary, langName, placementOffset, done) {
             try {
                 var cfg2 = {
                     style: style, animation: "none", font: "Arial",
                     size: 72, color: "#FFFFFF", highlight: "#FFFFFF",
-                    offsetSecs: 0,
+                    offsetSecs: parseFloat(placementOffset) || 0,
                     wordsPerCaption: wordsPerCaption, wordsMin: wordsMin, wordsMax: wordsMax,
                     captionTrackIndex: 1
                 };
@@ -1564,7 +2349,166 @@ document.addEventListener("DOMContentLoaded", function() {
             // ── Determine media path and timeline info ──
             // Variables used by dispatch logic below
 
-            function runTranscriber(mPath, tlStart, cIn, cOut, cDur) {
+            // Read the exact duration of the normalized PCM WAV part that ffmpeg
+            // produced. Source in/out duration is not reliable for speed-changed
+            // clips, and rounding it once per clip accumulates visible drift across
+            // a long multi-clip selection.
+            function wavDuration(filePath) {
+                var fd = null;
+                try {
+                    var stat = fsModule.statSync(filePath);
+                    var readLen = Math.min(stat.size, 65536);
+                    var buf = Buffer.alloc ? Buffer.alloc(readLen) : new Buffer(readLen);
+                    fd = fsModule.openSync(filePath, "r");
+                    fsModule.readSync(fd, buf, 0, readLen, 0);
+                    if (buf.toString("ascii", 0, 4) !== "RIFF" ||
+                        buf.toString("ascii", 8, 12) !== "WAVE") return 0;
+                    var pos = 12, byteRate = 0, dataBytes = 0;
+                    while (pos + 8 <= readLen) {
+                        var id = buf.toString("ascii", pos, pos + 4);
+                        var size = buf.readUInt32LE(pos + 4);
+                        if (id === "fmt " && pos + 16 <= readLen) byteRate = buf.readUInt32LE(pos + 16);
+                        if (id === "data") { dataBytes = size; break; }
+                        pos += 8 + size + (size % 2);
+                    }
+                    return (byteRate > 0 && dataBytes > 0) ? dataBytes / byteRate : 0;
+                } catch (e) {
+                    return 0;
+                } finally {
+                    if (fd !== null) { try { fsModule.closeSync(fd); } catch (e2) {} }
+                }
+            }
+
+            // The multi-clip audio file is deliberately compact: the selected clips
+            // are concatenated without potentially 40+ minutes of silence. Restore
+            // each transcript word to its clip's real timeline position before AI
+            // refinement and placement. A segment that crosses a concat boundary is
+            // split so no caption can bridge an empty part of the Premiere timeline.
+            function restoreTimelineMap(summary, timelineMap) {
+                if (!timelineMap || !timelineMap.length || !summary || !summary.json) return summary;
+                var doc = JSON.parse(fsModule.readFileSync(summary.json, "utf8"));
+                var sourceSegs = doc.segments || [];
+                var mapped = [];
+
+                function r3(n) { return Math.round(n * 1000) / 1000; }
+                function mapTime(t, entry) {
+                    var audioDur = entry.audioEnd - entry.audioStart;
+                    var scale = (audioDur > 0 && entry.timelineDuration > 0)
+                        ? entry.timelineDuration / audioDur : 1;
+                    return entry.timelineStart + (t - entry.audioStart) * scale;
+                }
+                function copyExtras(src, dst) {
+                    for (var key in src) {
+                        if (src.hasOwnProperty(key) && key !== "start" && key !== "end" &&
+                            key !== "text" && key !== "words" && key !== "timelineBreak") {
+                            dst[key] = src[key];
+                        }
+                    }
+                }
+
+                for (var si = 0; si < sourceSegs.length; si++) {
+                    var seg = sourceSegs[si];
+                    var sw = seg.words || [];
+                    var emitted = false;
+
+                    if (sw.length) {
+                        for (var mi = 0; mi < timelineMap.length; mi++) {
+                            var entry = timelineMap[mi];
+                            var outWords = [];
+                            for (var wi = 0; wi < sw.length; wi++) {
+                                var word = sw[wi];
+                                var mid = ((parseFloat(word.start) || 0) + (parseFloat(word.end) || 0)) / 2;
+                                var isLastMap = (mi === timelineMap.length - 1);
+                                if (mid >= entry.audioStart &&
+                                    (mid < entry.audioEnd || (isLastMap && mid <= entry.audioEnd + 0.05))) {
+                                    var wordStart = parseFloat(word.start);
+                                    var wordEnd = parseFloat(word.end);
+                                    if (isNaN(wordStart)) wordStart = entry.audioStart;
+                                    if (isNaN(wordEnd)) wordEnd = wordStart;
+                                    wordStart = Math.max(wordStart, entry.audioStart);
+                                    wordEnd = Math.min(wordEnd, entry.audioEnd);
+                                    if (wordEnd <= wordStart) wordEnd = Math.min(entry.audioEnd, wordStart + 0.001);
+                                    outWords.push({
+                                        start: r3(mapTime(wordStart, entry)),
+                                        end: r3(mapTime(wordEnd, entry)),
+                                        text: word.text || ""
+                                    });
+                                }
+                            }
+                            if (outWords.length) {
+                                var parts = [];
+                                for (var pi = 0; pi < outWords.length; pi++) {
+                                    if (outWords[pi].text) parts.push(outWords[pi].text);
+                                }
+                                var frag = {
+                                    start: outWords[0].start,
+                                    end: outWords[outWords.length - 1].end,
+                                    text: parts.join(" ").trim(),
+                                    words: outWords,
+                                    _timelineClip: mi
+                                };
+                                copyExtras(seg, frag);
+                                mapped.push(frag);
+                                emitted = true;
+                            }
+                        }
+                    }
+
+                    // Rare provider response with segment timestamps but no word
+                    // timestamps: assign the whole segment by its midpoint.
+                    if (!emitted) {
+                        var segStart = parseFloat(seg.start) || 0;
+                        var segEnd = parseFloat(seg.end) || segStart;
+                        var segMid = (segStart + segEnd) / 2;
+                        for (var fm = 0; fm < timelineMap.length; fm++) {
+                            var fallbackEntry = timelineMap[fm];
+                            if (segMid >= fallbackEntry.audioStart && segMid <= fallbackEntry.audioEnd + 0.05) {
+                                var fallbackSeg = {
+                                    start: r3(mapTime(Math.max(segStart, fallbackEntry.audioStart), fallbackEntry)),
+                                    end: r3(mapTime(Math.min(segEnd, fallbackEntry.audioEnd), fallbackEntry)),
+                                    text: seg.text || "",
+                                    words: [],
+                                    _timelineClip: fm
+                                };
+                                copyExtras(seg, fallbackSeg);
+                                mapped.push(fallbackSeg);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                mapped.sort(function(a, b) { return a.start - b.start; });
+                var lastForClip = {};
+                for (var li = 0; li < mapped.length; li++) lastForClip[mapped[li]._timelineClip] = li;
+                for (var ci = 0; ci < timelineMap.length; ci++) {
+                    if (lastForClip[ci] !== undefined) mapped[lastForClip[ci]].timelineBreak = true;
+                }
+                var maxEnd = 0, totalWords = 0;
+                for (var oi = 0; oi < mapped.length; oi++) {
+                    delete mapped[oi]._timelineClip;
+                    if (mapped[oi].end > maxEnd) maxEnd = mapped[oi].end;
+                    totalWords += (mapped[oi].words || []).length;
+                }
+
+                doc.segments = mapped;
+                doc.duration = r3(maxEnd);
+                doc.timelineMapped = true;
+                var mappedPath = String(summary.json).replace(/\.efp\.json$/, ".timeline.efp.json");
+                fsModule.writeFileSync(mappedPath, JSON.stringify(doc), "utf8");
+
+                var out = {};
+                for (var sk in summary) { if (summary.hasOwnProperty(sk)) out[sk] = summary[sk]; }
+                out.json = mappedPath;
+                out.duration = doc.duration;
+                out.segments = mapped.length;
+                out.words = totalWords;
+                console.log("[Captions] restored " + timelineMap.length + " clip ranges → " +
+                            mapped.length + " segments across " + doc.duration.toFixed(1) + "s of timeline");
+                return out;
+            }
+
+            function runTranscriber(mPath, tlStart, cIn, cOut, cDur, timelineMap) {
                 // ── Built-in JS transcriber (Windows, no Python) ──
                 if (useJsTranscriber) {
                     var trimNote = (cDur > 0.1) ? (" · " + cDur.toFixed(1) + "s") : "";
@@ -1579,6 +2523,14 @@ document.addEventListener("DOMContentLoaded", function() {
                                 hideProgress(); setStatus("");
                                 showStatus("Caption error: " + (summary.message || "unknown").slice(0, 120), "red");
                                 return;
+                            }
+                            if (timelineMap && timelineMap.length) {
+                                try { summary = restoreTimelineMap(summary, timelineMap); }
+                                catch (mapErr) {
+                                    hideProgress(); setStatus("");
+                                    showStatus("Could not restore multi-clip timeline positions: " + mapErr.message, "red");
+                                    return;
+                                }
                             }
                             if (summary.langWarning) {
                     // The spoken language differed from the one selected. Say so loudly:
@@ -1602,8 +2554,8 @@ document.addEventListener("DOMContentLoaded", function() {
                             showProgress("Syncing captions to timeline…", 75);
                             setStatus("Building timeline-synced captions…");
                             withRefinement(summary, setStatus, function(_s) {
-                                fallbackSRT(_s, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", tlStart, setStatus, wordsPerCaption, wordsMin, wordsMax);
-                            });
+                                placeCaptionResult(_s, tlStart);
+                            }, tlStart);
                         }
                     );
                     return;
@@ -1648,6 +2600,15 @@ document.addEventListener("DOMContentLoaded", function() {
                     return;
                 }
 
+                if (timelineMap && timelineMap.length) {
+                    try { summary = restoreTimelineMap(summary, timelineMap); }
+                    catch (mapErr2) {
+                        hideProgress(); setStatus("");
+                        showStatus("Could not restore multi-clip timeline positions: " + mapErr2.message, "red");
+                        return;
+                    }
+                }
+
                 if (summary.langWarning) {
                     // The spoken language differed from the one selected. Say so loudly:
                     // a forced-wrong language yields fluent-looking invented words, not
@@ -1672,8 +2633,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 showProgress("Syncing captions to timeline…", 75);
                 setStatus("Building timeline-synced captions…");
                 withRefinement(summary, setStatus, function(_s) {
-                    fallbackSRT(_s, style, "none", "Arial", 72, "#FFFFFF", "#FFFFFF", tlStart, setStatus, wordsPerCaption, wordsMin, wordsMax);
-                });
+                    placeCaptionResult(_s, tlStart);
+                }, tlStart);
                 return;
                 });
             }  // end runTranscriber()
@@ -1701,6 +2662,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
                     var concatList = osModule.tmpdir() + "/efp_concat_" + Date.now() + ".txt";
                     var partFiles = [];
+                    var partDurations = [];
                     var pending = clips.length;
                     var extractError = null;
 
@@ -1722,6 +2684,8 @@ document.addEventListener("DOMContentLoaded", function() {
                                     return;
                                 }
                                 extractError = err2;
+                            } else {
+                                partDurations[idx] = wavDuration(partFile) || clip.duration || clip.timelineDuration || 0;
                             }
                             pending--;
                             if (pending === 0) {
@@ -1735,6 +2699,29 @@ document.addEventListener("DOMContentLoaded", function() {
                                     return "file '" + f.replace(/'/g, "'\\''") + "'";
                                 }).join("\n");
                                 fsModule.writeFileSync(concatList, listContent, "utf8");
+
+                                // Map compact-audio time to each clip's position,
+                                // relative to the first selected clip. fallbackSRT
+                                // adds firstTlStart once at placement time.
+                                var timelineMap = [];
+                                var audioCursor = 0;
+                                for (var mapI = 0; mapI < clips.length; mapI++) {
+                                    var partDur = partDurations[mapI] || clips[mapI].duration ||
+                                                  clips[mapI].timelineDuration || 0;
+                                    if (partDur <= 0) {
+                                        hideProgress(); setStatus("");
+                                        showStatus("Could not determine duration of selected clip " + (mapI + 1), "red");
+                                        return;
+                                    }
+                                    var timelineDur = clips[mapI].timelineDuration || partDur;
+                                    timelineMap.push({
+                                        audioStart: audioCursor,
+                                        audioEnd: audioCursor + partDur,
+                                        timelineStart: (clips[mapI].timelineStart || 0) - firstTlStart,
+                                        timelineDuration: timelineDur
+                                    });
+                                    audioCursor += partDur;
+                                }
 
                                 // Concatenate all parts
                                 var combinedFile = osModule.tmpdir() + "/efp_combined_" + Date.now() + ".wav";
@@ -1758,7 +2745,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                     }
 
                                     // Run transcriber on combined audio (no --start/--end since we already trimmed)
-                                    runTranscriber(combinedFile, firstTlStart, 0, 0, 0);
+                                    runTranscriber(combinedFile, firstTlStart, 0, 0, 0, timelineMap);
                                 });
                             }
                         });
@@ -1770,6 +2757,18 @@ document.addEventListener("DOMContentLoaded", function() {
                 // Fallback: treat as single clip
                 runTranscriber(info.mediaPath, info.timelineStart || 0,
                                info.clipIn || 0, info.clipOut || 0, info.duration || 0);
+            }
+        });
+    });
+
+    safeBind("btn-remove-animated", function() {
+        if (operationRunning) return;
+        csInterface.evalScript('$._editflow.removeRenderedCaptions()', function(res) {
+            var parsed = safeParse(res);
+            handleJSXResult(res);
+            var statusLine = document.getElementById("cap-status");
+            if (statusLine && parsed && parsed.status === "success") {
+                statusLine.textContent = "Removed " + parsed.removed + " animated caption clip(s). Editable captions are unchanged.";
             }
         });
     });
@@ -1798,26 +2797,266 @@ document.addEventListener("DOMContentLoaded", function() {
                 showProgress("Done!", 100); setTimeout(hideProgress, 2500);
                 handleJSXResult(res);
                 var r = safeParse(res);
+                // A refinement failure must not end on a clean green line. The
+                // captions did land, so this is a warning, not an error — but it has
+                // to stay on screen, because the banner that carried it expired long
+                // before the placement finished.
+                var refineNote = window._efpRefineError
+                    ? "  ⚠ AI refine did not run: " + window._efpRefineError
+                    : "";
                 if (r && r.placed) {
-                    setStatus("✅ " + r.groups + " captions synced on timeline");
+                    setStatus("✅ " + r.groups + " captions synced on timeline" + refineNote);
                 } else if (r && r.groups) {
-                    setStatus("✅ " + r.groups + " captions ready → drag from EFP_Captions bin to Caption track (timing is synced)");
+                    setStatus("✅ " + r.groups + " captions ready → drag from EFP_Captions bin to Caption track (timing is synced)" + refineNote);
                 } else {
-                    setStatus("Caption generation completed.");
+                    setStatus("Caption generation completed." + refineNote);
+                }
+                if (window._efpRefineError) {
+                    showStatus("Captions placed, but the AI refinement failed: " + window._efpRefineError, "orange");
                 }
             }
         );
     }
+
+    // ============================================================
+    // CAPTION QA — builds Premiere's exact caption plan, then checks it locally.
+    // This intentionally never modifies caption text, tracks, or timeline items.
+    // ============================================================
+    (function initCaptionQa() {
+        var btn = document.getElementById("btn-caption-qa");
+        var reportEl = document.getElementById("caption-qa-report");
+        if (!btn || !reportEl) return;
+
+        function text(key, replacements) {
+            var out = t_refine(key);
+            replacements = replacements || {};
+            for (var rk in replacements) {
+                if (replacements.hasOwnProperty(rk)) out = out.replace("{" + rk + "}", replacements[rk]);
+            }
+            return out;
+        }
+        function escapeHtml(value) {
+            return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#39;");
+        }
+        function timecode(seconds) {
+            seconds = Math.max(0, parseFloat(seconds) || 0);
+            var h = Math.floor(seconds / 3600);
+            var m = Math.floor((seconds % 3600) / 60);
+            var s = Math.floor(seconds % 60);
+            function p(n) { return n < 10 ? "0" + n : String(n); }
+            return (h ? p(h) + ":" : "") + p(m) + ":" + p(s);
+        }
+        function normalized(textValue) {
+            return String(textValue || "").toLowerCase().replace(/[^\w\u0600-\u06FF]+/g, " ")
+                .replace(/^\s+|\s+$/g, "").replace(/\s+/g, " ");
+        }
+        function repeatedWord(textValue) {
+            var bits = normalized(textValue).split(" ");
+            var run = 1;
+            for (var i = 1; i < bits.length; i++) {
+                if (bits[i] && bits[i] === bits[i - 1]) {
+                    run++;
+                    if (run >= 3) return bits[i];
+                } else {
+                    run = 1;
+                }
+            }
+            return "";
+        }
+        function buildReport(plan, transcript, targetCode) {
+            var groups = (plan && plan.groups) || [];
+            var issues = [];
+            var boundaries = [];
+            var targetUsesArabic = /^(ar|fa|ur)$/i.test(targetCode || "");
+            var arabic = /[\u0600-\u06FF]/;
+
+            function add(level, at, title, detail, sample) {
+                issues.push({ level: level, at: Math.max(0, parseFloat(at) || 0), title: title, detail: detail, sample: sample || "" });
+            }
+            var sourceSegments = (transcript && transcript.segments) || [];
+            for (var sb = 0; sb < sourceSegments.length; sb++) {
+                if (sourceSegments[sb] && sourceSegments[sb].timelineBreak === true) {
+                    boundaries.push(parseFloat(sourceSegments[sb].end) || 0);
+                }
+            }
+
+            for (var i = 0; i < groups.length; i++) {
+                var group = groups[i] || {};
+                var captionText = String(group.text || "").replace(/^\s+|\s+$/g, "");
+                var start = parseFloat(group.start) || 0;
+                var end = parseFloat(group.end) || start;
+                var duration = Math.max(0.01, end - start);
+                var characters = captionText.length;
+                var words = captionText ? captionText.split(/\s+/).length : 0;
+                var cps = characters / duration;
+
+                if (characters > 84 || words > 14) {
+                    add("warning", start, "Long caption", characters + " characters · layout may need more than two lines", captionText);
+                }
+                if (cps > 20) {
+                    add("error", start, "Reading speed is too high", Math.round(cps) + " characters/sec · give this caption more time", captionText);
+                } else if (cps > 17) {
+                    add("warning", start, "Fast reading speed", Math.round(cps) + " characters/sec", captionText);
+                }
+                if (words >= 3 && duration < 0.65) {
+                    add("warning", start, "Caption is very brief", duration.toFixed(2) + "s for " + words + " words", captionText);
+                }
+                if (!targetUsesArabic && arabic.test(captionText)) {
+                    add("warning", start, "Arabic remains in the target subtitle", "Review this line for an untranslated fragment", captionText);
+                }
+                var repeated = repeatedWord(captionText);
+                if (repeated) {
+                    add("warning", start, "Unnatural repetition", '“' + repeated + '” repeats three times', captionText);
+                }
+                if (i > 0) {
+                    var previous = groups[i - 1] || {};
+                    var previousEnd = parseFloat(previous.end) || 0;
+                    var previousText = normalized(previous.text);
+                    if (previousEnd > start + 0.05) {
+                        add("error", start, "Overlapping captions", "This caption starts before the previous one has ended", captionText);
+                    }
+                    if (previousText && previousText === normalized(captionText)) {
+                        add("warning", start, "Repeated caption", "The same caption appears twice in a row", captionText);
+                    }
+                    // This is deliberately a review item: the transcript timing
+                    // reveals the gap, but only waveform/AI analysis can prove it
+                    // contains speech rather than a natural silent pause.
+                    var gap = start - previousEnd;
+                    if (gap > 4 && gap < 30) {
+                        var crossesCut = false;
+                        for (var gb = 0; gb < boundaries.length; gb++) {
+                            if (boundaries[gb] >= previousEnd - 0.05 && boundaries[gb] <= start + 0.05) { crossesCut = true; break; }
+                        }
+                        if (!crossesCut) add("review", previousEnd, "Long caption gap", gap.toFixed(1) + "s without a caption · review whether speech is missing", "");
+                    }
+                }
+                for (var cb = 0; cb < boundaries.length; cb++) {
+                    if (start < boundaries[cb] - 0.02 && end > boundaries[cb] + 0.02) {
+                        add("error", boundaries[cb], "Caption crosses an edit", "A caption spans a protected timeline cut", captionText);
+                    }
+                }
+            }
+            issues.sort(function(a, b) { return a.at - b.at; });
+            return { groups: groups.length, issues: issues };
+        }
+        function render(result) {
+            var issues = result.issues || [];
+            var counts = { error: 0, warning: 0, review: 0 };
+            for (var i = 0; i < issues.length; i++) counts[issues[i].level]++;
+            var heading = issues.length
+                ? text("cap_qa_found", {n: issues.length})
+                : text("cap_qa_clean");
+            var detail = issues.length
+                ? ""
+                : text("cap_qa_clean_detail", {n: result.groups || 0});
+            var html = '<div class="caption-qa-summary"><div><strong>' + escapeHtml(heading) + '</strong>' +
+                (detail ? '<div>' + escapeHtml(detail) + '</div>' : '') + '</div><div class="caption-qa-counts">';
+            if (counts.error) html += '<span class="caption-qa-count error">' + escapeHtml(text("cap_qa_error_count", {n:counts.error})) + '</span>';
+            if (counts.warning) html += '<span class="caption-qa-count warning">' + escapeHtml(text("cap_qa_warning_count", {n:counts.warning})) + '</span>';
+            if (counts.review) html += '<span class="caption-qa-count review">' + escapeHtml(text("cap_qa_review_count", {n:counts.review})) + '</span>';
+            html += '</div></div>';
+            var visible = issues.slice(0, 30);
+            if (visible.length) html += '<div class="caption-qa-list">';
+            for (var j = 0; j < visible.length; j++) {
+                var issue = visible[j];
+                var snippet = issue.sample ? (issue.detail + ' · ' + issue.sample) : issue.detail;
+                html += '<button type="button" class="caption-qa-item ' + issue.level + '" data-qa-time="' + issue.at + '">' +
+                    '<span class="caption-qa-severity"></span><span class="caption-qa-copy"><strong>' + escapeHtml(issue.title) +
+                    '</strong><span>' + escapeHtml(snippet) + '</span></span><span class="caption-qa-time">' + timecode(issue.at) + '</span></button>';
+            }
+            if (visible.length) html += '</div>';
+            if (issues.length > visible.length) html += '<p class="caption-qa-more">' + escapeHtml(text("cap_qa_more", {n: issues.length - visible.length})) + '</p>';
+            reportEl.innerHTML = html;
+            reportEl.classList.remove("hidden");
+            var jumpers = reportEl.querySelectorAll("[data-qa-time]");
+            for (var k = 0; k < jumpers.length; k++) {
+                jumpers[k].addEventListener("click", function() {
+                    var at = parseFloat(this.getAttribute("data-qa-time"));
+                    if (!csInterface || isNaN(at)) return;
+                    csInterface.evalScript('$._editflow.jumpToTimelineTime("' + at.toFixed(3) + '")');
+                });
+            }
+        }
+
+        safeBind("btn-caption-qa", function() {
+            var qa = settings.captionQa || {};
+            var sourcePath = String(qa.lastSummaryPath || "");
+            if (!sourcePath) {
+                showStatus(text("cap_qa_need_caption"), "orange");
+                return;
+            }
+            if (!fsModule || !fsModule.existsSync(sourcePath)) {
+                showStatus(text("cap_qa_missing_file"), "orange");
+                return;
+            }
+            if (!csInterface || !pathModule || !osModule) {
+                showStatus("Premiere connection is unavailable.", "red");
+                return;
+            }
+            var transcript;
+            try { transcript = JSON.parse(fsModule.readFileSync(sourcePath, "utf8")); }
+            catch(eRead) { showStatus(text("cap_qa_missing_file"), "orange"); return; }
+
+            btn.disabled = true;
+            reportEl.classList.remove("hidden");
+            reportEl.innerHTML = '<div class="caption-qa-summary"><strong>' + escapeHtml(text("cap_qa_scanning")) + '</strong></div>';
+            var planPath = pathModule.join(osModule.tmpdir(), "efp_caption_qa_" + Date.now() + ".json");
+            var cfg = {
+                style: qa.style || "phrase",
+                animation: "none",
+                offsetSecs: parseFloat(qa.timelineOffset) || 0,
+                wordsPerCaption: parseInt(qa.wordsMin, 10) || 3,
+                wordsMin: parseInt(qa.wordsMin, 10) || 3,
+                wordsMax: parseInt(qa.wordsMax, 10) || 5,
+                planOnly: true,
+                planPath: planPath
+            };
+            var escapedPath = sourcePath.replace(/\\/g, "\\\\").replace(/\"/g, '\\\"');
+            var escapedCfg = JSON.stringify(cfg).replace(/\\/g, "\\\\").replace(/\"/g, '\\\"');
+            csInterface.evalScript('$._editflow.placeAnimatedCaptions("' + escapedPath + '","' + escapedCfg + '")', function(raw) {
+                btn.disabled = false;
+                var response = safeParse(raw);
+                if (!response || response.status !== "success" || !response.plan || !fsModule.existsSync(response.plan)) {
+                    reportEl.classList.add("hidden");
+                    showStatus(text("cap_qa_plan_failed"), "orange");
+                    return;
+                }
+                try {
+                    var plan = JSON.parse(fsModule.readFileSync(response.plan, "utf8"));
+                    render(buildReport(plan, transcript, qa.targetCode || "auto"));
+                } catch(ePlan) {
+                    reportEl.classList.add("hidden");
+                    showStatus(text("cap_qa_plan_failed"), "orange");
+                }
+                try { fsModule.unlinkSync(response.plan); } catch(eClean) {}
+            });
+        });
+    })();
 
     // (Upgrade Caption to Graphic has been removed due to Adobe API limitations in recent Premiere builds)
 
 
 
     safeBind("btn-export-selected", function() {
-        if (!foundPresetPath || !fsModule) { showStatus("No export preset.", "red"); return; }
+        if (!fsModule) { showStatus("Export tools are unavailable.", "red"); return; }
+        var format = (document.getElementById("export-format") || {value:"video"}).value || "video";
+        if (format !== "mp3" && format !== "wav") format = "video";
+        settings.exportFormat = format;
+
+        var selectedPreset = format === "video" ? foundPresetPath : foundAudioPresetPaths[format];
+        if (!selectedPreset && format !== "video") {
+            findAudioExportPresets();
+            selectedPreset = foundAudioPresetPaths[format];
+        }
+        if (!selectedPreset) {
+            showStatus(format === "video" ? "No export preset." : t_refine("export_audio_preset_missing"), "red");
+            return;
+        }
+
         var fileName = (document.getElementById("export-filename").value || "").trim();
         var savePath = (document.getElementById("export-path").value || "").trim();
-        
+
         // Windows: validate save path if specified — must be absolute (e.g. C:\Users\... or D:\...)
         var isWinExport = (osModule && osModule.platform() === "win32");
         if (isWinExport && savePath !== "") {
@@ -1828,8 +3067,44 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }
 
+        function startDirectExport(presetPath, selectedPath, outputFormat, tempPreset, qualityText) {
+            var formatLabel = outputFormat === "video" ? qualityText + " Mbps" : outputFormat.toUpperCase();
+            showProgress("Exporting " + formatLabel + "...", 40);
+            var fnEsc = fileName.replace(/\\/g,"\\\\").replace(/"/g,'\\"');
+            var fpEsc = selectedPath.replace(/\\/g,"\\\\").replace(/"/g,'\\"');
+            var presetEsc = presetPath.replace(/\\/g,"\\\\").replace(/"/g,'\\"');
+            console.log("[Export] Format: " + outputFormat + " | Preset: " + presetPath);
+            csInterface.evalScript('$._editflow.exportCustom("' + presetEsc + '", "' + fnEsc + '", "' + fpEsc + '", "' + outputFormat + '")', function(res) {
+                console.log("[<-JSX] exportCustom:", res);
+                if (tempPreset) {
+                    // Keep the temporary video preset long enough for Premiere
+                    // to read it. Native Adobe audio presets remain untouched.
+                    setTimeout(function() {
+                        try { fsModule.unlinkSync(tempPreset); } catch(e) {}
+                    }, 300000);
+                }
+
+                var r = safeParse(res);
+                if (r && r.status === "success") {
+                    if (r.queued) {
+                        showProgress("Done!", 100);
+                        setTimeout(hideProgress, 2000);
+                        showStatus("✅ Export queued in Adobe Media Encoder", "green");
+                    } else {
+                        showStatus(outputFormat === "video" ? "⏳ Exporting in background..." : "⏳ Exporting audio in background...", "blue");
+                        pollExportFile(r.filePath, Date.now(), 600000);
+                    }
+                } else {
+                    showProgress("Export failed", 0);
+                    setTimeout(hideProgress, 1000);
+                    var errMsg = (r && r.message) ? r.message : "Export failed.";
+                    showStatus(errMsg, "red");
+                }
+            });
+        }
+
         function runExport(selectedPath) {
-            // Cleanup old temp presets (older than 10 mins) to keep temp folder clean
+            // Cleanup old temporary video presets (older than 10 minutes).
             try {
                 var tempDir = getSafeTempDir();
                 var files = fsModule.readdirSync(tempDir);
@@ -1838,45 +3113,22 @@ document.addEventListener("DOMContentLoaded", function() {
                     if (file.indexOf("efp_") === 0 && file.indexOf(".epr") !== -1) {
                         var filePath = pathModule.join(tempDir, file);
                         var stat = fsModule.statSync(filePath);
-                        if (now - stat.mtimeMs > 600000) { // 10 minutes
+                        if (now - stat.mtimeMs > 600000) {
                             try { fsModule.unlinkSync(filePath); } catch(err) {}
                         }
                     }
                 });
             } catch(err) {}
-            
-            console.log("[Export] File: " + (fileName || "(auto)") + " | Path: " + selectedPath);
+
+            console.log("[Export] File: " + (fileName || "(auto)") + " | Path: " + selectedPath + " | Format: " + format);
             showProgress("Preparing...", 10);
-            modifyPresetBitrate(function(tmp, br) {
-                showProgress("Exporting (" + br + " Mbps)...", 40);
-                var fnEsc = fileName.replace(/\\/g,"\\\\").replace(/"/g,'\\"');
-                var fpEsc = selectedPath.replace(/\\/g,"\\\\").replace(/"/g,'\\"');
-                console.log("[Export] Bitrate: " + br + " Mbps");
-                csInterface.evalScript('$._editflow.exportCustom("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '", "' + fnEsc + '", "' + fpEsc + '")', function(res) {
-                    console.log("[<-JSX] exportCustom:", res);
-                    // Delete the temp preset after a delay (e.g. 5 minutes) to give AME/Premiere ample time to read it
-                    setTimeout(function() {
-                        try { fsModule.unlinkSync(tmp); } catch(e) {}
-                    }, 300000);
-                    
-                    var r = safeParse(res);
-                    if (r && r.status === "success") {
-                        if (r.queued) {
-                            showProgress("Done!", 100); 
-                            setTimeout(hideProgress, 2000);
-                            showStatus("✅ Export queued in Adobe Media Encoder", "green");
-                        } else {
-                            showStatus("⏳ Exporting in background...", "blue");
-                            pollExportFile(r.filePath, Date.now(), 600000); // 10 mins
-                        }
-                    } else {
-                        showProgress("Export failed", 0);
-                        setTimeout(hideProgress, 1000);
-                        var errMsg = (r && r.message) ? r.message : "Export failed.";
-                        showStatus(errMsg, "red");
-                    }
+            if (format === "video") {
+                modifyPresetBitrate(function(tmp, br) {
+                    startDirectExport(tmp, selectedPath, format, tmp, br);
                 });
-            });
+            } else {
+                startDirectExport(selectedPreset, selectedPath, format, null, "");
+            }
         }
 
         if (savePath === "") {
@@ -2395,7 +3647,6 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // Step 4: Self-check — verify all expected buttons exist
     var expectedButtons = [
-        "btn-audio-up", "btn-audio-down",
         "reset-clip-transform", "apply-scale",
         "btn-paste-clipboard", "btn-paste-cancel",
         "btn-export-selected", "btn-capture-frame", "btn-export-browse"
@@ -2443,6 +3694,10 @@ function applyLanguage(lang) {
         var pKey = phEls[k].getAttribute('data-i18n-placeholder');
         if (t[pKey]) phEls[k].setAttribute('placeholder', t[pKey]);
     }
+    // The generate button changes meaning when animated captions are enabled;
+    // re-apply that state after the generic i18n pass updates its label.
+    if (typeof updateAnimatedCaptionUI === "function") updateAnimatedCaptionUI();
+    if (typeof updateExportFormatUI === "function") updateExportFormatUI(false);
 }
 
 // ── HELPERS ──────────────────────────────────────────────────
@@ -2617,8 +3872,25 @@ function loadSettings() {
                 for (var k in DEFAULT_SETTINGS.captions) {
                     if (d.captions[k] !== undefined) settings.captions[k] = d.captions[k];
                 }
+                // Animated-caption UI v2 makes presets self-contained. Older
+                // saved Arial/color overrides made every style look nearly the
+                // same, so migrate only this optional feature to clean defaults.
+                if (!d.captions.animatedUiVersion || d.captions.animatedUiVersion < 2) {
+                    settings.captions.animatedUiVersion = 2;
+                    settings.captions.animatedPreset = "clean-film";
+                    settings.captions.animatedFont = "";
+                    settings.captions.animatedSize = 100;
+                    settings.captions.animatedPosition = "preset";
+                    settings.captions.animatedBackgroundMode = "preset";
+                }
+            }
+            if (d.captionQa && typeof d.captionQa === "object") {
+                for (var qaKey in DEFAULT_SETTINGS.captionQa) {
+                    if (d.captionQa[qaKey] !== undefined) settings.captionQa[qaKey] = d.captionQa[qaKey];
+                }
             }
             if (typeof d.bitrate === "number") settings.bitrate = d.bitrate;
+            if (d.exportFormat === "video" || d.exportFormat === "mp3" || d.exportFormat === "wav") settings.exportFormat = d.exportFormat;
             if (typeof d.exportPath === "string") settings.exportPath = efpNormalizePath(d.exportPath);
             if (typeof d.groqApiKey === "string") settings.groqApiKey = d.groqApiKey;
             if (Array.isArray(d.favoriteSfx)) settings.favoriteSfx = d.favoriteSfx;
@@ -2671,6 +3943,8 @@ function applySettingsToUI() {
     // Bitrate input in Export section
     var bi = document.getElementById("batch-bitrate-input");
     if (bi) bi.value = settings.bitrate;
+    setSel("export-format", settings.exportFormat || "video");
+    updateExportFormatUI(false);
 
     // Default export path
     var ep = document.getElementById("export-path");
@@ -2703,6 +3977,19 @@ function applySettingsToUI() {
     setSel("cap-language",  settings.captions.language);
     setSel("cap-model",     settings.captions.model);
     setSel("cap-style",     settings.captions.style);
+    var animatedEl = document.getElementById("cap-animated");
+    if (animatedEl) animatedEl.checked = !!settings.captions.animated;
+    var animatedPresetEl = document.getElementById("cap-animated-preset");
+    if (animatedPresetEl) animatedPresetEl.value = settings.captions.animatedPreset || "clean-film";
+    setAnimatedControlValue("cap-animated-font", settings.captions.animatedFont || "");
+    setAnimatedControlValue("cap-animated-size", settings.captions.animatedSize || 100);
+    setAnimatedControlValue("cap-animated-position", settings.captions.animatedPosition || "preset");
+    var savedBackgroundMode = settings.captions.animatedBackgroundMode || "preset";
+    if (savedBackgroundMode === "custom") savedBackgroundMode = "black";
+    setAnimatedControlValue("cap-animated-background-mode", savedBackgroundMode);
+    var reviewEl = document.getElementById("cap-animated-review");
+    if (reviewEl) reviewEl.checked = !!settings.captions.animatedReview;
+    updateAnimatedCaptionUI();
     var wpcEl = document.getElementById("cap-words-per");
     if (wpcEl) wpcEl.value = settings.captions.wordsMin || settings.captions.wordsPerCaption || 3;
     var wpcMaxEl = document.getElementById("cap-words-max");
@@ -2714,6 +4001,82 @@ function setSel(id, val) {
     if (el && val !== undefined && val !== null) el.value = String(val);
 }
 
+function updateExportFormatUI(persist) {
+    var formatEl = document.getElementById("export-format");
+    var format = formatEl ? formatEl.value : (settings.exportFormat || "video");
+    if (format !== "mp3" && format !== "wav") format = "video";
+
+    var videoQuality = document.getElementById("export-video-quality");
+    var audioQuality = document.getElementById("export-audio-quality");
+    var exportButton = document.getElementById("btn-export-selected");
+    var isAudio = format !== "video";
+
+    if (videoQuality) videoQuality.classList.toggle("hidden", isAudio);
+    if (audioQuality) {
+        audioQuality.classList.toggle("hidden", !isAudio);
+        var mp3Match = String(foundAudioPresetPaths.mp3 || "").match(/MP3\s+(\d+)kbps/i);
+        var mp3Bitrate = mp3Match ? mp3Match[1] : "256";
+        audioQuality.textContent = format === "wav"
+            ? t_refine("export_audio_quality_wav")
+            : t_refine("export_audio_quality_mp3").replace("{bitrate}", mp3Bitrate);
+    }
+    if (exportButton) {
+        var buttonKey = isAudio ? "export_selected_audio" : "export_selected";
+        exportButton.setAttribute("data-i18n", buttonKey);
+        exportButton.textContent = t_refine(buttonKey);
+    }
+
+    if (persist) {
+        settings.exportFormat = format;
+        saveSettings();
+    }
+}
+
+var _exportFormatEl = document.getElementById("export-format");
+if (_exportFormatEl) {
+    _exportFormatEl.addEventListener("change", function() {
+        updateExportFormatUI(true);
+    });
+}
+
+function setAnimatedControlValue(id, value) {
+    var el = document.getElementById(id);
+    if (el && value !== undefined && value !== null) el.value = String(value);
+}
+
+function captionUiText(key, replacements) {
+    var value = t_refine(key);
+    if (replacements) {
+        for (var name in replacements) {
+            if (replacements.hasOwnProperty(name)) value = value.replace("{" + name + "}", replacements[name]);
+        }
+    }
+    return value;
+}
+
+function animatedCaptionOptionsFromUI() {
+    var size = parseInt((document.getElementById("cap-animated-size") || {value:"100"}).value, 10) || 100;
+    var font = String((document.getElementById("cap-animated-font") || {value:""}).value || "").trim();
+    return {
+        font: font.slice(0, 80),
+        size: Math.max(60, Math.min(150, size)),
+        position: (document.getElementById("cap-animated-position") || {value:"preset"}).value || "preset",
+        backgroundMode: (document.getElementById("cap-animated-background-mode") || {value:"preset"}).value || "preset",
+        review: !!(document.getElementById("cap-animated-review") || {}).checked
+    };
+}
+
+function persistAnimatedCaptionControls() {
+    var opts = animatedCaptionOptionsFromUI();
+    settings.captions.animatedUiVersion = 2;
+    settings.captions.animatedFont = opts.font;
+    settings.captions.animatedSize = opts.size;
+    settings.captions.animatedPosition = opts.position;
+    settings.captions.animatedBackgroundMode = opts.backgroundMode;
+    settings.captions.animatedReview = opts.review;
+    saveSettings();
+}
+
 function updateCapWordsPerVisibility() {
     var styleEl = document.getElementById("cap-style");
     var rowEl   = document.getElementById("cap-words-per-row");
@@ -2723,6 +4086,191 @@ function updateCapWordsPerVisibility() {
 
 var _capStyleEl = document.getElementById("cap-style");
 if (_capStyleEl) _capStyleEl.addEventListener("change", updateCapWordsPerVisibility);
+
+function updateAnimatedCaptionUI() {
+    var toggle = document.getElementById("cap-animated");
+    var options = document.getElementById("cap-animated-options");
+    var preset = (document.getElementById("cap-animated-preset") || {value:"clean-film"}).value;
+    if (options) options.style.display = (toggle && toggle.checked) ? "block" : "none";
+    var generateBtn = document.getElementById("btn-generate-captions");
+    if (generateBtn) {
+        var generateKey = (toggle && toggle.checked) ? "cap_generate_animated" : "cap_generate";
+        generateBtn.setAttribute("data-i18n", generateKey);
+        generateBtn.textContent = captionUiText(generateKey);
+    }
+    var cards = document.querySelectorAll(".cap-style-card");
+    for (var i = 0; i < cards.length; i++) {
+        var selected = cards[i].getAttribute("data-cap-preset") === preset;
+        if (selected) cards[i].classList.add("selected");
+        else cards[i].classList.remove("selected");
+        cards[i].setAttribute("aria-checked", selected ? "true" : "false");
+        cards[i].setAttribute("tabindex", selected ? "0" : "-1");
+    }
+    var opts = animatedCaptionOptionsFromUI();
+    var sizeOut = document.getElementById("cap-animated-size-value");
+    if (sizeOut) sizeOut.textContent = opts.size + "%";
+}
+
+var _capAnimatedEl = document.getElementById("cap-animated");
+if (_capAnimatedEl) _capAnimatedEl.addEventListener("change", function() {
+    settings.captions.animated = !!this.checked;
+    updateAnimatedCaptionUI();
+    saveSettings();
+});
+var _capAnimCards = document.querySelectorAll(".cap-style-card");
+for (var _capCardI = 0; _capCardI < _capAnimCards.length; _capCardI++) {
+    _capAnimCards[_capCardI].addEventListener("click", function() {
+        var id = this.getAttribute("data-cap-preset") || "clean-film";
+        var hidden = document.getElementById("cap-animated-preset");
+        if (hidden) hidden.value = id;
+        settings.captions.animatedPreset = id;
+        updateAnimatedCaptionUI();
+        persistAnimatedCaptionControls();
+    });
+    _capAnimCards[_capCardI].addEventListener("keydown", function(event) {
+        if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+        event.preventDefault();
+        var cards = document.querySelectorAll(".cap-style-card");
+        var current = 0;
+        for (var i = 0; i < cards.length; i++) if (cards[i] === this) current = i;
+        var forward = event.key === "ArrowRight" || event.key === "ArrowDown";
+        var next = (current + (forward ? 1 : -1) + cards.length) % cards.length;
+        cards[next].click();
+        cards[next].focus();
+    });
+}
+
+var _capControlIds = [
+    "cap-animated-font", "cap-animated-size", "cap-animated-position",
+    "cap-animated-background-mode", "cap-animated-review"
+];
+for (var _capCtlI = 0; _capCtlI < _capControlIds.length; _capCtlI++) {
+    (function(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener("input", updateAnimatedCaptionUI);
+        el.addEventListener("change", function() {
+            updateAnimatedCaptionUI();
+            persistAnimatedCaptionControls();
+        });
+    })(_capControlIds[_capCtlI]);
+}
+
+function formatCaptionEditorTime(seconds) {
+    var total = Math.max(0, Number(seconds) || 0);
+    var hours = Math.floor(total / 3600);
+    var minutes = Math.floor((total % 3600) / 60);
+    var secs = Math.floor(total % 60);
+    function two(v) { return v < 10 ? "0" + v : String(v); }
+    return two(hours) + ":" + two(minutes) + ":" + two(secs);
+}
+
+function reviewAnimatedCaptionGroups(groups, done) {
+    var modal = document.getElementById("cap-editor-modal");
+    var list = document.getElementById("cap-editor-list");
+    var count = document.getElementById("cap-editor-count");
+    var error = document.getElementById("cap-editor-error");
+    var cancelBtn = document.getElementById("btn-cap-editor-cancel");
+    var renderBtn = document.getElementById("btn-cap-editor-render");
+    if (!modal || !list || !cancelBtn || !renderBtn) return done(groups);
+
+    var working;
+    try { working = JSON.parse(JSON.stringify(groups)); }
+    catch(eClone) { working = groups.slice(0); }
+    list.textContent = "";
+    if (error) error.textContent = "";
+    if (count) count.textContent = captionUiText("cap_editor_count", {n: working.length});
+
+    var fragment = document.createDocumentFragment();
+    for (var i = 0; i < working.length; i++) {
+        var row = document.createElement("div");
+        row.className = "cap-editor-row";
+        var time = document.createElement("span");
+        time.className = "cap-editor-time";
+        time.textContent = formatCaptionEditorTime(working[i].start) + " – " + formatCaptionEditorTime(working[i].end);
+        var input = document.createElement("textarea");
+        input.className = "cap-editor-input";
+        input.rows = 1;
+        input.maxLength = 500;
+        input.dir = "auto";
+        input.value = String(working[i].text || "").trim();
+        input.setAttribute("data-caption-index", String(i));
+        input.setAttribute("aria-label", "Caption " + (i + 1));
+        input.addEventListener("input", function() {
+            this.removeAttribute("aria-invalid");
+            if (error) error.textContent = "";
+            this.style.height = "auto";
+            this.style.height = Math.min(96, Math.max(32, this.scrollHeight)) + "px";
+        });
+        row.appendChild(time);
+        row.appendChild(input);
+        fragment.appendChild(row);
+    }
+    list.appendChild(fragment);
+
+    var completed = false;
+    function finish(value) {
+        if (completed) return;
+        completed = true;
+        modal.classList.add("hidden");
+        modal.removeEventListener("keydown", onKeyDown);
+        cancelBtn.onclick = null;
+        renderBtn.onclick = null;
+        done(value);
+    }
+    function onKeyDown(event) {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            finish(null);
+        }
+    }
+    modal.addEventListener("keydown", onKeyDown);
+    cancelBtn.onclick = function() { finish(null); };
+    renderBtn.onclick = function() {
+        var inputs = list.querySelectorAll(".cap-editor-input");
+        var firstInvalid = null;
+        for (var j = 0; j < inputs.length; j++) {
+            var nextText = String(inputs[j].value || "").replace(/\s+/g, " ").trim();
+            if (!nextText) {
+                inputs[j].setAttribute("aria-invalid", "true");
+                if (!firstInvalid) firstInvalid = inputs[j];
+                continue;
+            }
+            var group = working[j];
+            var tokens = nextText.split(/\s+/);
+            var oldWords = group.words || [];
+            if (oldWords.length === tokens.length) {
+                for (var w = 0; w < tokens.length; w++) oldWords[w].text = tokens[w];
+            } else {
+                var start = Number(group.start) || 0;
+                var end = Math.max(start + 0.05, Number(group.end) || start + 0.05);
+                var slice = (end - start) / tokens.length;
+                group.words = [];
+                for (var n = 0; n < tokens.length; n++) {
+                    group.words.push({
+                        text: tokens[n],
+                        start: start + n * slice,
+                        end: n === tokens.length - 1 ? end : start + (n + 1) * slice
+                    });
+                }
+            }
+            group.text = nextText;
+        }
+        if (firstInvalid) {
+            if (error) error.textContent = captionUiText("cap_editor_empty");
+            firstInvalid.focus();
+            return;
+        }
+        finish(working);
+    };
+
+    modal.classList.remove("hidden");
+    setTimeout(function() {
+        var first = list.querySelector(".cap-editor-input");
+        if (first) first.focus();
+    }, 0);
+}
 
 function populateSettingsForm() {
     setSel("cfg-language", settings.language);
@@ -2889,6 +4437,63 @@ function findExportPreset() {
             }
         });
     }
+}
+
+// Audio formats use Adobe's own audio-only presets. This preserves the selected
+// timeline range, speed changes, audio effects and mix, and avoids a wasteful
+// intermediate video render before MP3/WAV conversion.
+function findAudioExportPresets() {
+    if (!fsModule || !pathModule) return;
+    foundAudioPresetPaths.mp3 = null;
+    foundAudioPresetPaths.wav = null;
+
+    var roots = [];
+    var isWin = osModule && osModule.platform() === "win32";
+    var years = ["2029", "2028", "2027", "2026", "2025", "2024", "2023", "2022", "2021", "2020"];
+    var i;
+    if (isWin) {
+        var programFiles = process.env["ProgramFiles"] || "C:\\Program Files";
+        for (i = 0; i < years.length; i++) {
+            roots.push(pathModule.join(programFiles, "Adobe", "Adobe Premiere Pro " + years[i], "MediaIO", "systempresets"));
+            roots.push(pathModule.join(programFiles, "Adobe", "Adobe Media Encoder " + years[i], "MediaIO", "systempresets"));
+        }
+        roots.push(pathModule.join(programFiles, "Adobe", "Adobe Premiere Pro (Beta)", "MediaIO", "systempresets"));
+        roots.push(pathModule.join(programFiles, "Adobe", "Adobe Media Encoder (Beta)", "MediaIO", "systempresets"));
+    } else {
+        for (i = 0; i < years.length; i++) {
+            roots.push("/Applications/Adobe Premiere Pro " + years[i] + "/Adobe Premiere Pro " + years[i] + ".app/Contents/MediaIO/systempresets");
+            roots.push("/Applications/Adobe Media Encoder " + years[i] + "/Adobe Media Encoder " + years[i] + ".app/Contents/MediaIO/systempresets");
+        }
+        roots.push("/Applications/Adobe Premiere Pro (Beta)/Adobe Premiere Pro (Beta).app/Contents/MediaIO/systempresets");
+        roots.push("/Applications/Adobe Media Encoder (Beta)/Adobe Media Encoder (Beta).app/Contents/MediaIO/systempresets");
+    }
+
+    var relative = {
+        mp3: [
+            ["3F3F3F3F_4D503320", "MP3 256kbps High Quality.epr"],
+            ["3F3F3F3F_4D503320", "MP3 192kbps High Quality.epr"],
+            ["3F3F3F3F_4D503320", "MP3 128kbps.epr"]
+        ],
+        wav: [
+            ["3F3F3F3F_57415645", "Waveform Audio 48kHz 16-bit.epr"]
+        ]
+    };
+
+    function firstExisting(options) {
+        for (var r = 0; r < roots.length; r++) {
+            for (var o = 0; o < options.length; o++) {
+                var candidate = pathModule.join(roots[r], options[o][0], options[o][1]);
+                try { if (fsModule.existsSync(candidate)) return candidate; } catch(e) {}
+            }
+        }
+        return null;
+    }
+
+    foundAudioPresetPaths.mp3 = firstExisting(relative.mp3);
+    foundAudioPresetPaths.wav = firstExisting(relative.wav);
+    console.log("[EFP] MP3 preset: " + (foundAudioPresetPaths.mp3 || "not found"));
+    console.log("[EFP] WAV preset: " + (foundAudioPresetPaths.wav || "not found"));
+    updateExportFormatUI(false);
 }
 function checkFirstLaunch() {
     try {
@@ -4169,8 +5774,15 @@ function importBlob(blob) {
     // Groq's free tier caps at 8,000 tokens per minute — a 40-segment batch blew
     // straight past it with a 413. 12 keeps each request comfortably inside the
     // free limit while still being few enough calls to stay fast. Verified.
-    var BATCH_SIZE = 12;          // segments per API call
+    // 12 segments per call had models quietly returning only part of the batch —
+    // the untouched segments stayed in the source language and reached the timeline
+    // half-translated. 8 is small enough to come back whole.
+    var BATCH_SIZE = 8;           // segments per API call
+    var REPAIR_BATCH_SIZE = 3;    // second pass, for whatever the first pass skipped
     var REQ_TIMEOUT = 180000;     // 3 min per call
+    // Free-tier limits are per MINUTE, so they clear on their own. Waiting is the
+    // correct response, not failing the run — 4 retries covers a long transcript.
+    var RATE_LIMIT_RETRIES = 4;
     // Groq rejects some default client User-Agents with a 403 — send an explicit
     // one rather than relying on whatever the runtime sets. Verified.
     var UA = "EditFlowPro/1.0";
@@ -4182,17 +5794,28 @@ function importBlob(blob) {
             host: "api.groq.com",
             path: "/openai/v1/chat/completions",
             // Groq's free-tier catalog rotates fast (llama-3.3-70b-versatile went
-            // 404 mid-session). Model choice here is driven by the free-tier TPM
-            // cap, not just quality: gpt-oss-120b allows only 8,000 tokens/min and
-            // rejected even a single-segment request with a 413, while
-            // compound-mini allows 70,000 and produced an equally clean Arabic
-            // correction + German translation. Verified 2026-08-22.
-            defaultModel: "groq/compound-mini",
+            // 404 mid-session). groq/compound-mini has the roomiest cap at 70,000
+            // TPM, but it is an AGENTIC model: it bills output tokens and returns
+            // `message.content` EMPTY, so every batch failed with "did not return
+            // valid JSON". gpt-oss-20b honours response_format and returns clean
+            // JSON. Its cap is only 8,000 TPM, which the rate-limit retry above
+            // absorbs by waiting out the minute. Verified live 2026-08-22.
+            defaultModel: "openai/gpt-oss-20b",
             key: function() { return settings.groqApiKey || ""; },
             headers: function(k) { return { "Authorization": "Bearer " + k }; },
             body: function(model, sys, userJson) {
                 return {
-                    model: model, temperature: 0.1, max_tokens: 8000,
+                    // max_tokens counts against the 8,000 TPM cap BEFORE the call
+                    // runs: asking for 8,000 made every request "too large" on its
+                    // own, a permanent 429 that no amount of waiting could clear.
+                    // 3,000 leaves room for the prompt and is far more than a
+                    // 12-segment batch needs.
+                    model: model, temperature: 0.1, max_tokens: 3000,
+                    // gpt-oss is a reasoning model and bills its thinking as output:
+                    // 358 tokens for a 3-segment batch at the default, 73 at "low",
+                    // for translations of equal quality. That 5x saving is what keeps
+                    // a full transcript inside the free tier.
+                    reasoning_effort: "low",
                     response_format: { type: "json_object" },
                     messages: [
                         { role: "system", content: sys },
@@ -4290,8 +5913,20 @@ function importBlob(blob) {
     };
 
     function buildSystemPrompt(mode, targetLang) {
-        var base =
-            "You are correcting raw speech-to-text output that will become video subtitles.\n" +
+        var translating = (mode === "translate" && targetLang);
+        // The task headline has to state the OUTPUT LANGUAGE first. When translation
+        // was one bullet at the end of a long "correct the Arabic" prompt, smaller
+        // models followed the bulk of the prompt and returned corrected Arabic — the
+        // request looked ignored even though refinement had run correctly.
+        var base = translating
+            ? ("You are producing " + targetLang + " subtitles from raw speech-to-text " +
+               "output in another language.\n" +
+               "EVERY segment you return MUST be written in " + targetLang + ". " +
+               "Never return the original language. This is the primary requirement.\n" +
+               "Work in two steps: first repair the transcription, then translate the " +
+               "repaired text into " + targetLang + ".\n")
+            : "You are correcting raw speech-to-text output that will become video subtitles.\n";
+        base +=
             "The transcriber is unreliable: it mishears words, invents foreign-looking " +
             "terms, and produces phrases that are grammatically shaped but meaningless.\n" +
             "Rules:\n" +
@@ -4309,15 +5944,21 @@ function importBlob(blob) {
             "- Keep each segment's word count as close to the original as possible. " +
             "Subtitle timing is derived from word positions, so adding or removing words " +
             "degrades sync.\n" +
+            "- An input segment marked clipBreakAfter:true is the end of a separate " +
+            "timeline clip. Do not complete its sentence or carry its context into the " +
+            "following segment.\n" +
             "- Return every segment you were given, with its original index.\n";
-        if (mode === "translate" && targetLang) {
+        if (translating) {
             base +=
-                "- After correcting, translate each segment into " + targetLang + ". " +
-                "Return only the translation as the segment text. Keep translations " +
-                "compact enough to read as a subtitle.\n";
+                "- The repair step is internal. Return ONLY the " + targetLang +
+                " translation as the segment text — never the original wording.\n" +
+                "- Keep each translation compact enough to read as a subtitle.\n" +
+                "- Translate meaning, not words: render the speaker's intent in natural " +
+                targetLang + ".\n";
         }
         base += 'Return ONLY JSON in this exact shape: ' +
                 '{"segments":[{"i":<original index>,"text":"<result>"}]}';
+        if (translating) base += "\nReminder: every \"text\" value must be in " + targetLang + ".";
         return base;
     }
 
@@ -4424,32 +6065,150 @@ function importBlob(blob) {
         var apiKey = provider.key();
         if (!apiKey) return cb("missing_key", summary);
 
+        // `summary.json` is a FILE PATH, not JSON text. That is the contract the
+        // transcriber writes (`"json": json_path`) and the JSX reads back with
+        // `new File(efpJsonPath)`. Parsing it as JSON threw on every single run,
+        // and the catch below handed the ORIGINAL summary straight back — so the
+        // panel placed raw, unrefined captions and reported success. Read the file.
+        // Inline JSON is still accepted so any caller that passes text keeps working.
+        var docText = String(summary.json || "");
+        var srcPath = "";
+        if (docText.charAt(0) !== "{") {
+            srcPath = docText;
+            if (!fsModule) return cb("File access unavailable", summary);
+            try { docText = fsModule.readFileSync(srcPath, "utf8"); }
+            catch (eRead) { return cb("Could not read the transcript file: " + eRead.message, summary); }
+        }
         var doc;
-        try { doc = JSON.parse(summary.json); }
+        try { doc = JSON.parse(docText); }
         catch (e) { return cb("Could not read the transcription", summary); }
 
         var segments = doc.segments || [];
         if (!segments.length) return cb(null, summary);
 
         var model = (settings.refineModel || "").trim() || provider.defaultModel;
+        var translating = (opts.mode === "translate" && !!opts.targetLang);
         var sys = buildSystemPrompt(opts.mode, opts.targetLang);
         var batches = chunk(segments, BATCH_SIZE);
         var done = 0, failed = null;
         var serverReceipt = null;   // what the provider's server reported back
         var results = {};   // original index -> corrected text
+        var repairPass = false;     // second pass over whatever the first pass skipped
 
-        function runBatch(bi) {
+        // Groq/Whisper can occasionally create a segment whose top-level `text` is
+        // empty while its timed `words` still contain the speech. Sending the empty
+        // string to the refinement provider skips that speech, then Full Sentence
+        // mode rebuilds it from the old word array — producing an Arabic island in
+        // an otherwise German translation. Treat the word array as the canonical
+        // fallback everywhere refinement compares or submits segment text.
+        function sourceText(seg) {
+            var direct = String((seg && seg.text) || "").trim();
+            if (direct) return direct;
+            var words = (seg && seg.words) || [];
+            var parts = [];
+            for (var sw = 0; sw < words.length; sw++) {
+                var word = String((words[sw] && words[sw].text) || "").trim();
+                if (word) parts.push(word);
+            }
+            // An overlapping Whisper boundary can put the first word of the next
+            // segment at the end of this word array as well. The real fixture ended
+            // with Arabic "جوب" while the next segment's text began "جوب سنتر",
+            // which would become "Job | Jobcenter" after translation. Remove the
+            // largest short suffix/prefix overlap before submitting the fallback.
+            var segIndex = segments.indexOf(seg);
+            var nextText = "";
+            if (!(seg && seg.timelineBreak === true) &&
+                segIndex >= 0 && segIndex + 1 < segments.length) {
+                nextText = String(segments[segIndex + 1].text || "").trim();
+            }
+            if (parts.length && nextText) {
+                var nextParts = nextText.split(/\s+/);
+                function tokenKey(token) {
+                    return String(token || "").toLowerCase()
+                        .replace(/^[\s.,!?;:\u060c\u061b\u061f"'()\[\]{}-]+|[\s.,!?;:\u060c\u061b\u061f"'()\[\]{}-]+$/g, "");
+                }
+                var maxOverlap = Math.min(3, parts.length, nextParts.length);
+                for (var ov = maxOverlap; ov > 0; ov--) {
+                    var same = true;
+                    for (var oi = 0; oi < ov; oi++) {
+                        if (!tokenKey(parts[parts.length - ov + oi]) ||
+                            tokenKey(parts[parts.length - ov + oi]) !== tokenKey(nextParts[oi])) {
+                            same = false; break;
+                        }
+                    }
+                    if (same) { parts.splice(parts.length - ov, ov); break; }
+                }
+            }
+            return parts.join(" ").trim();
+        }
+
+        function violatesTargetScript(text) {
+            if (!translating) return false;
+            var target = String(opts.targetLang || "").toLowerCase();
+            // Non-Arabic-script targets must not silently retain Arabic source
+            // phrases. Proper names should be transliterated by the model. Persian,
+            // Urdu, Pashto and Sindhi legitimately share this Unicode script, so do
+            // not reject their output merely because it contains Arabic letters.
+            var arabicScriptTarget = {
+                arabic: true, persian: true, urdu: true, pashto: true, sindhi: true
+            };
+            if (!arabicScriptTarget[target] && /[\u0600-\u06ff]/.test(String(text || ""))) return true;
+            return false;
+        }
+
+        // Segments the model did not actually act on. A missing index is an outright
+        // drop; in translate mode an index handed back byte-identical was not
+        // translated either. Both reach the timeline in the ORIGINAL language, which
+        // is how a run ends up half-translated while reporting success.
+        function untouchedIndices() {
+            var miss = [];
+            for (var mi = 0; mi < segments.length; mi++) {
+                if (typeof results[mi] !== "string") { miss.push(mi); continue; }
+                if (translating && results[mi] === sourceText(segments[mi])) { miss.push(mi); continue; }
+                if (violatesTargetScript(results[mi])) miss.push(mi);
+            }
+            return miss;
+        }
+
+        function runBatch(bi, attempt) {
             if (bi >= batches.length) return finish();
+            attempt = attempt || 0;
 
             var batch = batches[bi];
             var payloadSegs = [];
             for (var k = 0; k < batch.length; k++) {
-                payloadSegs.push({ i: segments.indexOf(batch[k]), text: batch[k].text || "" });
+                var payloadItem = { i: segments.indexOf(batch[k]), text: sourceText(batch[k]) };
+                if (batch[k].timelineBreak === true) payloadItem.clipBreakAfter = true;
+                payloadSegs.push(payloadItem);
             }
             var userJson = JSON.stringify({ segments: payloadSegs });
 
             httpJson(provider, apiKey, provider.body(model, sys, userJson), function(err, res) {
-                if (err) { failed = err; return finish(); }
+                // Groq's free tier caps tokens PER MINUTE, so a transcript of any real
+                // length runs out partway through and the whole refinement was thrown
+                // away. The 429 body states exactly how long to wait — honour it and
+                // retry the same batch instead of losing the work already paid for.
+                // Only a limit that says "try again in Xs" is transient. "Request too
+                // large" is the same 429 but permanent — the request can never fit,
+                // so retrying it just burns a minute per attempt and still fails.
+                var waitHint = err ? err.match(/try again in ([\d.]+)s/i) : null;
+                if (err && err.indexOf("RATE_LIMIT:") === 0 && waitHint &&
+                    attempt < RATE_LIMIT_RETRIES) {
+                    var waitS = Math.ceil(parseFloat(waitHint[1])) + 2;
+                    if (waitS > 90) waitS = 90;
+                    console.warn("[refine] rate limited on batch " + (bi + 1) + "/" + batches.length +
+                                 " — waiting " + waitS + "s, then retry " + (attempt + 1) +
+                                 "/" + RATE_LIMIT_RETRIES);
+                    if (progressCb) progressCb(done, batches.length, "waiting " + waitS + "s (free-tier limit)");
+                    return setTimeout(function() { runBatch(bi, attempt + 1); }, waitS * 1000);
+                }
+                // A failure during the repair pass must not throw away the segments
+                // the first pass got right.
+                if (err) {
+                    if (repairPass) console.warn("[refine] repair pass: " + err);
+                    else failed = err;
+                    return finish();
+                }
                 // Record what the SERVER said served this call, not what we asked for.
                 try {
                     if (provider.receipt) {
@@ -4467,13 +6226,28 @@ function importBlob(blob) {
                     // Some models wrap JSON in prose or a code fence — recover the object.
                     var m = raw.match(/\{[\s\S]*\}/);
                     try { parsed = JSON.parse(m ? m[0] : ""); }
-                    catch (e3) { failed = "Provider did not return valid JSON"; return finish(); }
+                    catch (e3) {
+                        // Print what actually came back. "did not return valid JSON"
+                        // with no sample is undiagnosable, and model behaviour here
+                        // changes without notice as provider catalogs rotate.
+                        console.error("[refine] unparseable reply (first 400 chars): " +
+                                      String(raw).slice(0, 400));
+                        failed = "Provider did not return valid JSON";
+                        return finish();
+                    }
                 }
                 var got = (parsed && parsed.segments) || [];
                 for (var g = 0; g < got.length; g++) {
                     var item = got[g];
                     if (typeof item.i === "number" && typeof item.text === "string" && item.text.trim()) {
-                        results[item.i] = item.text.trim();
+                        var candidate = item.text.trim();
+                        if (violatesTargetScript(candidate)) {
+                            console.warn("[refine] rejected segment " + item.i +
+                                         ": target=" + opts.targetLang + " still contains Arabic");
+                            delete results[item.i];
+                        } else {
+                            results[item.i] = candidate;
+                        }
                     }
                 }
                 done++;
@@ -4484,6 +6258,23 @@ function importBlob(blob) {
 
         function finish() {
             if (failed) return cb(failed, summary);
+
+            // One retry for whatever came back untouched, in much smaller batches.
+            var miss = untouchedIndices();
+            if (miss.length && !repairPass) {
+                repairPass = true;
+                console.warn("[refine] " + miss.length + "/" + segments.length +
+                             " segment(s) came back untouched — retrying them in batches of " +
+                             REPAIR_BATCH_SIZE);
+                var missSegs = [];
+                for (var mm = 0; mm < miss.length; mm++) missSegs.push(segments[miss[mm]]);
+                batches = chunk(missSegs, REPAIR_BATCH_SIZE);
+                done = 0;
+                return runBatch(0);
+            }
+            if (miss.length) {
+                console.warn("[refine] " + miss.length + " segment(s) still untouched after the repair pass");
+            }
             // Prefer the server-reported model over the one we requested — if these
             // ever disagree, that disagreement is exactly what you want surfaced.
             var servedModel = (serverReceipt && serverReceipt.model) ? serverReceipt.model : model;
@@ -4505,8 +6296,27 @@ function importBlob(blob) {
 
             var refined = {};
             for (var k in summary) { if (summary.hasOwnProperty(k)) refined[k] = summary[k]; }
-            refined.json = JSON.stringify(doc);
-            cb(null, refined, { changed: changed, total: segments.length, provider: usedLabel });
+
+            // Hand back a PATH, never JSON text — fallbackSRT and placeSecondSubtitle
+            // pass this value straight to the JSX, which opens it as a file. Write a
+            // NEW file instead of overwriting: the raw transcript has to survive for
+            // the second-subtitle pass and for diagnosing a bad refinement.
+            var outText = JSON.stringify(doc);
+            if (srcPath) {
+                var tag = opts.targetLang
+                    ? opts.targetLang.toLowerCase().replace(/[^a-z0-9]+/g, "")
+                    : "fix";
+                var newPath = srcPath.replace(/(\.refined\.[a-z0-9]+)?\.efp\.json$/, "") +
+                              ".refined." + tag + ".efp.json";
+                try { fsModule.writeFileSync(newPath, outText, "utf8"); }
+                catch (eW) { return cb("Could not save the refined transcript: " + eW.message, summary); }
+                refined.json = newPath;
+                console.log("[refine] wrote refined transcript → " + newPath);
+            } else {
+                refined.json = outText;
+            }
+            cb(null, refined, { changed: changed, total: segments.length,
+                                untouched: miss.length, provider: usedLabel });
         }
 
         runBatch(0);

@@ -2,7 +2,7 @@
 set -e
 
 # ─── Config ───────────────────────────────────────────────────────────────────
-EFP_VERSION="v16"
+EFP_VERSION="v1.3.31"
 EFP_ZIP_URL="https://github.com/ahmednajm1/editflow-pro/releases/latest/download/EditFlowPro.zip"
 CEP_PATH="$HOME/Library/Application Support/Adobe/CEP/extensions"
 EFP_DEST="$CEP_PATH/EditFlowPro"
