@@ -5,7 +5,7 @@
 
 !define APP_NAME "EditFlow Pro"
 !define COMP_NAME "Najm Media"
-!define VERSION "1.3.31"
+!define VERSION "1.3.32"
 
 ; ANSI stub: this Mac's Homebrew makensis has a broken x86-unicode stub
 ; (std::bad_alloc). Install paths are ASCII and extension files are copied

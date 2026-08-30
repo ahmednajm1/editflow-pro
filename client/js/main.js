@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.31";
+var CURRENT_VERSION = "1.3.32";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null, spawnModule = null;
 var foundPresetPath = null, foundAudioPresetPaths = {mp3:null, wav:null}, extensionPath = "", configPath = "";
@@ -2250,6 +2250,8 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }
         var opts = { maxBuffer: 16 * 1024 * 1024, timeout: 30 * 60 * 1000 };
+        var macCaptionRunnerPath = "";
+        var macRunnerRepairAttempted = false;
 
         showProgress("Finding audio...", 3, true);
         setStatus("Reading selection…");
@@ -2306,6 +2308,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 var macBin = extensionPath + "/bin/dist/whisper_runner";
                 if (fsModule.existsSync(macBin)) {
                     hasTranscriber = true;
+                    macCaptionRunnerPath = macBin;
                     cmdPrefix = shq(macBin);
                 }
             }
@@ -2571,7 +2574,10 @@ document.addEventListener("DOMContentLoaded", function() {
                 var trimNote = (cDur > 0.1) ? (" · " + cDur.toFixed(1) + "s") : "";
                 showProgress("Analyzing speech (" + model + ")…", 15, true);
                 setStatus("AI speech recognition" + trimNote + " · model = " + modelSize + " MB on first run");
-                console.log("[Captions] running:", cmd);
+                // A command includes the user's API key. CEP console logs are
+                // inspectable, so never log the secret even when debugging.
+                var safeCmd = apiKey ? cmd.split(apiKey).join("[REDACTED]") : cmd;
+                console.log("[Captions] running:", safeCmd);
 
                 activeCaptionProcess = execModule(cmd, opts, function(err, stdout, stderr) {
                 activeCaptionProcess = null;
@@ -2581,14 +2587,35 @@ document.addEventListener("DOMContentLoaded", function() {
                         showStatus("Captioning cancelled by user.", "orange");
                         return;
                     }
-                    hideProgress(); setStatus("");
-                    console.log("[Captions] err:", err.message, "\nstdout:", stdout, "\nstderr:", stderr);
                     // whisper_runner writes JSON to stdout even on failure — parse it first
                     var errData = safeParse(stdout);
                     if (errData && errData.message) {
+                        hideProgress(); setStatus("");
                         showStatus("Caption error: " + errData.message.slice(0, 120), "red");
+                    } else if (osModule && osModule.platform() === "darwin" &&
+                               !macRunnerRepairAttempted && macCaptionRunnerPath) {
+                        // A package installed on another Mac can retain a
+                        // quarantine marker or lose its execute bit. Repair only
+                        // our own bundled runner, without a Terminal prompt, then
+                        // retry once. The next error is shown normally.
+                        macRunnerRepairAttempted = true;
+                        try { fsModule.chmodSync(macCaptionRunnerPath, 493); } catch(repairChmodErr) {}
+                        showProgress("Repairing caption engine…", 18, true);
+                        setStatus("Preparing the caption engine on this Mac…");
+                        function retryMacRunner() {
+                            runTranscriber(mPath, tlStart, cIn, cOut, cDur, timelineMap);
+                        }
+                        if (execFileModule) {
+                            execFileModule("/usr/bin/xattr", ["-d", "com.apple.quarantine", macCaptionRunnerPath],
+                                           { timeout: 10000 }, retryMacRunner);
+                        } else {
+                            retryMacRunner();
+                        }
                     } else {
-                        showStatus("Transcription failed: " + (stderr || err.message || "unknown").slice(0, 800), "red");
+                        hideProgress(); setStatus("");
+                        console.warn("[Captions] Native runner failed without a structured response.",
+                                     "code=", err.code || "unknown", "stderr=", String(stderr || "").slice(0, 200));
+                        showStatus("The caption engine could not start. Please update or reinstall EditFlow Pro, then try again.", "red");
                     }
                     return;
                 }
