@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>One Panel</title>
-    <link rel="stylesheet" href="css/style.css?v=72">
+    <link rel="stylesheet" href="css/style.css?v=85">
     <script src="js/CSInterface.js"></script>
 </head>
 <body>
@@ -11,7 +11,7 @@
     <!-- SPLASH SCREEN -->
     <div id="splash-screen">
         <div class="splash-logo">
-            <img src="img/splash_logo.png" alt="One Panel" style="max-width: 250px; height: auto; border-radius: 8px; box-shadow: 0 4px 15px rgba(26,140,255,0.4);">
+            <img src="img/splash_logo.png?v=2" alt="One Panel" style="max-width: 250px; height: auto; display: block;">
         </div>
     </div>
 
@@ -322,10 +322,10 @@
     <div id="welcome-modal" class="modal-overlay hidden">
         <div class="modal-content welcome-content">
             <div class="welcome-glow"></div>
-            <div class="welcome-logo" style="background: none; box-shadow: none;">
+            <div class="welcome-logo" style="background: none; box-shadow: none; width: auto;">
                 <img src="img/welcome_logo.jpg" alt="One Panel" style="width: 100px; height: auto; mix-blend-mode: screen; filter: drop-shadow(0 4px 12px rgba(26,140,255,0.4)); margin-bottom: -10px;">
             </div>
-            <h2 class="welcome-title">One Panel <span class="welcome-pro">Pro</span></h2>
+            <h2 class="welcome-title">One Panel</h2>
             <p class="welcome-tagline" data-i18n="welcome_tagline">Edit faster. Work smarter. Inside Premiere.</p>
 
             <div class="welcome-features">
@@ -363,11 +363,11 @@
     <!-- ── API SETUP WIZARD MODAL ── -->
     <div id="setup-api-modal" class="modal-overlay hidden">
         <div class="modal-content welcome-content" style="width: 440px;">
-            <div class="welcome-glow" style="background: radial-gradient(circle, rgba(168,85,247,0.3) 0%, transparent 70%);"></div>
-            <div class="welcome-logo" style="background: linear-gradient(135deg, #A855F7 0%, #6E8CFF 100%); margin-bottom: 20px;">
-                <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                </svg>
+            <div class="welcome-glow" style="background: radial-gradient(circle, rgba(31,143,255,0.3) 0%, transparent 70%);"></div>
+            <!-- Was a dollar-sign glyph, which said "this costs money" on the one
+                 screen whose whole point is that the Groq key is free. -->
+            <div class="welcome-logo" style="background: none; box-shadow: none; width: auto; margin-bottom: 20px;">
+                <img src="img/one_panel_mark.png" alt="One Panel" style="width: 56px; height: auto; display: block;">
             </div>
             <h2 class="welcome-title" style="font-size: 20px !important;" data-i18n="setup_api_title">Activate AI Captions</h2>
             <p class="welcome-tagline" style="margin-bottom: 24px;" data-i18n="setup_api_desc">To get lightning-fast transcription, connect your free AI engine.</p>
@@ -388,7 +388,7 @@
 
             <div class="modal-actions" style="gap: 12px; margin-top: 24px;">
                 <button onclick="if(window.csInterface) { window.csInterface.openURLInDefaultBrowser('https://console.groq.com/keys'); } else { require('shell').openExternal('https://console.groq.com/keys'); } return false;" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2);" data-i18n="setup_api_get">Get Free Key ↗</button>
-                <button id="btn-setup-api-save" class="primary welcome-btn" style="box-shadow: 0 6px 18px rgba(168,85,247,0.3) !important;" data-i18n="setup_api_activate">Activate Now</button>
+                <button id="btn-setup-api-save" class="primary welcome-btn" style="box-shadow: 0 6px 18px rgba(31,143,255,0.3) !important;" data-i18n="setup_api_activate">Activate Now</button>
             </div>
             <p class="welcome-dont-show" id="btn-setup-api-close" style="margin-top: 16px; cursor: pointer;" data-i18n="setup_api_cancel">Cancel</p>
         </div>
@@ -446,35 +446,27 @@
                 </div>
             </div>
 
-            <!-- 1. Move Step & Reset -->
-            <div class="row-label">
-                <span class="label" data-i18n="transform_step">Move Step</span>
-                <div class="btn-group" id="step-chips">
+            <!-- 1. Arrows, and the distance they move, on one line. The step
+                 exists only to serve these four buttons, so it sits beside them
+                 rather than claiming a row of its own. The number box is gone:
+                 the four values are editable in Settings, and keeping both a
+                 picker and a free input for one value was the same control
+                 twice. #nudge-step stays as the hidden source of truth the
+                 arrows read. -->
+            <div class="arrow-row">
+                <button class="btn-arrow" id="nudge-left" data-i18n-title="transform_left_tip" title="Move Left">◀</button>
+                <button class="btn-arrow" id="nudge-up" data-i18n-title="transform_up_tip" title="Move Up">▲</button>
+                <button class="btn-arrow" id="nudge-down" data-i18n-title="transform_down_tip" title="Move Down">▼</button>
+                <button class="btn-arrow" id="nudge-right" data-i18n-title="transform_right_tip" title="Move Right">▶</button>
+                <div class="btn-group seg-group" id="step-chips" data-i18n-title="transform_step" title="Move Step">
                     <button class="btn-preset step-chip" data-val="5">5</button>
                     <button class="btn-preset step-chip chip-active" data-val="10">10</button>
                     <button class="btn-preset step-chip" data-val="20">20</button>
                     <button class="btn-preset step-chip" data-val="50">50</button>
                 </div>
-                <div style="display: flex; align-items: center; gap: 4px;">
-                    <input type="number" class="input-small" id="nudge-step" value="10" />
-                    <!-- <span class="label-unit" data-i18n="transform_px">px</span> -->
-                    <button class="btn-reset-small" id="reset-clip-transform" data-i18n-title="transform_reset_tip" title="Reset position to center + scale to 100%">↺</button>
-                </div>
+                <span class="label-unit">px</span>
+                <input type="hidden" id="nudge-step" value="10" />
             </div>
-
-            <!-- 2. أزرار الأسهم (Centered) -->
-            <div style="display: flex; flex-direction: column; align-items: center; margin: 24px 0 16px 0;">
-                <span style="font-size: 11px; color: var(--text-mute); font-weight: 600; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.05em; opacity: 0.5;">Position Controls</span>
-                <div class="arrow-row" style="display: flex; gap: 12px;">
-                    <button class="btn-arrow" id="nudge-left" data-i18n-title="transform_left_tip" title="Move Left">◀</button>
-                    <button class="btn-arrow" id="nudge-up" data-i18n-title="transform_up_tip" title="Move Up">▲</button>
-                    <button class="btn-arrow" id="nudge-down" data-i18n-title="transform_down_tip" title="Move Down">▼</button>
-                    <button class="btn-arrow" id="nudge-right" data-i18n-title="transform_right_tip" title="Move Right">▶</button>
-                </div>
-            </div>
-
-            <!-- الفاصل البصري -->
-            <div style="height: 1px; background: rgba(255, 255, 255, 0.1); margin: 16px 0; width: 100%;"></div>
 
             <!-- 3. Scale % -->
             <div class="row-label">
@@ -491,14 +483,11 @@
                 </div>
             </div>
 
-            <!-- 4. Set Scale Button -->
-            <button class="btn-apply" id="apply-scale" data-i18n="transform_set" style="padding: 10px 0; font-size: 13px; font-weight: 500; opacity: 0.9;">Set Scale</button>
-
-            <!-- 5. Tools -->
-            <div class="tools-row" id="transform-tools-chips">
-                <span class="label" data-i18n="transform_tools">Tools</span>
+            <!-- 4. Action bar: apply the scale, plus the two one-shot tools -->
+            <div class="transform-actions" id="transform-tools-chips">
+                <button class="btn-apply" id="apply-scale" data-i18n="transform_set">Set Scale</button>
+                <button class="btn-tool tool-chip" id="reset-clip-transform" data-i18n-title="transform_reset_tip" title="Reset position to center + scale to 100%">↺</button>
                 <button class="btn-tool tool-chip" id="btn-fit-frame" data-i18n-title="transform_fit_tip" title="Scale clip to fit inside the sequence frame">⊞ <span data-i18n="transform_fit">Fit</span></button>
-                <button class="btn-tool tool-chip" id="btn-center-anchor" data-i18n-title="transform_anchor_tip" title="Reset anchor point to center of frame">◎ <span data-i18n="transform_anchor">Anchor</span></button>
             </div>
         </div>
 
@@ -510,11 +499,11 @@
             </h3>
             <p class="description" data-i18n="sync_prep_desc">Select the clips you want to sync. Each selected video/audio clip moves to its own lane at the same time.</p>
             <div class="sync-prep-flow" aria-hidden="true">
-                <span data-i18n="sync_prep_select">Select clips</span><i></i><span data-i18n="sync_prep_separate">Separate lanes</span><i></i><span data-i18n="sync_prep_synchronize">Right-click &rarr; Synchronize</span><i></i><span data-i18n="sync_prep_pullstep">Pull to start</span><i></i><span data-i18n="sync_prep_restackstep">Re-stack</span>
+                <span data-i18n="sync_prep_select">Select clips</span><i></i><span data-i18n="sync_prep_separate">Separate lanes</span><i></i><span data-i18n="sync_prep_synchronize">Right-click &rarr; Synchronize</span><i></i><span data-i18n="sync_prep_restackstep">Re-stack</span><i></i><span data-i18n="sync_prep_pullstep">Pull to start</span>
             </div>
             <button id="btn-sync-prep" class="sync-prep-primary" data-i18n="sync_prep_prepare">Prepare Sync Lanes</button>
-            <button id="btn-sync-pull" class="secondary sync-prep-pull" data-i18n="sync_prep_pull">Pull clips to start</button>
             <button id="btn-sync-restack" class="secondary sync-prep-pull" data-i18n="sync_prep_restack">Re-stack onto fewer lanes</button>
+            <button id="btn-sync-pull" class="secondary sync-prep-pull" data-i18n="sync_prep_pull">Pull clips to start</button>
             <p class="sync-prep-safe" data-i18n="sync_prep_safe">Only selected clips move. Nothing is trimmed, duplicated or deleted. Undo with Cmd/Ctrl+Z.</p>
             <p id="sync-prep-status" class="sync-prep-status" aria-live="polite"></p>
         </div>

@@ -1,12 +1,12 @@
 #!/bin/bash
 # ============================================================
-# Windows EXE Package Builder for EditFlow Pro
+# Windows EXE Package Builder for One Panel
 # Creates a professional single-file installer .exe using NSIS.
 # ============================================================
 set -e
 cd "$(dirname "$0")"
 
-echo "Building EditFlow Pro Windows EXE Installer..."
+echo "Building One Panel Windows EXE Installer..."
 
 # Clean up temp folders
 rm -rf build_win_tmp
@@ -45,4 +45,4 @@ makensis installer.nsi
 # Clean up temp build folder
 rm -rf build_win_tmp
 
-echo "Done! Created EditFlow Pro Installer.exe for Windows users."
+echo "Done! Created One Panel Installer.exe for Windows users."

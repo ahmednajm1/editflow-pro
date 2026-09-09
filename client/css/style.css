@@ -69,6 +69,10 @@
   align-items: center;
   gap: 12px;
   animation: splashPulse 1.5s infinite ease-in-out;
+  background: #000;
+  padding: 28px 40px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(26,140,255,0.4);
 }
 .splash-icon {
   font-size: 38px;
@@ -315,9 +319,29 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: calc(var(--u)*2);
   padding: calc(var(--u)*4) calc(var(--u)*5);
   border-bottom: 1px solid var(--border);
   background: var(--bg);
+}
+/* Neither side could shrink, so on a narrow panel the title and its badges
+   pushed the language, settings and help buttons clean off the right edge:
+   Settings became unreachable. The title gives way now, the buttons never do. */
+.header-left {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+}
+/* The product name never shrinks. The badges beside it are nowrap and were
+   refusing to give, so the title absorbed every pixel of shrinkage and got
+   squeezed down to nothing while a licence chip sat there at full width. */
+.header-left h1 {
+  flex: 0 0 auto;
+}
+.header-left .badge,
+.header-left .pro-badge {
+  min-width: 0;
+  overflow: hidden;
 }
 .header-left h1 {
   margin: 0;
@@ -328,7 +352,7 @@ html, body {
   align-items: center;
   gap: calc(var(--u)*2);
 }
-.header-right { display: flex; align-items: center; gap: calc(var(--u)*3); }
+.header-right { display: flex; align-items: center; gap: calc(var(--u)*3); flex: 0 0 auto; }
 .badge {
   font-size: var(--fs-xs);
   font-weight: 600;
@@ -475,13 +499,19 @@ html[dir="rtl"] .header-dropdown {
   background: linear-gradient(145deg, rgba(8,40,20,.58), rgba(255,255,255,.025));
   border-color: rgba(31,143,255,.20);
 }
+/* nowrap on a flex row with no wrapping meant this line could only ever run
+   past the panel edge. The steps wrap onto as many lines as they need now;
+   nowrap stays on the items so a single step never breaks mid-phrase. */
 .sync-prep-flow {
   display: flex;
   align-items: center;
-  gap: 7px;
+  flex-wrap: wrap;
+  gap: 4px 7px;
   margin: 0 0 10px;
   color: #b8c4d0;
   font-size: 10px;
+}
+.sync-prep-flow > span {
   white-space: nowrap;
 }
 .sync-prep-flow i {
@@ -1058,7 +1088,6 @@ button.secondary { color: var(--text-mute); }
   font-size: 24px; font-weight: 700; margin: 0 0 8px 0;
   letter-spacing: -0.02em;
 }
-.welcome-pro { color: var(--accent); }
 .welcome-tagline {
   position: relative; z-index: 1;
   font-size: 13px; color: var(--text-mute); margin: 0 0 24px 0;
@@ -1148,6 +1177,12 @@ button.secondary { color: var(--text-mute); }
 .settings-tabs {
   display: flex;
   justify-content: center;
+  /* Centring an overflowing flex row pushes the first item past the start edge,
+     where scrolling cannot reach it: the General tab became unclickable on a
+     narrow panel. `safe` centres only while everything fits. The declaration
+     above stays as the fallback for engines that do not know the keyword, and
+     the narrow-width rule further down keeps all five tabs on screen anyway. */
+  justify-content: safe center;
   overflow-x: auto;
   padding: 0 8px;
   border-bottom: 1px solid var(--glass-border);
@@ -1298,8 +1333,88 @@ button.secondary { color: var(--text-mute); }
 
 .arrow-row {
   display: flex;
-  gap: 12px;
-  justify-content: flex-start;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 4px 0 12px 0;
+}
+/* The step picker rides along with the arrows, sized to its own content rather
+   than stretching like it does when it sits in a .row-label grid. */
+.arrow-row .seg-group {
+  flex: 0 0 auto;
+}
+/* width:auto again undoes the global `button { width: 100% }`. Inside a
+   .row-label the chips carry flex:1, which hides that; sized to content here,
+   it makes every chip claim the whole strip and clips all but the first. */
+.arrow-row .seg-group .btn-preset {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 30px;
+  padding: 0 8px;
+}
+.arrow-row .label-unit {
+  margin-inline-start: -6px;
+}
+
+/* Action bar: the primary Set Scale plus the two one-shot tools. Set Scale
+   takes the room that is left, the tools stay at their label width, and the
+   whole bar wraps instead of spilling once the panel gets narrow. */
+.transform-actions {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+/* Move Step only picks a number; the arrows above read it, and clicking a value
+   changes nothing on the timeline by itself. The Scale chips one row below DO
+   apply the instant they are clicked. Identical pills for both meant a click on
+   a step value looked broken. Joined segments read as "choose one", separate
+   pills read as "press me", so the two rows deliberately look different. */
+.seg-group {
+  gap: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(0,0,0,0.25);
+}
+.seg-group .btn-preset {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  height: 22px;
+}
+.seg-group .btn-preset + .btn-preset {
+  border-left: 1px solid var(--glass-border);
+}
+.seg-group .btn-preset:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: transparent;
+  color: #fff;
+}
+/* !important is needed only because the shared .chip-active rule uses it. The
+   glow is dropped on purpose: it reads as a button that was just pressed, which
+   is the exact wrong signal for a value that is merely selected. */
+.seg-group .btn-preset.chip-active {
+  background: rgba(31,143,255,0.28) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  box-shadow: none;
+}
+
+/* width:auto undoes the global `button { width: 100% }`, which would otherwise
+   resolve every flex-basis to the full row and push each button onto its own
+   line. */
+.transform-actions > .btn-apply {
+  flex: 1 1 110px;
+  width: auto;
+  padding: 7px 14px;
+}
+.transform-actions > .btn-tool {
+  flex: 0 0 auto;
+  width: auto;
+  padding: 6px 12px;
 }
 .btn-arrow {
   background: rgba(255,255,255,0.05);
@@ -1330,11 +1445,14 @@ button.secondary { color: var(--text-mute); }
 }
 .btn-reset-small:hover { background: rgba(255,255,255,0.1); border-color: var(--accent); color: #fff; }
 
+/* Only the Scale row uses this now, and the columns are tuned so it survives
+   down to a 300px panel: the wrapped two-line fallback below reads worse, so it
+   should trigger as late as the space allows. */
 .row-label {
   display: grid;
-  grid-template-columns: 65px minmax(0, 1fr) 75px;
+  grid-template-columns: 52px minmax(0, 1fr) 62px;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 10px;
 }
 .row-label > * {
@@ -1354,6 +1472,9 @@ button.secondary { color: var(--text-mute); }
   color: var(--text-mute);
   border-radius: 6px;
   height: 24px;
+  /* Flex items default to min-width:auto, so without this the chips refuse to
+     shrink and spill over the number input next to them on a narrow panel. */
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1820,8 +1941,32 @@ html, body {
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* Responsive query for narrow panels (e.g. Adobe Premiere sidebar placement) */
-@media (max-width: 290px) {
+/* Below 320px the fourth Scale chip escapes its track and slides under the
+   number box, so the row splits in two. Measured, not guessed: at 320px and up
+   the single row is clean, and it is the easier layout to scan, so it holds
+   everywhere it fits. */
+/* Progressive shedding, at the widths each badge actually needs. The title and
+   the three action buttons together need ~305px; the licence chip adds ~105 on
+   top of that and the version badge another ~67. Both are repeated in
+   Settings > About, so they are the right things to drop. */
+@media (max-width: 479px) {
+  .header-left #version-badge { display: none; }
+}
+@media (max-width: 409px) {
+  .header-left #proBadge { display: none; }
+}
+@media (max-width: 329px) {
+  /* Buy back the width the product name needs so it reads in full. */
+  .header { padding-inline: calc(var(--u)*3); }
+}
+
+/* Tighten the settings tabs so all five fit without scrolling at all. */
+@media (max-width: 359px) {
+  .settings-tabs { padding: 0 2px; }
+  .settings-tab { padding: 11px 4px; font-size: 10px; }
+}
+
+@media (max-width: 319px) {
   .panel-content {
     padding: 12px;
   }
@@ -1871,28 +2016,13 @@ html, body {
     font-size: 11px;
   }
   
-  /* Stack tools-row to avoid side spillover */
-  .tools-row {
-    display: grid;
-    grid-template-areas: 
-      "label label"
-      "fit anchor";
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
+  /* Set Scale takes its own line, the two tools share the one under it. */
+  .transform-actions > .btn-apply {
+    flex: 1 1 100%;
   }
-  
-  .tools-row > .label {
-    grid-area: label;
-    text-align: left;
-    margin-bottom: 2px;
-  }
-  
-  .tools-row > #btn-fit-frame {
-    grid-area: fit;
-  }
-  
-  .tools-row > #btn-center-anchor {
-    grid-area: anchor;
+
+  .transform-actions > .btn-tool {
+    flex: 1 1 0;
   }
   
   /* Fit preset chips on a single line */

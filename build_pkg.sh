@@ -2,7 +2,7 @@
 set -e
 cd "$(dirname "$0")"
 
-echo "Building EditFlow Pro Installer..."
+echo "Building One Panel Installer..."
 
 # Clean up
 rm -rf build_installer
@@ -56,7 +56,10 @@ for v in "${VERSIONS[@]}"; do
     su - "$USER" -c "defaults write com.adobe.CSXS.$v PlayerDebugMode 1" || true
 done
 
-# Set permissions for self-updates
+# The folder name stays EditFlowPro on purpose. CEP identifies an extension
+# by the ExtensionBundleId in its manifest, not by the folder, so keeping the
+# path means an existing install upgrades in place instead of appearing twice
+# in Premiere alongside the old one. Users never see this path.
 TARGET_DIR="/Library/Application Support/Adobe/CEP/extensions/EditFlowPro"
 echo "Setting write permissions for self-updates at: $TARGET_DIR"
 if [ -d "$TARGET_DIR" ]; then
@@ -70,10 +73,10 @@ exit 0
 EOF
 chmod +x build_installer/scripts/postinstall
 
-# Create EditFlowPro.zip for Hot-Updates
-echo "📦 Packaging EditFlowPro.zip for Hot-Updates..."
-rm -f EditFlowPro.zip
-(cd build_installer/root && zip -q -r ../../EditFlowPro.zip .)
+# Create OnePanel.zip for Hot-Updates
+echo "📦 Packaging OnePanel.zip for Hot-Updates..."
+rm -f OnePanel.zip
+(cd build_installer/root && zip -q -r ../../OnePanel.zip .)
 
 # Build the PKG
 pkgbuild --root build_installer/root \
@@ -81,7 +84,7 @@ pkgbuild --root build_installer/root \
          --version 17.0 \
          --scripts build_installer/scripts \
          --install-location "/Library/Application Support/Adobe/CEP/extensions/EditFlowPro" \
-         "EditFlow Pro Installer.pkg"
+         "One Panel Installer.pkg"
 
 rm -rf build_installer
-echo "Done! Created EditFlow Pro Installer.pkg and EditFlowPro.zip"
+echo "Done! Created One Panel Installer.pkg and OnePanel.zip"

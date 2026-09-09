@@ -3091,8 +3091,22 @@ $._onepanel.exportCustom = function(presetPath, fileName, folderPath, outputForm
                 seq.setOutPoint(sel[0].end.ticks);
                 workAreaType = 1; // 1 = ENCODE_IN_TO_OUT
             } catch(e) {}
+        } else {
+            // No clip selected — fall back to whatever In/Out the user already
+            // set on the timeline ruler (I/O keys), instead of always
+            // exporting the full sequence. Premiere reports those as 0..seq.end
+            // when nothing has been set, so only treat it as a real work area
+            // when it's narrower than that.
+            try {
+                var curIn = Number(String(seq.getInPointAsTime().ticks));
+                var curOut = Number(String(seq.getOutPointAsTime().ticks));
+                var fullEnd = Number(String(seq.end));
+                if (curIn > 0 || curOut < fullEnd) {
+                    workAreaType = 1; // 1 = ENCODE_IN_TO_OUT
+                }
+            } catch(e) {}
         }
-        
+
         // ── Direct background render (always use direct Premiere export to match Mac experience and support systems without AME) ──
         seq.exportAsMediaDirect(outPath, normPresetPath, workAreaType);
         
@@ -4450,79 +4464,6 @@ $._onepanel.restoreInOut = function(inTicks, outTicks) {
 };
 
 // =========================================================
-// CENTER ANCHOR POINT — Reset anchor to clip center
-// Detects coordinate system from Position property
-// =========================================================
-$._onepanel.centerAnchorPoint = function() {
-    try {
-        var seq = app.project.activeSequence;
-        if (!seq) return '{"status":"error","message":"No active sequence"}';
-
-        var sel = seq.getSelection();
-        if (!sel || sel.length === 0) return '{"status":"error","message":"Select a video clip first."}';
-
-        var seqW = seq.frameSizeHorizontal;
-        var seqH = seq.frameSizeVertical;
-        var count = 0;
-        var me = this;
-
-        for (var i = 0; i < sel.length; i++) {
-            var clip = sel[i];
-            if (clip.mediaType !== "Video") continue;
-
-            // Use existing helper to detect coordinate system
-            var posInfo = me._findPositionInfo(clip);
-            if (!posInfo) continue;
-
-            var compName = posInfo.compName;
-            var curPos = posInfo.prop.getValue();
-
-            // Detect normalized vs pixel coords from current position values
-            var isNormalized = (compName === "Align and Transform" || compName === "Transform" ||
-                                (Math.abs(curPos[0]) < 50 && Math.abs(curPos[1]) < 50));
-
-            // Find anchor point in the same component
-            var motionComp = null;
-            for (var c = 0; c < clip.components.numItems; c++) {
-                var dn = clip.components[c].displayName;
-                if (dn === compName) {
-                    motionComp = clip.components[c];
-                    break;
-                }
-            }
-            if (!motionComp) continue;
-
-            var anchorProp = null;
-            for (var p = 0; p < motionComp.properties.numItems; p++) {
-                var pn = motionComp.properties[p].displayName;
-                if (pn === "Anchor Point" || pn === "\u0646\u0642\u0637\u0629 \u0627\u0644\u0627\u0631\u062A\u0643\u0627\u0632" || pn === "Ankerpunkt" || pn === "Punto de anclaje" || pn.toLowerCase() === "anchor point") {
-                    anchorProp = motionComp.properties[p];
-                    break;
-                }
-            }
-
-            if (anchorProp) {
-                if (anchorProp.isTimeVarying()) anchorProp.setTimeVarying(false);
-
-                if (isNormalized) {
-                    // Normalized: center is (0.5, 0.5)
-                    anchorProp.setValue([0.5, 0.5]);
-                } else {
-                    // Pixel coords: center is (seqW/2, seqH/2)
-                    anchorProp.setValue([seqW / 2, seqH / 2]);
-                }
-                count++;
-            }
-        }
-
-        if (count > 0) return '{"status":"success","message":"Anchor Point centered on ' + count + ' clips","count":' + count + '}';
-        return '{"status":"error","message":"Could not find Anchor Point property. Select video clips."}';
-    } catch(e) {
-        return '{"status":"error","message":"' + e.message + '"}';
-    }
-};
-
-// =========================================================
 // FIT TO FRAME — Scale clip to fill sequence dimensions
 // =========================================================
 $._onepanel.fitToFrame = function(mode) {
@@ -4536,6 +4477,8 @@ $._onepanel.fitToFrame = function(mode) {
         var seqW = seq.frameSizeHorizontal;
         var seqH = seq.frameSizeVertical;
         var count = 0;
+        var unknownDims = 0;
+        var lastSrcW = 0, lastSrcH = 0, lastScale = 0;
         var me = this;
 
         for (var i = 0; i < sel.length; i++) {
@@ -4584,8 +4527,11 @@ $._onepanel.fitToFrame = function(mode) {
                 } catch(e) {}
             }
 
-            if (!srcW || srcW <= 0) srcW = seqW;
-            if (!srcH || srcH <= 0) srcH = seqH;
+            // No silent fallback to the sequence size here. That made an
+            // unreadable clip look exactly like a clip that already matches the
+            // frame: both landed on 100%, which is what Reset does, so Fit
+            // looked like a duplicate button instead of a failed one.
+            if (!srcW || srcW <= 0 || !srcH || srcH <= 0) { unknownDims++; continue; }
 
             var scaleX = (seqW / srcW) * 100;
             var scaleY = (seqH / srcH) * 100;
@@ -4595,6 +4541,7 @@ $._onepanel.fitToFrame = function(mode) {
             if (scaleInfo) {
                 if (scaleInfo.prop.isTimeVarying()) scaleInfo.prop.setTimeVarying(false);
                 scaleInfo.prop.setValue(targetScale, true);
+                lastSrcW = srcW; lastSrcH = srcH; lastScale = Math.round(targetScale);
 
                 var posInfo = me._findPositionInfo(clip);
                 if (posInfo) {
@@ -4613,8 +4560,15 @@ $._onepanel.fitToFrame = function(mode) {
         }
 
         if (count > 0) {
+            // Report the numbers. A clip already the size of the frame fits at
+            // 100%, which looks like nothing happened unless the panel says so.
             var modeLabel = (mode === "fill") ? "Fill" : "Fit";
-            return '{"status":"success","message":"' + modeLabel + ' applied to ' + count + ' clips","count":' + count + '}';
+            var msg = modeLabel + ": " + lastScale + "% (" + lastSrcW + "x" + lastSrcH + " in " + seqW + "x" + seqH + ")";
+            if (count > 1) msg = modeLabel + ": " + count + " clips";
+            return '{"status":"success","message":"' + msg + '","count":' + count + '}';
+        }
+        if (unknownDims > 0) {
+            return '{"status":"error","message":"Could not read the clip resolution, so there is nothing to fit to. Try a clip imported normally into the project."}';
         }
         return '{"status":"error","message":"Could not find Scale property on selected clips."}';
     } catch(e) {

@@ -1,9 +1,9 @@
 ; ============================================================
-; EditFlow Pro - Windows NSIS Installer Script
-; Compiles into a single EditFlow Pro Installer.exe
+; One Panel - Windows NSIS Installer Script
+; Compiles into a single One Panel Installer.exe
 ; ============================================================
 
-!define APP_NAME "EditFlow Pro"
+!define APP_NAME "One Panel"
 !define COMP_NAME "Najm Media"
 !define VERSION "1.3.32"
 
@@ -13,7 +13,7 @@
 Unicode false
 
 Name "${APP_NAME}"
-OutFile "EditFlow Pro Installer.exe"
+OutFile "One Panel Installer.exe"
 InstallDir "$APPDATA\Adobe\CEP\extensions\EditFlowPro"
 
 ; Request application privileges for current user (no admin popup!)

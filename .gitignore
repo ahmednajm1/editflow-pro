@@ -10,8 +10,12 @@
 .v*_launched
 editflow_config.json
 
-# Build outputs
+# Build outputs — these are ~30MB each and are served from the website repo,
+# not from here. Committing them would add 90MB to history per release.
 *.zxp
+*.zip
+*.pkg
+*.exe
 build/
 dist/
 

@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.32";
+var CURRENT_VERSION = "1.3.33";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null, spawnModule = null;
 var foundPresetPath = null, foundAudioPresetPaths = {mp3:null, wav:null}, extensionPath = "", configPath = "";
@@ -93,9 +93,7 @@ var i18n = {
         transform_tools: "Tools",
         transform_desc: "Move, scale, and adjust selected clips directly on the timeline.",
         transform_fit_tip: "Scale clip to fit inside the sequence frame",
-        transform_anchor_tip: "Reset anchor point to center of frame",
         transform_fit: "Fit",
-        transform_anchor: "Anchor",
         audio_quick: "Quick",
         transform_set: "Set",
         sync_prep_title: "Sync Prep",
@@ -383,9 +381,7 @@ var i18n = {
         transform_tools: "أدوات",
         transform_desc: "حرّك وغيّر حجم واضبط المقاطع مباشرةً على التايملاين.",
         transform_fit_tip: "تغيير الحجم لملء إطار السيكونس",
-        transform_anchor_tip: "إعادة تعيين نقطة الارتكاز للمركز",
         transform_fit: "Fit",
-        transform_anchor: "Anchor",
         audio_quick: "سريع",
         transform_set: "تطبيق",
         sync_prep_title: "تجهيز المزامنة",
@@ -1111,12 +1107,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 });
             })(chips[i]);
         }
-        // typing a custom value clears chip highlight
-        if (stepInput) {
-            stepInput.addEventListener('input', function() {
-                for (var j = 0; j < chips.length; j++) chips[j].classList.remove('chip-active');
-            });
-        }
     })();
 
     // ---- PRESET CHIPS — scale ----
@@ -1229,17 +1219,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 console.log('[FIT] Result:', result);
                 handleJSXResult(result);
                 updateClipInfo();
-            }
-        );
-    });
-
-    safeBind("btn-center-anchor", function() {
-        console.log('[ANCHOR] Center anchor point');
-        csInterface.evalScript(
-            '$._onepanel.centerAnchorPoint()',
-            function(result) {
-                console.log('[ANCHOR] Result:', result);
-                handleJSXResult(result);
             }
         );
     });
@@ -4232,7 +4211,20 @@ function applySettingsToUI() {
         stepChips[s].setAttribute('data-val', settings.moveStep[s]);
     }
     var stepInput = document.getElementById('nudge-step');
-    if (stepInput && settings.moveStep[0]) stepInput.value = settings.moveStep[0];
+    if (stepInput && settings.moveStep[0]) {
+        stepInput.value = settings.moveStep[0];
+        // The arrows read their distance from this input, so the lit chip has to
+        // agree with it. Before, the markup default stayed lit (10) while the
+        // input was reset to the first preset (5): the panel showed one step
+        // size and moved the clip by another.
+        for (var sh = 0; sh < stepChips.length; sh++) {
+            if (stepChips[sh].getAttribute('data-val') === String(stepInput.value)) {
+                stepChips[sh].classList.add('chip-active');
+            } else {
+                stepChips[sh].classList.remove('chip-active');
+            }
+        }
+    }
 
     // Transform Scale chips
     var tscaleChips = document.querySelectorAll('.scale-chip');
