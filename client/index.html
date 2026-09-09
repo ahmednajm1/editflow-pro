@@ -2,8 +2,8 @@
 <html lang="en" dir="ltr">
 <head>
     <meta charset="utf-8">
-    <title>EditFlow Pro</title>
-    <link rel="stylesheet" href="css/style.css?v=63">
+    <title>One Panel</title>
+    <link rel="stylesheet" href="css/style.css?v=72">
     <script src="js/CSInterface.js"></script>
 </head>
 <body>
@@ -11,7 +11,7 @@
     <!-- SPLASH SCREEN -->
     <div id="splash-screen">
         <div class="splash-logo">
-            <img src="img/splash_logo.png" alt="EditFlow Pro" style="max-width: 250px; height: auto; border-radius: 8px; box-shadow: 0 4px 15px rgba(26,140,255,0.4);">
+            <img src="img/splash_logo.png" alt="One Panel" style="max-width: 250px; height: auto; border-radius: 8px; box-shadow: 0 4px 15px rgba(26,140,255,0.4);">
         </div>
     </div>
 
@@ -227,13 +227,13 @@
 
                     <label data-i18n="cfg_export_path">Default Export Folder</label>
                     <div class="settings-row">
-                        <input type="text" id="cfg-export-path" placeholder="Desktop/EditFlowPro_Exports" style="flex:1;">
+                        <input type="text" id="cfg-export-path" placeholder="Desktop/OnePanel_Exports" style="flex:1;">
                         <button id="btn-cfg-browse-path" style="width:auto; padding:6px 12px;" data-i18n="export_browse">Browse</button>
                     </div>
 
                     <label data-i18n="cfg_download_path">Downloads Folder</label>
                     <div class="settings-row">
-                        <input type="text" id="cfg-download-path" data-i18n-placeholder="cfg_download_path_ph" placeholder="Movies/EditFlow Downloads" style="flex:1;">
+                        <input type="text" id="cfg-download-path" data-i18n-placeholder="cfg_download_path_ph" placeholder="Movies/One Panel Downloads" style="flex:1;">
                     </div>
 
                     <label data-i18n="cfg_filename_pattern">Default Filename Pattern</label>
@@ -253,7 +253,7 @@
                         <div class="about-logo" style="background: transparent; border: none; box-shadow: none; padding: 0;">
                             <img src="img/ef_logo.png" style="width: 140px; height: auto; object-fit: contain; margin-bottom: 12px;">
                         </div>
-                        <h3>EditFlow Pro</h3>
+                        <h3>One Panel</h3>
                         <p class="about-version" id="about-version">Version 1.3.30</p>
                         <p class="about-tagline" data-i18n="about_tagline">Professional one-click editing tools for Adobe Premiere Pro</p>
                         <hr class="about-divider">
@@ -323,9 +323,9 @@
         <div class="modal-content welcome-content">
             <div class="welcome-glow"></div>
             <div class="welcome-logo" style="background: none; box-shadow: none;">
-                <img src="img/welcome_logo.jpg" alt="EditFlow Pro" style="width: 100px; height: auto; mix-blend-mode: screen; filter: drop-shadow(0 4px 12px rgba(26,140,255,0.4)); margin-bottom: -10px;">
+                <img src="img/welcome_logo.jpg" alt="One Panel" style="width: 100px; height: auto; mix-blend-mode: screen; filter: drop-shadow(0 4px 12px rgba(26,140,255,0.4)); margin-bottom: -10px;">
             </div>
-            <h2 class="welcome-title">EditFlow <span class="welcome-pro">Pro</span></h2>
+            <h2 class="welcome-title">One Panel <span class="welcome-pro">Pro</span></h2>
             <p class="welcome-tagline" data-i18n="welcome_tagline">Edit faster. Work smarter. Inside Premiere.</p>
 
             <div class="welcome-features">
@@ -400,7 +400,7 @@
     <!-- HEADER -->
     <div class="header">
         <div class="header-left" style="display: flex; align-items: center; gap: 12px; margin-left: 4px;">
-            <h1 style="margin: 0; white-space: nowrap; font-size: 18px; font-weight: 700; letter-spacing: -0.02em;">EditFlow Pro</h1>
+            <h1 style="margin: 0; white-space: nowrap; font-size: 18px; font-weight: 700; letter-spacing: -0.02em;">One Panel</h1>
             <div class="badge badge-pro" id="version-badge" style="margin-left: 4px;">v1.3.30</div>
             <div class="pro-badge unlicensed" id="proBadge" style="margin-left: 2px;">🔒 Unlicensed</div>
         </div>
@@ -510,12 +510,44 @@
             </h3>
             <p class="description" data-i18n="sync_prep_desc">Select the clips you want to sync. Each selected video/audio clip moves to its own lane at the same time.</p>
             <div class="sync-prep-flow" aria-hidden="true">
-                <span data-i18n="sync_prep_select">Select clips</span><i></i><span data-i18n="sync_prep_separate">Separate lanes</span><i></i><span data-i18n="sync_prep_synchronize">Synchronize</span>
+                <span data-i18n="sync_prep_select">Select clips</span><i></i><span data-i18n="sync_prep_separate">Separate lanes</span><i></i><span data-i18n="sync_prep_synchronize">Right-click &rarr; Synchronize</span><i></i><span data-i18n="sync_prep_pullstep">Pull to start</span><i></i><span data-i18n="sync_prep_restackstep">Re-stack</span>
             </div>
             <button id="btn-sync-prep" class="sync-prep-primary" data-i18n="sync_prep_prepare">Prepare Sync Lanes</button>
-            <button id="btn-sync-prep-undo" class="secondary sync-prep-undo" data-i18n="sync_prep_undo">Undo last prep</button>
-            <p class="sync-prep-safe" data-i18n="sync_prep_safe">Only selected clips move. Nothing is trimmed, duplicated or deleted.</p>
+            <button id="btn-sync-pull" class="secondary sync-prep-pull" data-i18n="sync_prep_pull">Pull clips to start</button>
+            <button id="btn-sync-restack" class="secondary sync-prep-pull" data-i18n="sync_prep_restack">Re-stack onto fewer lanes</button>
+            <p class="sync-prep-safe" data-i18n="sync_prep_safe">Only selected clips move. Nothing is trimmed, duplicated or deleted. Undo with Cmd/Ctrl+Z.</p>
             <p id="sync-prep-status" class="sync-prep-status" aria-live="polite"></p>
+        </div>
+
+        <!-- 3. FRAMING GUIDE — see the platform UI while editing -->
+        <div class="action-group guide-group">
+            <h3>
+                <span class="icon"><svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M6 7h12"/><path d="M6 17h12"/><circle cx="16" cy="12" r="1"/></svg></span>
+                <span data-i18n="guide_title">Framing Guide</span>
+            </h3>
+            <p class="description" data-i18n="guide_desc">See what the app will cover, then reframe every shot at once from a single adjustment layer.</p>
+            <div class="guide-picker" role="group" aria-label="Platform">
+                <button id="btn-guide-reels"  class="guide-primary" data-i18n="guide_add_reels">Instagram Reels</button>
+                <button id="btn-guide-tiktok" class="guide-primary" data-i18n="guide_add_tiktok">TikTok</button>
+                <button id="btn-guide-shorts" class="guide-primary" data-i18n="guide_add_shorts">YouTube Shorts</button>
+            </div>
+            <button id="btn-guide-remove" class="secondary guide-remove" data-i18n="guide_remove">Remove guide</button>
+            <p class="sync-prep-safe" data-i18n="guide_safe">Guide only. Hide the track before you export.</p>
+            <p id="guide-status" class="sync-prep-status" aria-live="polite"></p>
+        </div>
+
+        <!-- 4. ADJUSTMENT LAYER — one layer, an effect already on it -->
+        <div class="action-group adj-group">
+            <h3>
+                <span class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18"/><path d="M8 8h8"/><path d="M8 16h8"/></svg></span>
+                <span data-i18n="adj_title">Adjustment Layer</span>
+            </h3>
+            <p class="description" data-i18n="adj_desc">Drop one layer over the whole sequence with the effect already on it. Every shot underneath changes at once.</p>
+            <div class="guide-picker" role="group" aria-label="Effect">
+                <button id="btn-adj-transform" class="guide-primary" data-i18n="adj_transform">Transform</button>
+            </div>
+            <p class="sync-prep-safe" data-i18n="adj_safe">Reuses an adjustment layer already in your project. Undo with Cmd/Ctrl+Z.</p>
+            <p id="adj-status" class="sync-prep-status" aria-live="polite"></p>
         </div>
 
         <!-- 3. SFX LIBRARY — 1-Click Sound Effects -->
@@ -633,7 +665,7 @@
 
             <div class="input-row">
                 <span style="font-size:10px; color:var(--text-mute); width:52px;" data-i18n="dl_saveto">Save to</span>
-                <input type="text" id="dl-path" data-i18n-placeholder="dl_path_ph" placeholder="Movies/EditFlow Downloads" style="flex:1;">
+                <input type="text" id="dl-path" data-i18n-placeholder="dl_path_ph" placeholder="Movies/One Panel Downloads" style="flex:1;">
                 <button id="btn-dl-browse" style="width:auto; padding:6px 10px;" data-i18n="export_browse">Browse</button>
                 <button id="btn-dl-open" class="secondary" style="width:auto; padding:6px 10px;" data-i18n-title="dl_open_folder" title="Open folder">📂</button>
             </div>
@@ -772,14 +804,19 @@
             </div>
             <p id="cap-refine-hint" style="display:none; font-size:10px; color:var(--text-mute); margin:4px 0 0;" data-i18n="cap_refine_hint">Timings are preserved. Set the provider under Settings → Captions.</p>
 
-            <!-- Optional pre-rendered animated captions. The normal editable-caption
-                 path remains the default and is untouched when this is disabled. -->
-            <label class="checkbox-label cap-animated-toggle" style="margin-top:8px;">
+            <!-- RETIRED 2026-09-03: animated captions are hidden from the panel.
+                 They rendered one transparent MOV per caption and could not be
+                 edited afterwards, so the editable-caption path is the only one
+                 offered. The markup and the engine stay in place because
+                 placeAnimatedCaptions() is ALSO the grouping engine the normal
+                 caption path calls in planOnly mode - deleting it breaks captions.
+                 To bring the feature back, drop the two hidden attributes below. -->
+            <label class="checkbox-label cap-animated-toggle hidden" hidden>
                 <input type="checkbox" id="cap-animated">
                 <span data-i18n="cap_animated">Animated caption styles</span>
                 <span class="cap-beta-badge">BETA</span>
             </label>
-            <div id="cap-animated-options" class="cap-animated-options" style="display:none;">
+            <div id="cap-animated-options" class="cap-animated-options" style="display:none;" hidden>
                 <div class="cap-style-heading">
                     <span data-i18n="cap_choose_style">Choose a style</span>
                     <span data-i18n="cap_choose_style_hint">Click once — the look is ready</span>
@@ -914,7 +951,7 @@
 
             <div class="input-row">
                 <span style="font-size:10px; color:var(--text-mute); white-space:nowrap;" data-i18n="export_saveto">Save to</span>
-                <input type="text" id="export-path" placeholder="Desktop/EditFlowPro_Exports">
+                <input type="text" id="export-path" placeholder="Desktop/OnePanel_Exports">
                 <button id="btn-export-browse" style="width:auto; padding:6px 10px;" data-i18n="export_browse">Browse</button>
             </div>
 
@@ -937,7 +974,7 @@
         <!-- STATUS BAR -->
         <div class="status-box status-info" id="status-box">
             <div class="pulsing-orb"></div>
-            <span id="status-text" data-i18n="status_ready">EditFlow Pro · ready</span>
+            <span id="status-text" data-i18n="status_ready">One Panel · ready</span>
         </div>
     </div>
 
@@ -961,7 +998,7 @@
     <div id="licenseOverlay" class="license-overlay hidden"></div>
 
     <script src="js/dspTools.js"></script>
-    <script src="js/main.js?v=65"></script>
+    <script src="js/main.js?v=84"></script>
     <script src="js/license.js?v=62"></script>
 </body>
 </html>

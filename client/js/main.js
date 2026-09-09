@@ -1,4 +1,4 @@
-// main.js - EditFlow Pro v17 — Production Build
+// main.js - One Panel v17 — Production Build
 // ES5 only. Direct csInterface.evalScript for ALL buttons.
 
 // Global error boundary — prevents silent crashes
@@ -102,13 +102,32 @@ var i18n = {
         sync_prep_desc: "Select the clips you want to sync. Each selected video/audio clip moves to its own lane at the same time.",
         sync_prep_select: "Select clips",
         sync_prep_separate: "Separate lanes",
-        sync_prep_synchronize: "Synchronize",
+        sync_prep_synchronize: "Right-click \u2192 Synchronize",
         sync_prep_prepare: "Prepare Sync Lanes",
-        sync_prep_undo: "Undo last prep",
-        sync_prep_safe: "Only selected clips move. Nothing is trimmed, duplicated or deleted.",
+        adj_title: "Adjustment Layer",
+        adj_desc: "Drop one layer over the whole sequence with the effect already on it. Every shot underneath changes at once.",
+        adj_transform: "Transform",
+        adj_safe: "Reuses an adjustment layer already in your project. Undo with Cmd/Ctrl+Z.",
+        adj_working: "Adding the adjustment layer\u2026",
+        guide_title: "Framing Guide",
+        guide_desc: "See what the app will cover, then reframe every shot at once from a single adjustment layer.",
+        guide_add_reels: "Instagram Reels",
+        guide_add_tiktok: "TikTok",
+        guide_add_shorts: "YouTube Shorts",
+        guide_remove: "Remove guide",
+        guide_safe: "Guide only. Hide the track before you export.",
+        guide_working: "Adding the framing guide\u2026",
+        guide_removing: "Removing the framing guide\u2026",
+        sync_prep_restack: "Re-stack onto fewer lanes",
+        sync_prep_restackstep: "Re-stack",
+        sync_prep_restack_working: "Packing the clips onto fewer lanes\u2026",
+        sync_prep_pull: "Pull clips to start",
+        sync_prep_pullstep: "Pull to start",
+        sync_prep_pull_working: "Pulling clips to the sequence start\u2026",
+        sync_prep_pull_done: "Moved {n} clip(s) to the start. Sync spacing kept.",
+        sync_prep_safe: "Only selected clips move. Nothing is trimmed, duplicated or deleted. Undo with Cmd/Ctrl+Z.",
         sync_prep_working: "Preparing separate sync lanes…",
-        sync_prep_ready: "{video} video + {audio} audio lane(s) ready. Now use Premiere's Synchronize.",
-        sync_prep_undo_done: "Restored {n} clip(s) to their original lanes.",
+        sync_prep_ready: "{video} video + {audio} audio lane(s) ready, and targeted. Right-click the clips in the timeline and choose Synchronize.",
         paste_title: "Paste from Web",
         paste_desc: "Copy any image from a browser → click Paste. Added to your Project bin ready to drag in.",
         paste_btn: "Paste Image from Internet",
@@ -175,7 +194,7 @@ var i18n = {
         welcome_f4: "Smart Tools: Transform, Web Paste & Frame Capture",
         welcome_dont_show: "Don't show this again",
         welcome_made_by: "Crafted by",
-        status_ready: "EditFlow Pro · ready",
+        status_ready: "One Panel · ready",
         task_report: "Task Report",
         setup_api_title: "Activate Free Captions",
         setup_api_desc: "For lightning-fast transcription, connect your free speech engine.",
@@ -285,7 +304,7 @@ var i18n = {
         dl_place_newseq: "New sequence matching the video",
         dl_place_bin: "Project bin only",
         dl_saveto: "Save to",
-        dl_path_ph: "Movies/EditFlow Downloads",
+        dl_path_ph: "Movies/One Panel Downloads",
         dl_open_folder: "Open folder",
         dl_desc: "Paste a YouTube or Instagram link to bring your own or licensed footage straight onto the timeline.",
         dl_url_ph: "Paste a video link\u2026",
@@ -327,7 +346,7 @@ var i18n = {
         dl_err_folder: "That save folder cannot be used. Pick another one.",
         dl_err_ffmpeg: "FFmpeg is required for downloads. Install it, then try again.",
         cfg_download_path: "Downloads Folder",
-        cfg_download_path_ph: "Movies/EditFlow Downloads",
+        cfg_download_path_ph: "Movies/One Panel Downloads",
         cap_qa_title: "فحص الكابشنات",
         cap_qa_local: "محلي",
         cap_qa_desc: "يفحص آخر كابشنات مولدة بحثاً عن مخاطر التوقيت والقراءة واللغة وحدود القص.",
@@ -373,13 +392,32 @@ var i18n = {
         sync_prep_desc: "حدّد المقاطع التي تريد مزامنتها. ينتقل كل فيديو أو صوت محدد إلى مسار مستقل مع بقاء توقيته كما هو.",
         sync_prep_select: "حدّد المقاطع",
         sync_prep_separate: "مسارات مستقلة",
-        sync_prep_synchronize: "Synchronize",
+        sync_prep_synchronize: "زر الفأرة الأيمن ← Synchronize",
         sync_prep_prepare: "تجهيز مسارات المزامنة",
-        sync_prep_undo: "استرجاع آخر تجهيز",
-        sync_prep_safe: "تتحرك المقاطع المحددة فقط. لا قصّ ولا نسخ ولا حذف.",
+        adj_title: "طبقة الضبط",
+        adj_desc: "ضع طبقة واحدة فوق التسلسل كله والإفكت عليها جاهز. كل اللقطات تحتها تتغير معاً.",
+        adj_transform: "Transform",
+        adj_safe: "تستخدم طبقة ضبط موجودة في مشروعك. للتراجع Cmd/Ctrl+Z.",
+        adj_working: "جارٍ إضافة طبقة الضبط\u2026",
+        guide_title: "دليل التأطير",
+        guide_desc: "شاهد ما الذي ستغطيه المنصّة، ثم أعد تأطير كل اللقطات دفعة واحدة من طبقة ضبط واحدة.",
+        guide_add_reels: "انستغرام ريلز",
+        guide_add_tiktok: "تيك توك",
+        guide_add_shorts: "يوتيوب شورتس",
+        guide_remove: "إزالة الدليل",
+        guide_safe: "للمعاينة فقط. أخفِ المسار قبل التصدير.",
+        guide_working: "جارٍ إضافة دليل التأطير\u2026",
+        guide_removing: "جارٍ إزالة دليل التأطير\u2026",
+        sync_prep_restack: "أعد الرصّ على مسارات أقل",
+        sync_prep_restackstep: "إعادة الرصّ",
+        sync_prep_restack_working: "جارٍ رصّ المقاطع على مسارات أقل\u2026",
+        sync_prep_pull: "اسحب المقاطع للبداية",
+        sync_prep_pullstep: "اسحب للبداية",
+        sync_prep_pull_working: "جارٍ سحب المقاطع إلى بداية التسلسل\u2026",
+        sync_prep_pull_done: "تم سحب {n} مقطعاً إلى البداية. الفروق بينها محفوظة.",
+        sync_prep_safe: "تتحرك المقاطع المحددة فقط. لا قصّ ولا نسخ ولا حذف. للتراجع استخدم Cmd/Ctrl+Z.",
         sync_prep_working: "جارٍ تجهيز مسارات المزامنة…",
-        sync_prep_ready: "أصبحت {video} فيديو و{audio} صوت في مسارات مستقلة. استخدم Synchronize من Premiere الآن.",
-        sync_prep_undo_done: "تمت إعادة {n} مقطعاً إلى مساراته الأصلية.",
+        sync_prep_ready: "جاهز: {video} فيديو و{audio} صوت، كل واحد في مساره ومستهدَف. انقر بزر الفأرة الأيمن على المقاطع واختر Synchronize.",
         paste_title: "لصق من الويب",
         paste_desc: "انسخ أي صورة من المتصفح → اضغط لصق. تضاف إلى ملفات المشروع جاهزة للسحب.",
         paste_btn: "لصق صورة من الإنترنت",
@@ -450,7 +488,7 @@ var i18n = {
         welcome_f4: "أدوات ذكية: التحويل، لصق من الويب، والتقاط الإطارات",
         welcome_dont_show: "لا تظهر هذه الرسالة مرة أخرى",
         welcome_made_by: "صُنع بإتقان بواسطة",
-        status_ready: "EditFlow Pro · جاهز",
+        status_ready: "One Panel · جاهز",
         task_report: "تقرير المهمة",
         setup_api_title: "تفعيل الترجمة المجانية",
         setup_api_desc: "للحصول على تفريغ فائق السرعة، قم بربط محرك التفريغ المجاني.",
@@ -542,7 +580,7 @@ var i18n = {
         dl_place_newseq: "\u0633\u064a\u0643\u0648\u064a\u0646\u0633 \u062c\u062f\u064a\u062f \u0628\u0645\u0642\u0627\u0633 \u0627\u0644\u0641\u064a\u062f\u064a\u0648",
         dl_place_bin: "\u0645\u062c\u0644\u062f \u0627\u0644\u0645\u0634\u0631\u0648\u0639 \u0641\u0642\u0637",
         dl_saveto: "\u0627\u0644\u062d\u0641\u0638 \u0641\u064a",
-        dl_path_ph: "Movies/EditFlow Downloads",
+        dl_path_ph: "Movies/One Panel Downloads",
         dl_open_folder: "\u0641\u062a\u062d \u0627\u0644\u0645\u062c\u0644\u062f",
         dl_desc: "\u0627\u0644\u0635\u0642 \u0631\u0627\u0628\u0637 \u064a\u0648\u062a\u064a\u0648\u0628 \u0623\u0648 \u0627\u0646\u0633\u062a\u063a\u0631\u0627\u0645 \u0644\u0625\u062d\u0636\u0627\u0631 \u0645\u0648\u0627\u062f\u0643 \u0623\u0648 \u0627\u0644\u0645\u0648\u0627\u062f \u0627\u0644\u0645\u0631\u062e\u0651\u0635\u0629 \u0645\u0628\u0627\u0634\u0631\u0629 \u0625\u0644\u0649 \u0627\u0644\u062a\u0627\u064a\u0645 \u0644\u0627\u064a\u0646.",
         dl_url_ph: "\u0627\u0644\u0635\u0642 \u0631\u0627\u0628\u0637 \u0627\u0644\u0641\u064a\u062f\u064a\u0648\u2026",
@@ -584,7 +622,7 @@ var i18n = {
         dl_err_folder: "\u062a\u0639\u0630\u0651\u0631 \u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0645\u062c\u0644\u062f \u0627\u0644\u062d\u0641\u0638. \u0627\u062e\u062a\u0631 \u0645\u062c\u0644\u062f\u0627\u064b \u0622\u062e\u0631.",
         dl_err_ffmpeg: "\u0627\u0644\u062a\u062d\u0645\u064a\u0644 \u064a\u062d\u062a\u0627\u062c FFmpeg. \u062b\u0628\u0651\u062a\u0647 \u062b\u0645 \u0623\u0639\u062f \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629.",
         cfg_download_path: "\u0645\u062c\u0644\u062f \u0627\u0644\u062a\u062d\u0645\u064a\u0644\u0627\u062a",
-        cfg_download_path_ph: "Movies/EditFlow Downloads"
+        cfg_download_path_ph: "Movies/One Panel Downloads"
     }
 };
 
@@ -626,8 +664,33 @@ document.addEventListener("DOMContentLoaded", function() {
         csInterface = new CSInterface();
         extensionPath = csInterface.getSystemPath(SystemPath.EXTENSION);
         if (osModule && pathModule) {
-            var userData = pathModule.join(osModule.homedir(), "Library", "Application Support", "EditFlowPro");
-            configPath = pathModule.join(userData, "editflow_config.json");
+            var userData = pathModule.join(osModule.homedir(), "Library", "Application Support", "OnePanel");
+
+            /* The product was renamed from One Panel to One Panel. Anyone who
+               used the old build has their settings, their Groq key and roughly
+               50MB of downloaded tools sitting in the old folder. Move it across
+               once, on first run, instead of making them set everything up again.
+               A plain rename, so it costs nothing and cannot half-copy. */
+            try {
+                var legacyDir = pathModule.join(osModule.homedir(), "Library", "Application Support", "EditFlowPro");
+                if (fsModule && fsModule.existsSync(legacyDir) && !fsModule.existsSync(userData)) {
+                    fsModule.renameSync(legacyDir, userData);
+                    console.log("[OP] migrated settings from EditFlowPro to OnePanel");
+                }
+            } catch (e) { console.warn("[OP] settings migration skipped:", e.message); }
+
+            configPath = pathModule.join(userData, "onepanel_config.json");
+
+            /* The config file inside that folder is renamed too, so do the same
+               one-time move for it. */
+            try {
+                var legacyCfg = pathModule.join(userData, "editflow_config.json");
+                if (fsModule && fsModule.existsSync(legacyCfg) && !fsModule.existsSync(configPath)) {
+                    fsModule.renameSync(legacyCfg, configPath);
+                    console.log("[OP] migrated editflow_config.json to onepanel_config.json");
+                }
+            } catch (e) { console.warn("[OP] config migration skipped:", e.message); }
+
             EFP_BIN_DIR = pathModule.join(userData, "tools");
         } else {
             configPath = extensionPath + "/editflow_config.json"; // fallback
@@ -673,17 +736,17 @@ document.addEventListener("DOMContentLoaded", function() {
     if (aboutVer) aboutVer.innerHTML = "Version " + CURRENT_VERSION;
 
     // Step 5: Verify JSX is loaded
-    csInterface.evalScript('typeof $._editflow_loaded', function(result) {
-        console.log("[JSX] _editflow_loaded = " + result);
+    csInterface.evalScript('typeof $._onepanel_loaded', function(result) {
+        console.log("[JSX] _onepanel_loaded = " + result);
         if (result !== "boolean") {
             console.log("[CRITICAL] hostscript.jsx not loaded! Loading manually...");
             var jsxPath = csInterface.getSystemPath(SystemPath.EXTENSION) + "/jsx/hostscript.jsx";
             csInterface.evalScript('$.evalFile("' + jsxPath.replace(/\\/g, "\\\\") + '")', function(r2) {
                 console.log("[JSX] Manual load result: " + r2);
-                csInterface.evalScript('typeof $._editflow_loaded', function(r3) {
-                    console.log("[JSX] After manual load: _editflow_loaded = " + r3);
+                csInterface.evalScript('typeof $._onepanel_loaded', function(r3) {
+                    console.log("[JSX] After manual load: _onepanel_loaded = " + r3);
                     if (r3 === "boolean") {
-                        showStatus("EditFlow Pro ready.", "green");
+                        showStatus("One Panel ready.", "green");
                     } else {
                         showStatus("JSX load failed!", "red");
                     }
@@ -691,7 +754,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 });
             });
         } else {
-            showStatus("EditFlow Pro ready.", "green");
+            showStatus("One Panel ready.", "green");
             hideSplashScreen();
         }
     });
@@ -703,7 +766,7 @@ document.addEventListener("DOMContentLoaded", function() {
     // UPDATE CHECKER
     // ============================================================
     function checkForUpdates() {
-        var remoteUrl = "https://www.najmedia.com/editflow/version.json?t=" + new Date().getTime();
+        var remoteUrl = "https://www.najmedia.com/onepanel/version.json?t=" + new Date().getTime();
         fetch(remoteUrl)
             .then(function(response) { return response.json(); })
             .then(function(data) {
@@ -739,7 +802,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 var targetUrl = downloadUrl;
                 var isWin = (osModule && osModule.platform() === "win32");
                 if (isWin && targetUrl.indexOf(".pkg") !== -1) {
-                    targetUrl = "https://www.najmedia.com/editflow/EditFlow%20Pro%20Installer.exe";
+                    targetUrl = "https://www.najmedia.com/onepanel/One Panel%20Pro%20Installer.exe";
                 }
                 csInterface.openURLInDefaultBrowser(targetUrl);
                 banner.classList.remove("visible");
@@ -852,7 +915,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         if (isWin) {
                             btnNow.innerHTML = currentLang === "ar" ? "تنزيل الـ EXE" : "Download EXE";
                             btnNow.onclick = function() {
-                                csInterface.openURLInDefaultBrowser("https://www.najmedia.com/editflow/EditFlow%20Pro%20Installer.exe");
+                                csInterface.openURLInDefaultBrowser("https://www.najmedia.com/onepanel/One Panel%20Pro%20Installer.exe");
                                 banner.classList.remove("visible");
                             };
                         } else {
@@ -898,7 +961,7 @@ document.addEventListener("DOMContentLoaded", function() {
             var isWin = (osModule && osModule.platform() === "win32");
             var fallbackUrl = downloadUrl;
             if (isWin && fallbackUrl.indexOf(".pkg") !== -1) {
-                fallbackUrl = "https://www.najmedia.com/editflow/EditFlow%20Pro%20Installer.exe";
+                fallbackUrl = "https://www.najmedia.com/onepanel/One Panel%20Pro%20Installer.exe";
             }
 
             msg.innerHTML = currentLang === "ar" ? "فشل التحديث التلقائي! يرجى تحميله يدوياً." : "Auto-update failed! Please install manually.";
@@ -932,7 +995,7 @@ document.addEventListener("DOMContentLoaded", function() {
         if (!btn) return;
         btn.addEventListener('click', function() {
             var step = settings.audioStep || 1;
-            csInterface.evalScript('$._editflow.nudgeAudioLevel("' + step + '")', function(result) {
+            csInterface.evalScript('$._onepanel.nudgeAudioLevel("' + step + '")', function(result) {
                 console.log('[AUDIO] Up:', result);
                 handleJSXResult(result);
             });
@@ -945,7 +1008,7 @@ document.addEventListener("DOMContentLoaded", function() {
         if (!btn) return;
         btn.addEventListener('click', function() {
             var step = settings.audioStep || 1;
-            csInterface.evalScript('$._editflow.nudgeAudioLevel("-' + step + '")', function(result) {
+            csInterface.evalScript('$._onepanel.nudgeAudioLevel("-' + step + '")', function(result) {
                 console.log('[AUDIO] Down:', result);
                 handleJSXResult(result);
             });
@@ -966,7 +1029,7 @@ document.addEventListener("DOMContentLoaded", function() {
     function setPlaceholder(id, v) { var el = document.getElementById(id); if (el) el.placeholder = v; }
 
     function updateClipInfo() {
-        csInterface.evalScript('$._editflow.getSequenceInfo()', function(seqResult) {
+        csInterface.evalScript('$._onepanel.getSequenceInfo()', function(seqResult) {
             try {
                 var seq = JSON.parse(seqResult);
                 if (seq.error) { setText('seq-info', seq.error); return; }
@@ -975,7 +1038,7 @@ document.addEventListener("DOMContentLoaded", function() {
             } catch(e) { setText('seq-info', 'Error reading sequence'); }
         });
 
-        csInterface.evalScript('$._editflow.getClipPositionInfo()', function(result) {
+        csInterface.evalScript('$._onepanel.getClipPositionInfo()', function(result) {
             try {
                 var info = JSON.parse(result);
                 if (!info.error) {
@@ -987,7 +1050,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // Reset clip transform button
     document.getElementById('reset-clip-transform').addEventListener('click', function() {
-        csInterface.evalScript('$._editflow.resetClipTransform()', function(result) {
+        csInterface.evalScript('$._onepanel.resetClipTransform()', function(result) {
             console.log('[RESET] transform:', result);
             handleJSXResult(result);
             updateClipInfo();
@@ -1016,7 +1079,7 @@ document.addEventListener("DOMContentLoaded", function() {
         el.addEventListener("click", function() {
             console.log("[ALIGN] " + direction);
             csInterface.evalScript(
-                '$._editflow.alignClip("' + direction + '")',
+                '$._onepanel.alignClip("' + direction + '")',
                 function(result) {
                     console.log("[ALIGN] Result:", result);
                     handleJSXResult(result);
@@ -1069,7 +1132,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         scaleInput.value = chip.getAttribute('data-val');
                         // auto-apply on chip click
                         csInterface.evalScript(
-                            '$._editflow.setScaleValue("' + chip.getAttribute('data-val') + '")',
+                            '$._onepanel.setScaleValue("' + chip.getAttribute('data-val') + '")',
                             function(result) {
                                 console.log("[SCALE-CHIP] Result:", result);
                                 handleJSXResult(result);
@@ -1094,7 +1157,7 @@ document.addEventListener("DOMContentLoaded", function() {
         el.addEventListener("click", function() {
             var step = document.getElementById("nudge-step").value || "10";
             csInterface.evalScript(
-                '$._editflow.nudgePosition("' + direction + '","' + step + '")',
+                '$._onepanel.nudgePosition("' + direction + '","' + step + '")',
                 function(result) {
                     console.log("[NUDGE] " + direction + ":", result);
                     updateClipInfo();
@@ -1118,7 +1181,7 @@ document.addEventListener("DOMContentLoaded", function() {
             if (!s) return;
             console.log("[SCALE] " + s + "%");
             csInterface.evalScript(
-                '$._editflow.setScaleValue("' + s + '")',
+                '$._onepanel.setScaleValue("' + s + '")',
                 function(result) {
                     console.log("[SCALE] Result:", result);
                     handleJSXResult(result);
@@ -1143,7 +1206,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     var db = chip.getAttribute('data-db');
                     console.log('[AUDIO-QUICK] Set ' + db + ' dB');
                     csInterface.evalScript(
-                        '$._editflow.setAudioLevel("' + db + '")',
+                        '$._onepanel.setAudioLevel("' + db + '")',
                         function(result) {
                             console.log('[AUDIO-QUICK] Result:', result);
                             handleJSXResult(result);
@@ -1161,7 +1224,7 @@ document.addEventListener("DOMContentLoaded", function() {
     safeBind("btn-fit-frame", function() {
         console.log('[FIT] Fit to frame');
         csInterface.evalScript(
-            '$._editflow.fitToFrame("fit")',
+            '$._onepanel.fitToFrame("fit")',
             function(result) {
                 console.log('[FIT] Result:', result);
                 handleJSXResult(result);
@@ -1173,7 +1236,7 @@ document.addEventListener("DOMContentLoaded", function() {
     safeBind("btn-center-anchor", function() {
         console.log('[ANCHOR] Center anchor point');
         csInterface.evalScript(
-            '$._editflow.centerAnchorPoint()',
+            '$._onepanel.centerAnchorPoint()',
             function(result) {
                 console.log('[ANCHOR] Result:', result);
                 handleJSXResult(result);
@@ -1182,16 +1245,165 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     // ============================================================
+    // ADJUSTMENT LAYER — one layer over everything, effect already attached.
+    // Premiere exposes no API that CREATES an adjustment layer, so this finds one
+    // already in the project and reuses it. Adding another preset is one entry
+    // in EFFECTS plus one button; the JSX takes the effect name as an argument.
+    // ============================================================
+    (function() {
+        var EFFECTS = [
+            { id: "btn-adj-transform", effect: "Transform" }
+        ];
+        var statusEl = document.getElementById("adj-status");
+        if (!statusEl) return;
+        var busy = false;
+
+        function setAdjStatus(text, isError) {
+            statusEl.textContent = text || "";
+            statusEl.className = "sync-prep-status" + (isError ? " is-error" : "");
+        }
+        function setBusy(next) {
+            busy = next;
+            for (var i = 0; i < EFFECTS.length; i++) {
+                var el = document.getElementById(EFFECTS[i].id);
+                if (!el) continue;
+                el.disabled = next;
+                if (next) el.classList.add("is-working");
+                else el.classList.remove("is-working");
+            }
+        }
+
+        function bind(spec) {
+            var el = document.getElementById(spec.id);
+            if (!el) return;
+            el.addEventListener("click", function() {
+                if (busy || !csInterface) {
+                    if (!csInterface) setAdjStatus("Premiere connection is unavailable.", true);
+                    return;
+                }
+                setBusy(true);
+                setAdjStatus(t_refine("adj_working"));
+                csInterface.evalScript('$._onepanel.addAdjustmentLayer("' + spec.effect + '")', function(raw) {
+                    console.log("[AdjLayer]", spec.effect, "->", raw);
+                    setBusy(false);
+                    var result = null;
+                    try { result = JSON.parse(raw); } catch (e) {}
+                    if (!result) {
+                        setAdjStatus("Premiere could not add the adjustment layer.", true);
+                        return;
+                    }
+                    if (result.status === "success") {
+                        setAdjStatus(result.message, false);
+                        showStatus(result.message, "green");
+                        return;
+                    }
+                    // "partial" means the layer landed but the effect did not, and
+                    // "nolayer" is a plain instruction, so neither is an error state.
+                    setAdjStatus(result.message || "Premiere could not add the adjustment layer.",
+                        result.status !== "partial" && result.status !== "nolayer");
+                });
+            });
+        }
+        for (var e = 0; e < EFFECTS.length; e++) bind(EFFECTS[e]);
+    })();
+
+    // ============================================================
+    // FRAMING GUIDE — platform UI overlay on its own locked track.
+    // The image ships inside the extension, so the path is resolved from the
+    // panel's own location rather than trusting any folder on the user's disk.
+    // ============================================================
+    (function() {
+        // One handler for every platform: the button carries the file name, so
+        // adding a platform later is a new button plus a new PNG, nothing more.
+        var PLATFORMS = [
+            { id: "btn-guide-reels",  file: "efp_guide_reels.png",  label: "Instagram Reels" },
+            { id: "btn-guide-tiktok", file: "efp_guide_tiktok.png", label: "TikTok" },
+            { id: "btn-guide-shorts", file: "efp_guide_shorts.png", label: "YouTube Shorts" }
+        ];
+        var addBtn = document.getElementById("btn-guide-reels");
+        var removeBtn = document.getElementById("btn-guide-remove");
+        var statusEl = document.getElementById("guide-status");
+        var busy = false;
+        if (!addBtn || !removeBtn || !statusEl) return;
+
+        function setGuideStatus(text, isError) {
+            statusEl.textContent = text || "";
+            statusEl.className = "sync-prep-status" + (isError ? " is-error" : "");
+        }
+        function setBusy(next) {
+            busy = next;
+            removeBtn.disabled = next;
+            for (var b = 0; b < PLATFORMS.length; b++) {
+                var el = document.getElementById(PLATFORMS[b].id);
+                if (!el) continue;
+                el.disabled = next;
+                if (next) el.classList.add("is-working");
+                else el.classList.remove("is-working");
+            }
+        }
+        function guidePath(fileName) {
+            var base = decodeURI(window.location.href.replace(/[^\/]*$/, ""));
+            base = base.replace(/^file:\/\//, "");
+            return base + "img/guides/" + fileName;
+        }
+        function callJSX(expr, workingKey, cb) {
+            if (busy || !csInterface) {
+                if (!csInterface) setGuideStatus("Premiere connection is unavailable.", true);
+                return;
+            }
+            setBusy(true);
+            setGuideStatus(t_refine(workingKey));
+            csInterface.evalScript(expr, function(raw) {
+                console.log("[Guide]", expr, "->", raw);
+                setBusy(false);
+                var result = null;
+                try { result = JSON.parse(raw); } catch (e) { result = null; }
+                cb(result);
+            });
+        }
+
+        function bindPlatform(spec) {
+            var el = document.getElementById(spec.id);
+            if (!el) return;
+            el.addEventListener("click", function() {
+                var path = guidePath(spec.file);
+                callJSX('$._onepanel.addFramingGuide("' + path.replace(/"/g, '\\"') + '","' + spec.label + '")',
+                    "guide_working", function(result) {
+                    if (!result || result.status !== "success") {
+                        setGuideStatus((result && result.message) || "Premiere could not add the guide.", true);
+                        return;
+                    }
+                    setGuideStatus(spec.label + " \u2014 " + result.message, false);
+                    showStatus(result.message, "green");
+                });
+            });
+        }
+        for (var pi = 0; pi < PLATFORMS.length; pi++) bindPlatform(PLATFORMS[pi]);
+
+        removeBtn.addEventListener("click", function() {
+            callJSX('$._onepanel.removeFramingGuide()', "guide_removing", function(result) {
+                if (!result || result.status !== "success") {
+                    setGuideStatus((result && result.message) || "Premiere could not remove the guide.", true);
+                    return;
+                }
+                setGuideStatus(result.message, false);
+                showStatus(result.message, "green");
+            });
+        });
+    })();
+
+    // ============================================================
     // SYNC PREP — separate selected sources into clean lanes before
     // calling Premiere's native Synchronize command. The JSX route keeps
     // an undo manifest, so this panel control never strands an edit.
     // ============================================================
     (function() {
         var prepareBtn = document.getElementById("btn-sync-prep");
-        var undoBtn = document.getElementById("btn-sync-prep-undo");
+        var pullBtn = document.getElementById("btn-sync-pull");
+        var restackBtn = document.getElementById("btn-sync-restack");
         var statusEl = document.getElementById("sync-prep-status");
         var busy = false;
-        if (!prepareBtn || !undoBtn || !statusEl) return;
+        if (!prepareBtn || !statusEl) return;
 
         function replaceTokens(text, values) {
             for (var key in values) {
@@ -1206,57 +1418,86 @@ document.addEventListener("DOMContentLoaded", function() {
         function setBusy(nextBusy) {
             busy = nextBusy;
             prepareBtn.disabled = nextBusy;
+            if (pullBtn) pullBtn.disabled = nextBusy;
+            if (restackBtn) restackBtn.disabled = nextBusy;
             prepareBtn.setAttribute("aria-busy", nextBusy ? "true" : "false");
             if (nextBusy) prepareBtn.classList.add("is-working");
             else prepareBtn.classList.remove("is-working");
         }
-        function refreshUndoAvailability() {
-            undoBtn.disabled = true;
-            if (!csInterface) return;
-            csInterface.evalScript('$._editflow.getSyncPrepUndoState()', function(raw) {
-                var state = safeParse(raw);
-                undoBtn.disabled = !(state && state.status === "success" && state.available);
-            });
-        }
-        function run(method, isUndo) {
+        function run(method) {
             if (busy || !csInterface) {
                 if (!csInterface) setSyncStatus("Premiere connection is unavailable.", true);
                 return;
             }
             setBusy(true);
-            if (isUndo) {
-                undoBtn.disabled = true;
-                setSyncStatus("");
-            } else {
-                setSyncStatus(t_refine("sync_prep_working"));
-            }
-            csInterface.evalScript('$._editflow.' + method + '()', function(raw) {
+            setSyncStatus(t_refine("sync_prep_working"));
+            csInterface.evalScript('$._onepanel.' + method + '()', function(raw) {
                 setBusy(false);
                 var result = safeParse(raw);
                 if (!result || result.status !== "success") {
                     setSyncStatus((result && result.message) || "Premiere could not prepare sync lanes.", true);
-                    refreshUndoAvailability();
                     return;
                 }
-                var message;
-                if (isUndo) {
-                    message = replaceTokens(t_refine("sync_prep_undo_done"), {n: result.count || 0});
-                    undoBtn.disabled = true;
-                } else {
-                    message = replaceTokens(t_refine("sync_prep_ready"), {
-                        video: result.video || 0,
-                        audio: result.audio || 0
-                    });
-                    undoBtn.disabled = false;
-                }
+                var message = replaceTokens(t_refine("sync_prep_ready"), {
+                    video: result.video || 0,
+                    audio: result.audio || 0
+                });
                 setSyncStatus(message, false);
                 showStatus(message, "green");
             });
         }
 
-        prepareBtn.addEventListener("click", function() { run("prepareSyncLanes", false); });
-        undoBtn.addEventListener("click", function() { run("undoSyncLanes", true); });
-        setTimeout(refreshUndoAvailability, 800);
+        prepareBtn.addEventListener("click", function() { run("prepareSyncLanes"); });
+
+        // Synchronize parks the aligned group away from 00:00. This slides the whole
+        // selection left by the same amount, so the gap in front disappears while the
+        // offsets between clips - the sync itself - stay exactly as Premiere set them.
+        // Re-stack is the step after Synchronize: the sync itself lives in the clip
+        // START TIMES, so packing lanes cannot disturb it - only the lane changes.
+        if (restackBtn) restackBtn.addEventListener("click", function() {
+            if (busy || !csInterface) {
+                if (!csInterface) setSyncStatus("Premiere connection is unavailable.", true);
+                return;
+            }
+            setBusy(true);
+            restackBtn.disabled = true;
+            setSyncStatus(t_refine("sync_prep_restack_working"));
+            csInterface.evalScript('$._onepanel.restackSyncedClips()', function(raw) {
+                console.log("[SyncPrep] restackSyncedClips ->", raw);
+                setBusy(false);
+                restackBtn.disabled = false;
+                var result = safeParse(raw);
+                if (!result || result.status !== "success") {
+                    setSyncStatus((result && result.message) || "Premiere could not pack the clips.", true);
+                    return;
+                }
+                setSyncStatus(result.message, false);
+                showStatus(result.message, "green");
+            });
+        });
+
+        if (pullBtn) pullBtn.addEventListener("click", function() {
+            if (busy || !csInterface) {
+                if (!csInterface) setSyncStatus("Premiere connection is unavailable.", true);
+                return;
+            }
+            setBusy(true);
+            pullBtn.disabled = true;
+            setSyncStatus(t_refine("sync_prep_pull_working"));
+            csInterface.evalScript('$._onepanel.pullSyncedClipsToStart()', function(raw) {
+                console.log("[SyncPrep] pullSyncedClipsToStart ->", raw);
+                setBusy(false);
+                pullBtn.disabled = false;
+                var result = safeParse(raw);
+                if (!result || result.status !== "success") {
+                    setSyncStatus((result && result.message) || "Premiere could not move the clips.", true);
+                    return;
+                }
+                var msg = replaceTokens(t_refine("sync_prep_pull_done"), {n: result.moved || 0});
+                setSyncStatus(msg, false);
+                showStatus(msg, "green");
+            });
+        });
     })();
 
     // ============================================================
@@ -1295,7 +1536,7 @@ document.addEventListener("DOMContentLoaded", function() {
     // Shows a professional download prompt when the AI engine binary is missing.
     // Injected dynamically so the HTML stays clean.
     function showCaptionDownloadBanner() {
-        showStatus("AI Engine binary not found in installation. Please reinstall EditFlow Pro.", "red");
+        showStatus("AI Engine binary not found in installation. Please reinstall One Panel.", "red");
     }
 
     // ── Built-in JS Transcriber (no Python needed) ──────────────────────────
@@ -1378,7 +1619,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     "Authorization": "Bearer " + apiKey,
                     "Content-Type": "multipart/form-data; boundary=" + boundary,
                     "Content-Length": fullBody.length,
-                    "User-Agent": "EditFlowPro/1.0"
+                    "User-Agent": "OnePanel/1.0"
                 }
             };
 
@@ -1823,7 +2064,7 @@ document.addEventListener("DOMContentLoaded", function() {
             };
             var planCfgEsc = jsxArg(JSON.stringify(planCfg));
             csInterface.evalScript(
-                '$._editflow.placeAnimatedCaptions("' + jsxArg(summary.json) + '","' + planCfgEsc + '")',
+                '$._onepanel.placeAnimatedCaptions("' + jsxArg(summary.json) + '","' + planCfgEsc + '")',
                 function(planRes) {
                     var planResult = safeParse(planRes);
                     if (!planResult || planResult.status !== "success" || !planResult.plan) {
@@ -1848,7 +2089,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     function beginAnimatedRender(reviewedGroups) {
                     groups = reviewedGroups || groups;
                     showProgress("Preparing animated caption render…", 78, true);
-                    csInterface.evalScript('$._editflow.getSequenceInfo()', function(seqRaw) {
+                    csInterface.evalScript('$._onepanel.getSequenceInfo()', function(seqRaw) {
                         var seqInfo = safeParse(seqRaw) || {};
                         var frameW = parseInt(seqInfo.width, 10) || 1920;
                         var frameH = parseInt(seqInfo.height, 10) || 1080;
@@ -1897,7 +2138,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                     showProgress("Placing animated captions on timeline…", 96, true);
                                     setStatus("Importing " + clips.length + " transparent animation clips…");
                                     csInterface.evalScript(
-                                        '$._editflow.placeRenderedCaptions("' + jsxArg(manifestPath) + '","{}")',
+                                        '$._onepanel.placeRenderedCaptions("' + jsxArg(manifestPath) + '","{}")',
                                         function(placeRes) {
                                             showProgress("Done!", 100);
                                             setTimeout(hideProgress, 2200);
@@ -2226,7 +2467,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 var cfgStr2 = JSON.stringify(cfg2).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
                 var jsonEsc2 = translatedSummary.json.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
                 csInterface.evalScript(
-                    '$._editflow.placeAnimatedCaptions("' + jsonEsc2 + '","' + cfgStr2 + '")',
+                    '$._onepanel.placeAnimatedCaptions("' + jsonEsc2 + '","' + cfgStr2 + '")',
                     function(res2) {
                         console.log("[refine] second subtitle (" + langName + "):", res2);
                         var r2 = safeParse(res2);
@@ -2256,7 +2497,7 @@ document.addEventListener("DOMContentLoaded", function() {
         showProgress("Finding audio...", 3, true);
         setStatus("Reading selection…");
 
-        csInterface.evalScript('$._editflow.getAudioMedia()', function(raw) {
+        csInterface.evalScript('$._onepanel.getAudioMedia()', function(raw) {
             var info = safeParse(raw);
             if (!info) {
                 hideProgress(); setStatus(""); showStatus("Select an audio/video clip first.", "red"); return;
@@ -2615,7 +2856,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         hideProgress(); setStatus("");
                         console.warn("[Captions] Native runner failed without a structured response.",
                                      "code=", err.code || "unknown", "stderr=", String(stderr || "").slice(0, 200));
-                        showStatus("The caption engine could not start. Please update or reinstall EditFlow Pro, then try again.", "red");
+                        showStatus("The caption engine could not start. Please update or reinstall One Panel, then try again.", "red");
                     }
                     return;
                 }
@@ -2790,7 +3031,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     safeBind("btn-remove-animated", function() {
         if (operationRunning) return;
-        csInterface.evalScript('$._editflow.removeRenderedCaptions()', function(res) {
+        csInterface.evalScript('$._onepanel.removeRenderedCaptions()', function(res) {
             var parsed = safeParse(res);
             handleJSXResult(res);
             var statusLine = document.getElementById("cap-status");
@@ -2819,7 +3060,7 @@ document.addEventListener("DOMContentLoaded", function() {
         var cfgStr = JSON.stringify(cfg).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
         var jsonEsc = summary.json.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
         csInterface.evalScript(
-            '$._editflow.placeAnimatedCaptions("' + jsonEsc + '","' + cfgStr + '")',
+            '$._onepanel.placeAnimatedCaptions("' + jsonEsc + '","' + cfgStr + '")',
             function(res) {
                 showProgress("Done!", 100); setTimeout(hideProgress, 2500);
                 handleJSXResult(res);
@@ -3001,7 +3242,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 jumpers[k].addEventListener("click", function() {
                     var at = parseFloat(this.getAttribute("data-qa-time"));
                     if (!csInterface || isNaN(at)) return;
-                    csInterface.evalScript('$._editflow.jumpToTimelineTime("' + at.toFixed(3) + '")');
+                    csInterface.evalScript('$._onepanel.jumpToTimelineTime("' + at.toFixed(3) + '")');
                 });
             }
         }
@@ -3041,7 +3282,7 @@ document.addEventListener("DOMContentLoaded", function() {
             };
             var escapedPath = sourcePath.replace(/\\/g, "\\\\").replace(/\"/g, '\\\"');
             var escapedCfg = JSON.stringify(cfg).replace(/\\/g, "\\\\").replace(/\"/g, '\\\"');
-            csInterface.evalScript('$._editflow.placeAnimatedCaptions("' + escapedPath + '","' + escapedCfg + '")', function(raw) {
+            csInterface.evalScript('$._onepanel.placeAnimatedCaptions("' + escapedPath + '","' + escapedCfg + '")', function(raw) {
                 btn.disabled = false;
                 var response = safeParse(raw);
                 if (!response || response.status !== "success" || !response.plan || !fsModule.existsSync(response.plan)) {
@@ -3101,7 +3342,7 @@ document.addEventListener("DOMContentLoaded", function() {
             var fpEsc = selectedPath.replace(/\\/g,"\\\\").replace(/"/g,'\\"');
             var presetEsc = presetPath.replace(/\\/g,"\\\\").replace(/"/g,'\\"');
             console.log("[Export] Format: " + outputFormat + " | Preset: " + presetPath);
-            csInterface.evalScript('$._editflow.exportCustom("' + presetEsc + '", "' + fnEsc + '", "' + fpEsc + '", "' + outputFormat + '")', function(res) {
+            csInterface.evalScript('$._onepanel.exportCustom("' + presetEsc + '", "' + fnEsc + '", "' + fpEsc + '", "' + outputFormat + '")', function(res) {
                 console.log("[<-JSX] exportCustom:", res);
                 if (tempPreset) {
                     // Keep the temporary video preset long enough for Premiere
@@ -3227,9 +3468,9 @@ document.addEventListener("DOMContentLoaded", function() {
         if (fsModule.existsSync(bundled)) return bundled;
         var toolsDir;
         if (isWin) {
-            toolsDir = osModule.homedir() + "\\AppData\\Roaming\\EditFlowPro\\tools";
+            toolsDir = osModule.homedir() + "\\AppData\\Roaming\\OnePanel\\tools";
         } else {
-            toolsDir = osModule.homedir() + "/Library/Application Support/EditFlowPro/tools";
+            toolsDir = osModule.homedir() + "/Library/Application Support/OnePanel/tools";
         }
         var toolsPath = toolsDir + (isWin ? "\\" : "/") + "ffmpeg" + ext;
         if (fsModule.existsSync(toolsPath)) return toolsPath;
@@ -3268,7 +3509,7 @@ document.addEventListener("DOMContentLoaded", function() {
         progressCb("Downloading ffmpeg (one-time)…", 5);
         console.log("[ensureFFmpegGlobal] ffmpeg not found, downloading...");
         
-        var toolsDir = (process.env["APPDATA"] || (osModule.homedir() + "\\AppData\\Roaming")) + "\\EditFlowPro\\tools";
+        var toolsDir = (process.env["APPDATA"] || (osModule.homedir() + "\\AppData\\Roaming")) + "\\OnePanel\\tools";
         var outPath = toolsDir + "\\ffmpeg.exe";
         
         try { fsModule.mkdirSync(toolsDir, { recursive: true }); } catch(e) {}
@@ -3335,7 +3576,7 @@ document.addEventListener("DOMContentLoaded", function() {
         showProgress("Reading playhead...", 20);
         console.log('[CAPTURE] Reading playhead frame info...');
         
-        csInterface.evalScript('$._editflow.getPlayheadFrameInfo()', function(result) {
+        csInterface.evalScript('$._onepanel.getPlayheadFrameInfo()', function(result) {
             console.log('[CAPTURE] Info:', result);
             try {
                 var r = JSON.parse(result);
@@ -3360,7 +3601,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     var safeTempDir = getSafeTempDir().replace(/\\/g, "/");
                     var safePreset = pngPreset.replace(/\\/g, "/");
                     
-                    csInterface.evalScript('$._editflow.exportNativeFrame("' + safePreset + '", "' + safeTempDir + '")', function(res) {
+                    csInterface.evalScript('$._onepanel.exportNativeFrame("' + safePreset + '", "' + safeTempDir + '")', function(res) {
                         try {
                             var nr = JSON.parse(res);
                             if (nr.status !== "success" || nr.method !== "media_direct") {
@@ -3389,11 +3630,11 @@ document.addEventListener("DOMContentLoaded", function() {
 
                                 if (expectedFile && fsModule.existsSync(expectedFile)) {
                                     clearInterval(interval);
-                                    csInterface.evalScript('$._editflow.restoreInOut("' + nr.oldIn + '", "' + nr.oldOut + '")');
+                                    csInterface.evalScript('$._onepanel.restoreInOut("' + nr.oldIn + '", "' + nr.oldOut + '")');
                                     copyFrameToClipboard(expectedFile, 'PNG');
                                 } else if (checks > 40) { // 10 seconds timeout
                                     clearInterval(interval);
-                                    csInterface.evalScript('$._editflow.restoreInOut("' + nr.oldIn + '", "' + nr.oldOut + '")');
+                                    csInterface.evalScript('$._onepanel.restoreInOut("' + nr.oldIn + '", "' + nr.oldOut + '")');
                                     showProgress("", 0); hideProgress();
                                     showStatus("Capture timeout.", "red");
                                 }
@@ -3413,7 +3654,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     return;
                 }
 
-                var pngPath = pathModule.join(getSafeTempDir(), 'editflow_frame_' + Date.now() + '.png');
+                var pngPath = pathModule.join(getSafeTempDir(), 'onepanel_frame_' + Date.now() + '.png');
                 showProgress("Extracting frame...", 60);
 
                 ensureFFmpegGlobal(function(msg, pct) { showProgress(msg, pct, true); }, function(err, ffmpegBin) {
@@ -3553,7 +3794,7 @@ document.addEventListener("DOMContentLoaded", function() {
         if(tutBtn) tutBtn.addEventListener("click", function(e) {
             e.preventDefault();
             helpDrop.classList.remove("show");
-            if(window.csInterface) window.csInterface.openURLInDefaultBrowser("https://www.najmedia.com/editflow/");
+            if(window.csInterface) window.csInterface.openURLInDefaultBrowser("https://www.najmedia.com/onepanel/");
         });
         
         var contactBtn = document.getElementById("btn-help-contact");
@@ -4004,8 +4245,12 @@ function applySettingsToUI() {
     setSel("cap-language",  settings.captions.language);
     setSel("cap-model",     settings.captions.model);
     setSel("cap-style",     settings.captions.style);
+    // Animated captions are retired from the panel. Force the toggle off no matter
+    // what an older config says, otherwise a user who had it enabled would keep
+    // getting rendered overlays from a control they can no longer see or switch off.
     var animatedEl = document.getElementById("cap-animated");
-    if (animatedEl) animatedEl.checked = !!settings.captions.animated;
+    if (animatedEl) animatedEl.checked = false;
+    settings.captions.animated = false;
     var animatedPresetEl = document.getElementById("cap-animated-preset");
     if (animatedPresetEl) animatedPresetEl.value = settings.captions.animatedPreset || "clean-film";
     setAnimatedControlValue("cap-animated-font", settings.captions.animatedFont || "");
@@ -4388,7 +4633,7 @@ function readSettingsForm() {
 function getClipboardDir() {
     if (!fsModule || !osModule || !pathModule) return "";
     var home = osModule.homedir();
-    var clipboardDir = pathModule.join(home, "Documents", "EditFlowPro_Clipboard");
+    var clipboardDir = pathModule.join(home, "Documents", "OnePanel_Clipboard");
     try {
         if (!fsModule.existsSync(clipboardDir)) {
             fsModule.mkdirSync(clipboardDir, { recursive: true });
@@ -4403,7 +4648,7 @@ function getSafeTempDir() {
     var isWin = (osModule.platform() === "win32");
     if (isWin) {
         var publicDir = process.env["PUBLIC"] || "C:\\Users\\Public";
-        var safeDir = pathModule.join(publicDir, "EditFlowPro_Temp");
+        var safeDir = pathModule.join(publicDir, "OnePanel_Temp");
         try {
             if (!fsModule.existsSync(safeDir)) {
                 fsModule.mkdirSync(safeDir, { recursive: true });
@@ -4661,7 +4906,7 @@ function pasteFromClipboard() {
                     return;
                 }
                 if (ps) ps.innerText = "Importing...";
-                csInterface.evalScript('$._editflow.importClipboardImage("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '")', function(res) {
+                csInterface.evalScript('$._onepanel.importClipboardImage("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '")', function(res) {
                     if (ps) ps.innerText = "Done!";
                     handleJSXResult(res);
                     try { fsModule.unlinkSync(tmp); } catch(e2) {}
@@ -4705,7 +4950,7 @@ function pasteFromClipboard() {
                 return;
             }
             if (ps) ps.innerText = "Importing...";
-            csInterface.evalScript('$._editflow.importClipboardImage("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '")', function(res) {
+            csInterface.evalScript('$._onepanel.importClipboardImage("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '")', function(res) {
                 if (ps) ps.innerText = "Done!";
                 handleJSXResult(res);
                 // On macOS, do not delete the file since it is linked project media
@@ -4745,7 +4990,7 @@ function importBlob(blob) {
             tmp = pathModule.join(clipboardDir, "efp_paste_" + Date.now() + ".png");
         }
         fsModule.writeFileSync(tmp, buf);
-        csInterface.evalScript('$._editflow.importClipboardImage("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '")', function(res) {
+        csInterface.evalScript('$._onepanel.importClipboardImage("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '")', function(res) {
             handleJSXResult(res);
         });
     };
@@ -5062,7 +5307,7 @@ function importBlob(blob) {
 
         if (typeof csInterface !== "undefined") {
             csInterface.evalScript(
-                '$._editflow.importSFXToTimeline("' + escapedPath + '")',
+                '$._onepanel.importSFXToTimeline("' + escapedPath + '")',
                 function(result) {
                     console.log("[SFX] Result:", result);
                     if (typeof handleJSXResult === "function") handleJSXResult(result);
@@ -5103,7 +5348,7 @@ function importBlob(blob) {
 
 // =========================================================
 // WEB DOWNLOADER — YouTube / Instagram -> Premiere timeline
-// yt-dlp is provisioned on first use into the EditFlowPro tools dir rather
+// yt-dlp is provisioned on first use into the OnePanel tools dir rather
 // than bundled: the shipped zip stays ~30MB, and yt-dlp can self-update when
 // the sites change their extractors (which they do constantly).
 // =========================================================
@@ -5231,8 +5476,8 @@ function importBlob(blob) {
         if (!osModule || !pathModule) return "";
         var home = osModule.homedir();
         return isWin()
-            ? pathModule.join(home, "Videos", "EditFlow Downloads")
-            : pathModule.join(home, "Movies", "EditFlow Downloads");
+            ? pathModule.join(home, "Videos", "One Panel Downloads")
+            : pathModule.join(home, "Movies", "One Panel Downloads");
     }
 
     // The visible in-panel field wins, so the user always knows exactly where the
@@ -5677,7 +5922,7 @@ function importBlob(blob) {
         }
 
         csInterface.evalScript(
-            '$._editflow.importMediaToTimeline("' + escaped + '", "' + mode + '")',
+            '$._onepanel.importMediaToTimeline("' + escaped + '", "' + mode + '")',
             function(result) {
                 console.log("[dl] importMediaToTimeline:", result);
                 setBusy(false);
@@ -5812,7 +6057,7 @@ function importBlob(blob) {
     var RATE_LIMIT_RETRIES = 4;
     // Groq rejects some default client User-Agents with a 403 — send an explicit
     // one rather than relying on whatever the runtime sets. Verified.
-    var UA = "EditFlowPro/1.0";
+    var UA = "OnePanel/1.0";
 
     var PROVIDER_LABELS = { groq: "Groq", anthropic: "Claude", openai: "GPT" };
 

@@ -1,5 +1,5 @@
 /* ============================================================
-   EditFlow Pro — Brand-aligned design system
+   One Panel — Brand-aligned design system
    Tokens (locked to brand spec):
      primary    #818C98   muted blue-gray  (borders, secondary text)
      secondary  #082814   deep green       (highlighted card surface)
@@ -510,6 +510,22 @@ button.sync-prep-primary {
 }
 button.sync-prep-primary:hover { background: var(--accent-h); border-color: var(--accent-h); color: #fff; }
 button.sync-prep-primary.is-working { cursor: wait; opacity: .72; }
+.sync-prep-pull { margin-top: 7px; }
+button.guide-primary {
+  width: 100%;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+button.guide-primary:hover { background: var(--accent-h); border-color: var(--accent-h); color: #fff; }
+button.guide-primary.is-working { cursor: wait; opacity: .72; }
+/* One row of platform choices; they wrap to two lines in a narrow panel rather
+   than shrinking their labels to nothing. */
+.guide-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+.guide-picker button { flex: 1 1 30%; min-width: 92px; width: auto; font-size: 11.5px; padding: 8px 6px; }
+.guide-remove { margin-top: 7px; }
+.guide-remove:disabled { cursor: default; opacity: .42; }
 .sync-prep-undo { margin-top: 7px; }
 .sync-prep-undo:disabled { cursor: default; opacity: .42; }
 .sync-prep-safe,
@@ -1207,6 +1223,12 @@ button.secondary { color: var(--text-mute); }
   cursor: pointer;
 }
 .checkbox-label input { margin: 0; }
+
+/* RETIRED 2026-09-03: animated caption styles are no longer offered in the panel.
+   .checkbox-label sets display:flex !important, and .hidden is declared earlier in
+   this file, so the generic helper loses on source order. Two classes here beat it
+   on specificity regardless of order. Delete this rule to bring the toggle back. */
+.checkbox-label.cap-animated-toggle { display: none !important; }
 
 .modal-actions {
   padding: 16px 24px;

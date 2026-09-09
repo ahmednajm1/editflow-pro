@@ -1,13 +1,13 @@
-// hostscript.jsx - EditFlow Pro v17
+// hostscript.jsx - One Panel v17
 // ES3 only. Locale-independent component matching.
 
 var TICKS_PER_SECOND = 254016000000;
 
-$._editflow = {
+$._onepanel = {
 
     log: function(msg) {
         try {
-            var logDir = new Folder(Folder.userData.fsName + "/.editflowpro");
+            var logDir = new Folder(Folder.userData.fsName + "/.onepanel");
             if (!logDir.exists) logDir.create();
             var f = new File(logDir.fsName + "/debug.log");
             f.open("a");
@@ -472,7 +472,7 @@ $._editflow = {
     // and retain a one-step undo manifest.
     // =========================================================
     _syncPrepUndoFile: function() {
-        var folder = new Folder(Folder.userData.fsName + "/.editflowpro");
+        var folder = new Folder(Folder.userData.fsName + "/.onepanel");
         if (!folder.exists) folder.create();
         return new File(folder.fsName + "/sync_prep_undo.json");
     },
@@ -594,21 +594,53 @@ $._editflow = {
     },
 
     _syncPrepFindQEItem: function(entry, currentTrack, seq, qeSeq) {
-        var tracks = entry.type === "Video" ? seq.videoTracks : seq.audioTracks;
         var qeTrack = null;
         try {
             qeTrack = entry.type === "Video" ? qeSeq.getVideoTrackAt(currentTrack) : qeSeq.getAudioTrackAt(currentTrack);
         } catch(eTrack) { return null; }
-        if (!qeTrack || !tracks[currentTrack]) return null;
-        for (var ci = 0; ci < tracks[currentTrack].clips.numItems; ci++) {
+        if (!qeTrack) return null;
+
+        // QE lists gaps as items of type "Empty" alongside real clips, so its item
+        // order does NOT line up with Premiere's clips collection: a track with one
+        // clip reports numItems 2, and an entirely empty track still reports 1.
+        // The old code took the Premiere clip index and passed it to getItemAt(),
+        // which returns the wrong object as soon as a track has a gap - and a gap
+        // exposes moveToTrack() too, so it could move empty space instead of the
+        // selected clip. Match on QE's own start ticks and never on an index.
+        var count = 0;
+        try { count = qeTrack.numItems; } catch(eCount) { return null; }
+        for (var qi = 0; qi < count; qi++) {
             try {
-                var clip = tracks[currentTrack].clips[ci];
-                var nodeMatches = entry.nodeId && clip.nodeId && String(entry.nodeId) === String(clip.nodeId);
-                var fallbackMatches = clip.name === entry.name && String(clip.start.ticks) === String(entry.startTicks);
-                if (nodeMatches || fallbackMatches) return qeTrack.getItemAt(ci);
+                var item = qeTrack.getItemAt(qi);
+                if (!item) continue;
+                var itemType = "";
+                try { itemType = String(item.type || ""); } catch(eType) {}
+                if (itemType !== "Clip") continue;
+                if (String(item.start.ticks) === String(entry.startTicks)) return item;
             } catch(eItem) {}
         }
         return null;
+    },
+
+    // Premiere greys out Clip > Synchronize unless every track holding a selected
+    // clip is TARGETED (the blue V/A button in the track header). QE's addTracks()
+    // creates lanes untargeted, so a freshly prepared layout could never be
+    // synchronized until the editor clicked each new header by hand.
+    _syncPrepTargetLanes: function(seq, items) {
+        var targeted = 0;
+        for (var i = 0; i < items.length; i++) {
+            try {
+                var tracks = items[i].type === "Video" ? seq.videoTracks : seq.audioTracks;
+                var track = tracks[items[i].targetTrack];
+                if (track && typeof track.setTargeted === "function") {
+                    track.setTargeted(true, true);
+                    targeted++;
+                }
+            } catch (eTarget) {
+                this.log("Sync Prep could not target lane: " + eTarget.message);
+            }
+        }
+        return targeted;
     },
 
     _syncPrepMove: function(entry, currentTrack, trackDelta, seq, qeSeq) {
@@ -622,6 +654,656 @@ $._editflow = {
             this.log("Sync Prep move failed: " + e.message);
             return false;
         }
+    },
+
+    // =========================================================
+    // SYNCHRONIZE — optional wrapper over Premiere's own Clip > Synchronize
+    //
+    // Premiere's public DOM has no synchronize entry point, and QE is
+    // undocumented: its surface changes between Premiere generations. So probe
+    // with reflect first and refuse to call anything whose signature we do not
+    // know. An unsupported build falls back to the native Clip menu; we never
+    // fire a guessed call at the user's timeline.
+    // =========================================================
+    _syncWantedNames: ["synchronize", "syncselection", "synchronizeselection", "syncclips"],
+
+    _syncListMethods: function(target) {
+        var names = [];
+        if (!target) return names;
+        try {
+            var methods = target.reflect.methods;
+            for (var mi = 0; mi < methods.length; mi++) {
+                try { names.push(String(methods[mi].name)); } catch (eName) {}
+            }
+        } catch (eReflect) {}
+        return names;
+    },
+
+    _syncArgCount: function(target, name) {
+        try {
+            var info = target.reflect.find(name);
+            if (info && info.arguments) return info.arguments.length;
+        } catch (eArgs) {}
+        return -1;
+    },
+
+    _syncFindMethod: function(target) {
+        var names = this._syncListMethods(target);
+        for (var wi = 0; wi < this._syncWantedNames.length; wi++) {
+            for (var xi = 0; xi < names.length; xi++) {
+                if (String(names[xi]).toLowerCase() === this._syncWantedNames[wi]) {
+                    return { name: names[xi], argc: this._syncArgCount(target, names[xi]) };
+                }
+            }
+        }
+        return null;
+    },
+
+    // Read-only diagnostic for Sync Prep failures. Compares Premiere's public
+    // clip indices against QE's item indices on the same track, because QE counts
+    // empty gaps as items and the two orders diverge as soon as a track has a gap.
+    // Changes nothing: no moves, no track creation, no file writes.
+    diagnoseSyncPrep: function() {
+        var seq = this.getSeq();
+        if (!seq) return '{"status":"error","message":"Open an active sequence first."}';
+        var selection = this.getSel();
+        if (!selection || !selection.length) {
+            return '{"status":"error","message":"Select the clips you would normally prepare, then run this again."}';
+        }
+        try { app.enableQE(); } catch (eEnable) {}
+        var qeSeq = null;
+        try { qeSeq = qe.project.getActiveSequence(); } catch (eQE) {}
+        if (!qeSeq) return '{"status":"error","message":"Premiere could not access QE."}';
+
+        var out = '{"status":"success","clips":[';
+        var wrote = 0;
+        for (var i = 0; i < selection.length; i++) {
+            var sel = selection[i];
+            var type = "";
+            try { type = sel.mediaType || ""; } catch (eT) {}
+            if (type !== "Video" && type !== "Audio") continue;
+            var tracks = type === "Video" ? seq.videoTracks : seq.audioTracks;
+            var trackIdx = this._syncPrepTrackIndex(sel, tracks);
+            var domIdx = -1, domCount = 0, qeCount = -1;
+            var qeName = "", qeStart = "", qeType = "", qeHasMove = false, matchOK = false;
+            if (trackIdx >= 0) {
+                try { domCount = tracks[trackIdx].clips.numItems; } catch (eC) {}
+                for (var ci = 0; ci < domCount; ci++) {
+                    try {
+                        var c = tracks[trackIdx].clips[ci];
+                        if (String(c.start.ticks) === String(sel.start.ticks) && c.name === sel.name) { domIdx = ci; break; }
+                    } catch (eL) {}
+                }
+                var qeTrack = null;
+                try {
+                    qeTrack = type === "Video" ? qeSeq.getVideoTrackAt(trackIdx) : qeSeq.getAudioTrackAt(trackIdx);
+                } catch (eQT) {}
+                if (qeTrack) {
+                    try { qeCount = qeTrack.numItems; } catch (eN) {}
+                    if (domIdx >= 0) {
+                        try {
+                            var qeItem = qeTrack.getItemAt(domIdx);
+                            if (qeItem) {
+                                try { qeName = String(qeItem.name || ""); } catch (e1) {}
+                                try { qeStart = String(qeItem.start.ticks || ""); } catch (e2) {}
+                                try { qeType = String(qeItem.type || ""); } catch (e3) {}
+                                qeHasMove = (typeof qeItem.moveToTrack === "function");
+                                matchOK = (qeStart === String(sel.start.ticks));
+                            }
+                        } catch (eG) {}
+                    }
+                }
+            }
+            if (wrote) out += ",";
+            out += '{"name":"' + this._syncPrepEscape(sel.name) + '","type":"' + type +
+                '","track":' + trackIdx + ',"domIndex":' + domIdx + ',"domClips":' + domCount +
+                ',"qeNumItems":' + qeCount + ',"qeNameAtDomIndex":"' + this._syncPrepEscape(qeName) +
+                '","qeTypeAtDomIndex":"' + this._syncPrepEscape(qeType) +
+                '","qeHasMoveToTrack":' + qeHasMove + ',"startTicksMatch":' + matchOK + '}';
+            wrote++;
+        }
+        out += '],"qeSequenceMethods":[';
+        var m1 = this._syncListMethods(qeSeq);
+        for (var a = 0; a < m1.length; a++) { if (a) out += ","; out += '"' + this._syncPrepEscape(m1[a]) + '"'; }
+        out += '],"qeTrackMethods":[';
+        var m2 = [];
+        try { m2 = this._syncListMethods(qeSeq.getVideoTrackAt(0)); } catch (eTM) {}
+        for (var b = 0; b < m2.length; b++) { if (b) out += ","; out += '"' + this._syncPrepEscape(m2[b]) + '"'; }
+        return out + ']}';
+    },
+
+    // Diagnostic only. Lists what QE actually exposes on this Premiere build so
+    // the exact call can be wired without guessing. Reads nothing, changes nothing.
+    probeSyncSupport: function() {
+        try { app.enableQE(); } catch (eEnable) {}
+        var qeSeq = null;
+        try { qeSeq = qe.project.getActiveSequence(); } catch (eQE) {}
+        if (!qeSeq) return '{"status":"error","message":"Open an active sequence first."}';
+        var names = this._syncListMethods(qeSeq);
+        var found = this._syncFindMethod(qeSeq);
+        var raw = '{"status":"success","count":' + names.length + ',"match":';
+        if (found) raw += '{"name":"' + this._syncPrepEscape(found.name) + '","argc":' + found.argc + '}';
+        else raw += 'null';
+        raw += ',"methods":[';
+        for (var i = 0; i < names.length; i++) {
+            if (i) raw += ",";
+            raw += '"' + this._syncPrepEscape(names[i]) + '"';
+        }
+        return raw + ']}';
+    },
+
+    // =========================================================
+    // PULL TO START — remove the empty run Synchronize leaves in front
+    //
+    // Premiere's Synchronize aligns clips by shifting them, which usually parks
+    // the whole group well into the timeline. This slides every selected clip
+    // left by the same amount, so the earliest one lands on 00:00 while every
+    // relative offset - the sync itself - is preserved exactly.
+    // =========================================================
+    _pullShiftItem: function(clip, delta) {
+        var beforeStart, beforeEnd;
+        try {
+            beforeStart = Number(String(clip.start.ticks));
+            beforeEnd = Number(String(clip.end.ticks));
+        } catch (eRead) { return false; }
+        var targetStart = beforeStart + delta;
+        if (targetStart < 0) return false;
+
+        try {
+            var st = clip.start;
+            st.ticks = String(targetStart);
+            clip.start = st;
+        } catch (eStart) {
+            this.log("Pull to start: could not set start: " + eStart.message);
+            return false;
+        }
+
+        // Premiere is not consistent here: on some builds writing start moves the
+        // whole clip, on others it trims and leaves end where it was. Read end
+        // back and correct it only when it did not follow, so a build that
+        // already moved the clip is never trimmed by a second write.
+        try {
+            var afterEnd = Number(String(clip.end.ticks));
+            if (afterEnd !== beforeEnd + delta) {
+                var en = clip.end;
+                en.ticks = String(beforeEnd + delta);
+                clip.end = en;
+            }
+        } catch (eEnd) {
+            this.log("Pull to start: could not set end: " + eEnd.message);
+        }
+
+        try { return Number(String(clip.start.ticks)) === targetStart; }
+        catch (eVerify) { return false; }
+    },
+
+    pullSyncedClipsToStart: function() {
+        var seq = this.getSeq();
+        if (!seq) return '{"status":"error","message":"Open an active sequence first."}';
+        var selection = this.getSel();
+        if (!selection || !selection.length) {
+            return '{"status":"error","message":"Select the synchronized clips first."}';
+        }
+
+        // Snapshot every start before touching anything. Linked video/audio can
+        // move together, so a target computed after the first write would be wrong.
+        var items = [], i;
+        for (i = 0; i < selection.length; i++) {
+            var type = "";
+            try { type = selection[i].mediaType || ""; } catch (eType) {}
+            if (type !== "Video" && type !== "Audio") continue;
+            try {
+                items.push({ clip: selection[i], start: Number(String(selection[i].start.ticks)) });
+            } catch (eSnap) {}
+        }
+        if (!items.length) {
+            return '{"status":"error","message":"Select at least one video or audio clip."}';
+        }
+
+        var earliest = items[0].start;
+        for (i = 1; i < items.length; i++) {
+            if (items[i].start < earliest) earliest = items[i].start;
+        }
+        if (earliest === 0) {
+            return '{"status":"error","message":"These clips already start at the beginning of the sequence."}';
+        }
+
+        var delta = -earliest;
+        var moved = 0, already = 0, failed = 0;
+        for (i = 0; i < items.length; i++) {
+            var want = items[i].start + delta;
+            var now = -1;
+            try { now = Number(String(items[i].clip.start.ticks)); } catch (eNow) {}
+            // A linked partner may already have been carried along by Premiere.
+            if (now === want) { already++; continue; }
+            if (this._pullShiftItem(items[i].clip, delta)) moved++; else failed++;
+        }
+
+        if (failed) {
+            return '{"status":"error","moved":' + moved + ',"failed":' + failed +
+                ',"message":"Moved ' + moved + ' clip(s), but ' + failed +
+                ' could not be moved. Use the Premiere Edit menu Undo, then try again."}';
+        }
+        return '{"status":"success","moved":' + (moved + already) +
+            ',"message":"Pulled ' + (moved + already) + ' clip(s) to the sequence start."}';
+    },
+
+    // =========================================================
+    // FRAMING GUIDE — drop a platform UI mock over the whole sequence
+    //
+    // Vertical platforms cover the edges of the frame with their own interface,
+    // so a shot that reads fine in Premiere can have its subject sitting under
+    // the caption or the action buttons. This lays a transparent mock of that
+    // interface on a locked track above everything, spanning the sequence, so
+    // the safe area is visible while editing. It is a guide only: it never
+    // touches existing clips and is removed with one button.
+    // =========================================================
+    _guideBin: function() {
+        var root = app.project.rootItem;
+        for (var i = 0; i < root.children.numItems; i++) {
+            var child = root.children[i];
+            if (child && child.name === "EFP_Guides" && child.type === 2) return child;
+        }
+        try { return root.createBin("EFP_Guides"); } catch (eBin) { return root; }
+    },
+
+    _guideFindImported: function(bin, wantName) {
+        var pools = [bin, app.project.rootItem], b, j;
+        for (b = 0; b < pools.length; b++) {
+            if (!pools[b]) continue;
+            for (j = pools[b].children.numItems - 1; j >= 0; j--) {
+                var item = pools[b].children[j];
+                try { if (item && item.name === wantName) return item; } catch (eName) {}
+            }
+        }
+        return null;
+    },
+
+    addFramingGuide: function(guidePath, guideLabel) {
+        var seq = this.getSeq();
+        if (!seq) return '{"status":"error","message":"Open a sequence first."}';
+        if (!app.project) return '{"status":"error","message":"Open a project first."}';
+
+        var file = new File(guidePath);
+        if (!file.exists) {
+            return '{"status":"error","message":"Guide image is missing from the extension folder. Reinstall or update One Panel."}';
+        }
+
+        // Refuse to stack a second guide: two overlays are never useful and the
+        // remove button would have to guess which one the editor meant.
+        var vt, ci;
+        for (vt = 0; vt < seq.videoTracks.numTracks; vt++) {
+            for (ci = 0; ci < seq.videoTracks[vt].clips.numItems; ci++) {
+                var existing = "";
+                try { existing = String(seq.videoTracks[vt].clips[ci].name || ""); } catch (eEx) {}
+                if (existing.indexOf("efp_guide_") === 0) {
+                    return '{"status":"error","message":"A framing guide is already on the timeline. Remove it first."}';
+                }
+            }
+        }
+
+        var bin = this._guideBin();
+        var wantName = decodeURI(file.name);
+        var imported = this._guideFindImported(bin, wantName);
+        if (!imported) {
+            try { app.project.importFiles([file.fsName], true, bin, false); }
+            catch (eImport) {
+                return '{"status":"error","message":"Premiere could not import the guide image: ' + this._syncPrepEscape(eImport.message) + '"}';
+            }
+            imported = this._guideFindImported(bin, wantName);
+        }
+        if (!imported) {
+            return '{"status":"error","message":"The guide was imported but could not be found in the project panel."}';
+        }
+
+        // Fit any sequence resolution. Without this a 1080x1920 guide covers only
+        // a quarter of a 4K vertical frame and reads as a broken overlay.
+        try { if (typeof imported.setScaleToFrameSize === "function") imported.setScaleToFrameSize(); } catch (eScale) {}
+
+        // Append one empty lane on top; every existing track index stays put.
+        var originalTracks = seq.videoTracks.numTracks;
+        try { app.enableQE(); } catch (eEnable) {}
+        var qeSeq = null;
+        try { qeSeq = qe.project.getActiveSequence(); } catch (eQE) {}
+        if (!qeSeq || typeof qeSeq.addTracks !== "function") {
+            return '{"status":"error","message":"Premiere could not add a track for the guide."}';
+        }
+        try { qeSeq.addTracks(1, originalTracks, 0, 0); }
+        catch (eAdd) {
+            return '{"status":"error","message":"Could not add the guide track: ' + this._syncPrepEscape(eAdd.message) + '"}';
+        }
+
+        var track = seq.videoTracks[originalTracks];
+        if (!track) return '{"status":"error","message":"The new guide track could not be read back."}';
+
+        try { track.overwriteClip(imported, 0); }
+        catch (ePlace) {
+            return '{"status":"error","message":"Premiere refused to place the guide: ' + this._syncPrepEscape(ePlace.message) + '"}';
+        }
+        if (!track.clips.numItems) {
+            return '{"status":"error","message":"The guide track stayed empty. Try again after clicking the timeline."}';
+        }
+
+        // Stretch the still across the whole sequence so it is visible wherever
+        // the playhead lands, not just over the first few seconds.
+        var placed = track.clips[0];
+        var seqEnd = 0;
+        try { seqEnd = Number(String(seq.end)); } catch (eEnd) {}
+        if (seqEnd > 0) {
+            try {
+                var en = placed.end;
+                en.ticks = String(seqEnd);
+                placed.end = en;
+            } catch (eStretch) { this.log("Framing guide: could not stretch to sequence end: " + eStretch.message); }
+        }
+
+        // Lock the lane: the guide must never be picked up by a ripple, a razor
+        // or a stray drag while the editor works underneath it.
+        // setLocked takes a NUMBER, not a boolean: passing true throws "Illegal
+        // Parameter type", and the old catch swallowed it while the message still
+        // told the editor the lane was locked. Report what actually happened.
+        var locked = false;
+        try {
+            if (typeof track.setLocked === "function") {
+                track.setLocked(1);
+                locked = (typeof track.isLocked === "function") ? !!track.isLocked() : true;
+            }
+        } catch (eLock) { this.log("Framing guide: lock failed: " + eLock.message); }
+
+        return '{"status":"success","track":' + (originalTracks + 1) +
+            ',"locked":' + locked +
+            ',"label":"' + this._syncPrepEscape(guideLabel || "") +
+            '","message":"Framing guide added on V' + (originalTracks + 1) +
+            (locked ? ' and locked."}' : '. Premiere would not lock the lane."}');
+    },
+
+    removeFramingGuide: function() {
+        var seq = this.getSeq();
+        if (!seq) return '{"status":"error","message":"Open a sequence first."}';
+        var removed = 0, vt, ci;
+        for (vt = seq.videoTracks.numTracks - 1; vt >= 0; vt--) {
+            var track = seq.videoTracks[vt];
+            var wasLocked = false;
+            try { wasLocked = (typeof track.isLocked === "function") ? track.isLocked() : false; } catch (eL) {}
+            // A locked track rejects removal, so unlock, delete, then restore the
+            // lock only if nothing of ours was on it.
+            if (wasLocked) { try { track.setLocked(0); } catch (eU) {} }
+            var hit = false;
+            for (ci = track.clips.numItems - 1; ci >= 0; ci--) {
+                var clip = track.clips[ci];
+                var nm = "";
+                try { nm = String(clip.name || ""); } catch (eN) {}
+                if (nm.indexOf("efp_guide_") !== 0) continue;
+                try { clip.remove(0, 1); removed++; hit = true; }
+                catch (eRemove) { this.log("removeFramingGuide: " + eRemove.message); }
+            }
+            if (wasLocked && !hit) { try { track.setLocked(1); } catch (eR) {} }
+        }
+        if (!removed) {
+            return '{"status":"error","message":"There is no framing guide on this sequence."}';
+        }
+
+        // Give back exactly ONE lane - the single one this feature adds - and only
+        // when it is the top lane and now empty. An earlier version looped while
+        // the top lane was empty and stripped ELEVEN of the editor's own blank
+        // lanes in one click. Never walk down a sequence deleting tracks.
+        var lanesRemoved = 0;
+        try {
+            var topIdx = seq.videoTracks.numTracks - 1;
+            if (topIdx > 0 && seq.videoTracks[topIdx].clips.numItems === 0) {
+                app.enableQE();
+                qe.project.getActiveSequence().removeVideoTrack(topIdx);
+                if (seq.videoTracks.numTracks === topIdx) lanesRemoved = 1;
+            }
+        } catch (eTracks) { this.log("Framing guide: could not tidy the empty lane: " + eTracks.message); }
+
+        return '{"status":"success","removed":' + removed + ',"lanes":' + lanesRemoved +
+            ',"message":"Removed the framing guide."}';
+    },
+
+    // =========================================================
+    // ADJUSTMENT LAYER — dropped on top with Transform already applied
+    //
+    // Reframing wide footage for a vertical cut means moving and scaling every
+    // shot. Doing that on each clip is slow and gets lost on a re-edit; doing it
+    // once on an adjustment layer above them is the normal craft answer, and the
+    // Transform effect is the one to use rather than Motion because it also
+    // carries a shutter angle for motion blur.
+    //
+    // Premiere exposes no API that CREATES an adjustment layer, so this finds one
+    // already in the project (isAdjustmentLayer is reliable for that) and tells
+    // the editor plainly when there is none to use.
+    // =========================================================
+    _findAdjustmentLayer: function() {
+        var found = null;
+        function walk(bin, depth) {
+            if (found || depth > 5 || !bin || !bin.children) return;
+            for (var i = 0; i < bin.children.numItems; i++) {
+                if (found) return;
+                var child = bin.children[i];
+                try {
+                    if (child.type === 2) { walk(child, depth + 1); continue; }
+                    if (typeof child.isAdjustmentLayer === "function" && child.isAdjustmentLayer()) {
+                        found = child;
+                        return;
+                    }
+                } catch (eItem) {}
+            }
+        }
+        try { walk(app.project.rootItem, 0); } catch (eWalk) {}
+        return found;
+    },
+
+    addAdjustmentLayer: function(effectName) {
+        var seq = this.getSeq();
+        if (!seq) return '{"status":"error","message":"Open a sequence first."}';
+        if (!app.project) return '{"status":"error","message":"Open a project first."}';
+
+        var layer = this._findAdjustmentLayer();
+        if (!layer) {
+            return '{"status":"nolayer","message":"No adjustment layer in this project yet. Create one once with File, New, Adjustment Layer - then this button will reuse it every time."}';
+        }
+
+        var originalTracks = seq.videoTracks.numTracks;
+        try { app.enableQE(); } catch (eEnable) {}
+        var qeSeq = null;
+        try { qeSeq = qe.project.getActiveSequence(); } catch (eQE) {}
+        if (!qeSeq || typeof qeSeq.addTracks !== "function") {
+            return '{"status":"error","message":"Premiere could not add a track for the adjustment layer."}';
+        }
+        try { qeSeq.addTracks(1, originalTracks, 0, 0); }
+        catch (eAdd) {
+            return '{"status":"error","message":"Could not add the adjustment track: ' + this._syncPrepEscape(eAdd.message) + '"}';
+        }
+
+        var track = seq.videoTracks[originalTracks];
+        if (!track) return '{"status":"error","message":"The new adjustment track could not be read back."}';
+
+        try { track.overwriteClip(layer, 0); }
+        catch (ePlace) {
+            return '{"status":"error","message":"Premiere refused to place the adjustment layer: ' + this._syncPrepEscape(ePlace.message) + '"}';
+        }
+        if (!track.clips.numItems) {
+            return '{"status":"error","message":"The adjustment track stayed empty. Click the timeline once and try again."}';
+        }
+
+        // Cover the whole sequence: a reframe that stops partway through is worse
+        // than none, because the cut silently changes framing mid-edit.
+        var placed = track.clips[0];
+        var seqEnd = 0;
+        try { seqEnd = Number(String(seq.end)); } catch (eEndRead) {}
+        if (seqEnd > 0) {
+            try {
+                var en = placed.end;
+                en.ticks = String(seqEnd);
+                placed.end = en;
+            } catch (eStretch) { this.log("Adjustment layer: could not stretch to sequence end: " + eStretch.message); }
+        }
+
+        // The effect name is case sensitive in QE: "transform" returns a nameless
+        // object that silently does nothing when added. Whatever the panel asks
+        // for is passed straight through, so a new preset is a new button only.
+        var wanted = String(effectName || "Transform");
+        var applied = false;
+        var effect = null;
+        try { effect = qe.project.getVideoEffectByName(wanted); } catch (eFind) {}
+        if (effect) {
+            try {
+                var qeTrack = qeSeq.getVideoTrackAt(originalTracks);
+                for (var qi = 0; qi < qeTrack.numItems; qi++) {
+                    var item = qeTrack.getItemAt(qi);
+                    var itemType = "";
+                    try { itemType = String(item.type || ""); } catch (eType) {}
+                    if (itemType !== "Clip") continue;
+                    item.addVideoEffect(effect);
+                    applied = true;
+                    break;
+                }
+            } catch (eApply) { this.log("Adjustment layer: could not add Transform: " + eApply.message); }
+        }
+
+        if (!applied) {
+            return '{"status":"partial","track":' + (originalTracks + 1) +
+                ',"message":"Adjustment layer added on V' + (originalTracks + 1) +
+                ', but ' + this._syncPrepEscape(wanted) + ' could not be attached. Add it from the Effects panel."}';
+        }
+        return '{"status":"success","track":' + (originalTracks + 1) +
+            ',"effect":"' + this._syncPrepEscape(wanted) +
+            '","message":"Adjustment layer added on V' + (originalTracks + 1) +
+            ' with ' + this._syncPrepEscape(wanted) + ' ready. Open Effect Controls to adjust."}';
+    },
+
+    // =========================================================
+    // RE-STACK — pack synced clips back onto the fewest lanes
+    //
+    // Sync Prep spreads every source onto its own lane so Premiere's Synchronize
+    // can run. Once it has run, those lanes are mostly empty air: twenty tracks
+    // holding one clip each. This packs them back down by the classic interval
+    // approach - walk the clips in time order and drop each on the lowest lane
+    // that is still free at that moment.
+    //
+    // Times are never touched. Only the lane changes, so the sync survives.
+    // =========================================================
+    _restackSnapshot: function(seq, selection) {
+        var picked = { Video: [], Audio: [] }, i;
+        for (i = 0; i < selection.length; i++) {
+            var type = "";
+            try { type = String(selection[i].mediaType || ""); } catch (eT) {}
+            if (type !== "Video" && type !== "Audio") continue;
+            var tracks = type === "Video" ? seq.videoTracks : seq.audioTracks;
+            var track = this._syncPrepTrackIndex(selection[i], tracks);
+            if (track < 0) continue;
+            try {
+                picked[type].push({
+                    type: type,
+                    track: track,
+                    from: Number(String(selection[i].start.ticks)),
+                    to: Number(String(selection[i].end.ticks)),
+                    startTicks: String(selection[i].start.ticks),
+                    nodeId: "",
+                    name: selection[i].name || ""
+                });
+            } catch (eSnap) {}
+        }
+        return picked;
+    },
+
+    // Everything NOT being moved still owns its lane. Without this the packer
+    // would happily drop a clip on top of footage the editor never selected.
+    _restackFixedSpans: function(tracks, moving) {
+        var busy = [], ti, ci;
+        for (ti = 0; ti < tracks.numTracks; ti++) {
+            busy.push([]);
+            for (ci = 0; ci < tracks[ti].clips.numItems; ci++) {
+                try {
+                    var clip = tracks[ti].clips[ci];
+                    var from = Number(String(clip.start.ticks));
+                    var to = Number(String(clip.end.ticks));
+                    var mine = false;
+                    for (var m = 0; m < moving.length; m++) {
+                        if (moving[m].track === ti && moving[m].from === from) { mine = true; break; }
+                    }
+                    if (!mine) busy[ti].push([from, to]);
+                } catch (eSpan) {}
+            }
+        }
+        return busy;
+    },
+
+    _restackFits: function(spans, from, to) {
+        for (var i = 0; i < spans.length; i++) {
+            if (from < spans[i][1] && to > spans[i][0]) return false;
+        }
+        return true;
+    },
+
+    _restackKind: function(seq, qeSeq, kind, moving) {
+        var tracks = kind === "Video" ? seq.videoTracks : seq.audioTracks;
+        var busy = this._restackFixedSpans(tracks, moving);
+        moving.sort(function(a, b) { return a.from - b.from; });
+
+        var moved = 0, failed = 0, highest = -1, i, lane;
+        for (i = 0; i < moving.length; i++) {
+            var item = moving[i];
+            var target = -1;
+            for (lane = 0; lane < tracks.numTracks; lane++) {
+                if (this._restackFits(busy[lane], item.from, item.to)) { target = lane; break; }
+            }
+            // Every lane is taken at this moment, so the clip keeps the one it has.
+            if (target < 0) { busy[item.track].push([item.from, item.to]); failed++; continue; }
+            if (target > highest) highest = target;
+
+            if (target === item.track) {
+                busy[target].push([item.from, item.to]);
+                continue;
+            }
+            if (this._syncPrepMove(item, item.track, target - item.track, seq, qeSeq)) {
+                busy[target].push([item.from, item.to]);
+                item.track = target;
+                moved++;
+            } else {
+                busy[item.track].push([item.from, item.to]);
+                failed++;
+            }
+        }
+        return { moved: moved, failed: failed, lanes: highest + 1 };
+    },
+
+    restackSyncedClips: function() {
+        var seq = this.getSeq();
+        if (!seq) return '{"status":"error","message":"Open a sequence first."}';
+        var selection = this.getSel();
+        if (!selection || selection.length < 2) {
+            return '{"status":"error","message":"Select the synchronized clips you want packed together."}';
+        }
+
+        var picked = this._restackSnapshot(seq, selection);
+        if (!picked.Video.length && !picked.Audio.length) {
+            return '{"status":"error","message":"None of the selected items are video or audio clips."}';
+        }
+
+        try { app.enableQE(); } catch (eEnable) {}
+        var qeSeq = null;
+        try { qeSeq = qe.project.getActiveSequence(); } catch (eQE) {}
+        if (!qeSeq) return '{"status":"error","message":"Premiere could not access the sequence lanes."}';
+
+        var v = { moved: 0, failed: 0, lanes: 0 }, a = { moved: 0, failed: 0, lanes: 0 };
+        if (picked.Video.length) v = this._restackKind(seq, qeSeq, "Video", picked.Video);
+        if (picked.Audio.length) a = this._restackKind(seq, qeSeq, "Audio", picked.Audio);
+
+        var moved = v.moved + a.moved, failed = v.failed + a.failed;
+        if (!moved && !failed) {
+            return '{"status":"error","message":"These clips are already packed as tightly as they can be."}';
+        }
+        if (failed) {
+            return '{"status":"error","moved":' + moved + ',"failed":' + failed +
+                ',"message":"Packed ' + moved + ' clip(s), but ' + failed +
+                ' could not move. Use the Premiere Edit menu Undo and try again."}';
+        }
+        return '{"status":"success","moved":' + moved +
+            ',"videoLanes":' + v.lanes + ',"audioLanes":' + a.lanes +
+            ',"message":"Packed ' + moved + ' clip(s) onto ' + v.lanes + ' video and ' +
+            a.lanes + ' audio lane(s). Empty lanes above are yours to delete."}';
     },
 
     getSyncPrepUndoState: function() {
@@ -710,8 +1392,12 @@ $._editflow = {
             return '{"status":"error","message":"Could not save the undo step. Selected clips were restored; empty lanes may remain."}';
         }
 
+        // Target the new lanes so Premiere's own Synchronize is immediately available.
+        var targeted = this._syncPrepTargetLanes(seq, moved);
+
         return '{"status":"success","video":' + video.length + ',"audio":' + audio.length +
-            ',"count":' + moved.length + ',"message":"Prepared ' + moved.length + ' separate sync lanes."}';
+            ',"count":' + moved.length + ',"targeted":' + targeted +
+            ',"message":"Prepared ' + moved.length + ' separate sync lanes."}';
     },
 
     undoSyncLanes: function() {
@@ -732,13 +1418,33 @@ $._editflow = {
         try { qeSeq = qe.project.getActiveSequence(); } catch(eQE) {}
         if (!qeSeq) return '{"status":"error","message":"Premiere could not access the sync lanes for undo."}';
 
+        // Track what is still on a prepared lane. A partial undo already moved some
+        // clips home, so the old "remaining lanes were left untouched" wording was
+        // wrong and the stale manifest still listed clips that had been restored.
         var restored = 0;
+        var stillPrepared = [];
         for (var i = undo.items.length - 1; i >= 0; i--) {
             var entry = undo.items[i];
             if (this._syncPrepMove(entry, entry.targetTrack, entry.sourceTrack - entry.targetTrack, seq, qeSeq)) restored++;
+            else stillPrepared.push(entry);
         }
-        if (restored !== undo.items.length) {
-            return '{"status":"error","message":"Could not restore every clip. The remaining lanes were left untouched."}';
+        if (stillPrepared.length) {
+            // Rewrite the manifest with only the clips that are still on a prepared
+            // lane, so pressing Undo again retries exactly those and nothing else.
+            stillPrepared.reverse();
+            this._syncPrepWriteUndo(seq, stillPrepared);
+            return '{"status":"error","restored":' + restored + ',"remaining":' + stillPrepared.length +
+                ',"message":"Moved ' + restored + ' clip(s) back. ' + stillPrepared.length +
+                ' clip(s) are still on their prepared lanes. Press Undo last prep again, or use the Premiere Edit menu Undo."}';
+        }
+        // Release the targeting we switched on during prepare; leaving every lane
+        // targeted after an undo changes where Premiere pastes and inserts.
+        for (var ui = 0; ui < undo.items.length; ui++) {
+            try {
+                var uTracks = undo.items[ui].type === "Video" ? seq.videoTracks : seq.audioTracks;
+                var uTrack = uTracks[undo.items[ui].targetTrack];
+                if (uTrack && typeof uTrack.setTargeted === "function") uTrack.setTargeted(false, true);
+            } catch (eUntarget) {}
         }
         try { this._syncPrepUndoFile().remove(); } catch(eRemove) {}
         this._syncPrepUndoMemory = null;
@@ -769,7 +1475,7 @@ $._editflow = {
     exportSelected: function(presetPath) {
         var seq = this.getSeq();
         if (!seq) return '{"status":"error","message":"Open a project."}';
-        var folder = new Folder(Folder.desktop.fsName + "/EditFlowPro_Exports");
+        var folder = new Folder(Folder.desktop.fsName + "/OnePanel_Exports");
         if (!folder.exists) folder.create();
         var out = folder.fsName + "/" + seq.name + "_selected.mp4";
         var f = new File(out); var d = 1;
@@ -785,7 +1491,7 @@ $._editflow = {
     exportAll: function(presetPath) {
         var seq = this.getSeq();
         if (!seq) return '{"status":"error","message":"Open a project."}';
-        var folder = new Folder(Folder.desktop.fsName + "/EditFlowPro_Exports");
+        var folder = new Folder(Folder.desktop.fsName + "/OnePanel_Exports");
         if (!folder.exists) folder.create();
         var vt = seq.videoTracks[0]; var count = 0;
         for (var i = 0; i < vt.clips.numItems; i++) {
@@ -805,7 +1511,7 @@ $._editflow = {
     exportForSocial: function(presetPath, suffix) {
         var seq = this.getSeq();
         if (!seq) return '{"status":"error","message":"Open a project."}';
-        var folder = new Folder(Folder.desktop.fsName + "/EditFlowPro_Exports");
+        var folder = new Folder(Folder.desktop.fsName + "/OnePanel_Exports");
         if (!folder.exists) folder.create();
         var baseName = seq.name + "_" + (suffix || "social");
         var out = folder.fsName + "/" + baseName + ".mp4";
@@ -907,7 +1613,7 @@ $._editflow = {
             offsetSecs = parseFloat(offsetSecs) || 0;
             for (var i = 0; i < peaks.length; i++) {
                 var t = peaks[i] + offsetSecs; if (t < 0) continue;
-                var m = markers.createMarker(t); m.name = "Beat " + (i+1); m.comments = "EditFlow";
+                var m = markers.createMarker(t); m.name = "Beat " + (i+1); m.comments = "One Panel";
                 count++; if (count >= 2000) break;
             }
             return '{"status":"success","message":"Placed ' + count + ' markers","count":' + count + '}';
@@ -1216,7 +1922,7 @@ $._editflow = {
 // 22=Shadows, 23=Whites, 24=Blacks
 // =========================================================
 
-$._editflow.findLumetriComponent = function(clip) {
+$._onepanel.findLumetriComponent = function(clip) {
     for (var c = 0; c < clip.components.numItems; c++) {
         var comp = clip.components[c];
         if (comp.displayName === "Lumetri Color") return comp;
@@ -1227,7 +1933,7 @@ $._editflow.findLumetriComponent = function(clip) {
     return null;
 };
 
-$._editflow.ensureLumetriOnTrack = function(trackIdx) {
+$._onepanel.ensureLumetriOnTrack = function(trackIdx) {
     // Add Lumetri to ALL clips on this track via QE iteration
     // This avoids the QE↔DOM index mismatch problem
     app.enableQE();
@@ -1243,7 +1949,7 @@ $._editflow.ensureLumetriOnTrack = function(trackIdx) {
     }
 };
 
-$._editflow.setLumetriValues = function(lumetri, values) {
+$._onepanel.setLumetriValues = function(lumetri, values) {
     var count = 0;
     for (var idx in values) {
         try {
@@ -1261,7 +1967,7 @@ $._editflow.setLumetriValues = function(lumetri, values) {
     return count;
 };
 
-$._editflow.applyColorPreset = function(presetName, presetType, intensityStr) {
+$._onepanel.applyColorPreset = function(presetName, presetType, intensityStr) {
     var intensity = parseFloat(intensityStr) || 100;
     var factor = intensity / 100;
 
@@ -1342,7 +2048,7 @@ $._editflow.applyColorPreset = function(presetName, presetType, intensityStr) {
     return '{"status":"error","message":"Could not apply preset. Select video clips."}';
 };
 
-$._editflow.resetColor = function() {
+$._onepanel.resetColor = function() {
     var me = this;
     var seq = me.getSeq();
     if (!seq) return '{"status":"error","message":"Open a sequence"}';
@@ -1363,7 +2069,7 @@ $._editflow.resetColor = function() {
     return '{"status":"error","message":"No Lumetri found to reset"}';
 };
 
-$._editflow.applyAIColor = function(valuesJSON) {
+$._onepanel.applyAIColor = function(valuesJSON) {
     var me = this;
     try { var values = eval("(" + valuesJSON + ")"); } catch(e) { return '{"status":"error","message":"Invalid color data"}'; }
     var seq = me.getSeq();
@@ -1454,7 +2160,7 @@ $._editflow.applyAIColor = function(valuesJSON) {
 };
 
 // Search ALL Lumetri properties by displayName and set value
-$._editflow.setLumetriPropByName = function(lumetri, targetName, value) {
+$._onepanel.setLumetriPropByName = function(lumetri, targetName, value) {
     for (var i = 0; i < lumetri.properties.numItems; i++) {
         try {
             var prop = lumetri.properties[i];
@@ -1469,7 +2175,7 @@ $._editflow.setLumetriPropByName = function(lumetri, targetName, value) {
 };
 
 // Debug: dump all Lumetri property names (call from console for discovery)
-$._editflow.dumpLumetriProps = function() {
+$._onepanel.dumpLumetriProps = function() {
     var seq = this.getSeq(); if (!seq) return "no seq";
     var sel = this.getSel(); if (!sel) return "no sel";
     var clip = sel[0]; if (!clip || clip.mediaType !== "Video") return "no video clip";
@@ -1486,8 +2192,8 @@ $._editflow.dumpLumetriProps = function() {
     return result;
 };
 
-// Presets stored as $._editflow properties (ES3 compatible)
-$._editflow.LOG_PRESETS = {
+// Presets stored as $._onepanel properties (ES3 compatible)
+$._onepanel.LOG_PRESETS = {
     "slog3": { 14:-5, 15:0, 16:120, 19:0.8, 20:65, 21:-15, 22:25, 23:10, 24:-15 },
     "vlog":  { 14:0, 15:0, 16:115, 19:0.6, 20:60, 21:-10, 22:20, 23:8, 24:-12 },
     "clog":  { 14:0, 15:0, 16:112, 19:0.5, 20:55, 21:-8, 22:18, 23:5, 24:-10 },
@@ -1496,7 +2202,7 @@ $._editflow.LOG_PRESETS = {
     "dlog":  { 14:0, 15:0, 16:108, 19:0.4, 20:48, 21:-5, 22:12, 23:5, 24:-8 }
 };
 
-$._editflow.LOOK_PRESETS = {
+$._onepanel.LOOK_PRESETS = {
     "blade_runner": { 14:-18, 15:5, 16:70, 19:-0.3, 20:30, 21:-25, 22:-15, 23:-10, 24:-30 },
     "matrix":       { 14:-25, 15:20, 16:50, 19:-0.2, 20:40, 21:-15, 22:-20, 24:-35 },
     "joker":        { 14:12, 15:-5, 16:115, 19:0.1, 20:25, 21:-10, 22:15 },
@@ -1525,7 +2231,7 @@ $._editflow.LOOK_PRESETS = {
 // -------------------------------------------------------
 // Helper: Sequence info
 // -------------------------------------------------------
-$._editflow.getSequenceInfo = function() {
+$._onepanel.getSequenceInfo = function() {
     try {
         var seq = app.project.activeSequence;
         if (!seq) return '{"error":"no active sequence"}';
@@ -1562,7 +2268,7 @@ $._editflow.getSequenceInfo = function() {
 // Helper: Find Position property
 // Priority: Align and Transform > Transform > Motion
 // -------------------------------------------------------
-$._editflow._findPositionInfo = function(clip) {
+$._onepanel._findPositionInfo = function(clip) {
     var targetComp = null;
     var motionComp = null;
 
@@ -1595,7 +2301,7 @@ $._editflow._findPositionInfo = function(clip) {
 // -------------------------------------------------------
 // Helper: Find Scale property
 // -------------------------------------------------------
-$._editflow._findScaleProp = function(clip) {
+$._onepanel._findScaleProp = function(clip) {
     for (var c = 0; c < clip.components.numItems; c++) {
         var comp = clip.components[c];
         var name = comp.displayName;
@@ -1616,7 +2322,7 @@ $._editflow._findScaleProp = function(clip) {
 // -------------------------------------------------------
 // Read clip position info (for live info bar)
 // -------------------------------------------------------
-$._editflow.getClipPositionInfo = function() {
+$._onepanel.getClipPositionInfo = function() {
     try {
         var seq = app.project.activeSequence;
         if (!seq) return '{"error":"no active sequence"}';
@@ -1629,7 +2335,7 @@ $._editflow.getClipPositionInfo = function() {
         var seqH = seq.frameSizeVertical;
 
         // ---- Position ----
-        var posInfo = $._editflow._findPositionInfo(clip);
+        var posInfo = $._onepanel._findPositionInfo(clip);
         var posX = 0;
         var posY = 0;
         var compName = "none";
@@ -1668,7 +2374,7 @@ $._editflow.getClipPositionInfo = function() {
 
         // ---- Scale ----
         var scaleVal = 100;
-        var scaleInfo = $._editflow._findScaleProp(clip);
+        var scaleInfo = $._onepanel._findScaleProp(clip);
         if (scaleInfo) {
             scaleVal = scaleInfo.prop.getValue();
         }
@@ -1700,7 +2406,7 @@ $._editflow.getClipPositionInfo = function() {
 // Smart alignment
 // direction: "left","right","top","bottom","centerH","centerV","centerBoth"
 // -------------------------------------------------------
-$._editflow.alignClip = function(direction) {
+$._onepanel.alignClip = function(direction) {
     try {
         var seq = app.project.activeSequence;
         if (!seq) return '{"status":"error","message":"no active sequence"}';
@@ -1714,7 +2420,7 @@ $._editflow.alignClip = function(direction) {
 
         for (var i = 0; i < sel.length; i++) {
             var clip = sel[i];
-            var posInfo = $._editflow._findPositionInfo(clip);
+            var posInfo = $._onepanel._findPositionInfo(clip);
 
             if (!posInfo) {
                 results.push("Clip " + i + ": no Position found");
@@ -1754,7 +2460,7 @@ $._editflow.alignClip = function(direction) {
 
             // Reset Scale to 100% on Center Both
             if (direction === "centerBoth") {
-                var si = $._editflow._findScaleProp(clip);
+                var si = $._onepanel._findScaleProp(clip);
                 if (si) si.prop.setValue(100, true);
             }
 
@@ -1779,7 +2485,7 @@ $._editflow.alignClip = function(direction) {
 // direction: "left","right","up","down"
 // stepPx: pixel step (auto-converted for normalized coords)
 // -------------------------------------------------------
-$._editflow.nudgePosition = function(direction, stepPxStr) {
+$._onepanel.nudgePosition = function(direction, stepPxStr) {
     try {
         var stepPx = parseFloat(stepPxStr);
         if (isNaN(stepPx) || stepPx <= 0) stepPx = 10;
@@ -1795,7 +2501,7 @@ $._editflow.nudgePosition = function(direction, stepPxStr) {
         var count = 0;
 
         for (var i = 0; i < sel.length; i++) {
-            var posInfo = $._editflow._findPositionInfo(sel[i]);
+            var posInfo = $._onepanel._findPositionInfo(sel[i]);
             if (!posInfo) continue;
 
             var val = posInfo.prop.getValue();
@@ -1837,7 +2543,7 @@ $._editflow.nudgePosition = function(direction, stepPxStr) {
 // -------------------------------------------------------
 // Manual Position — auto-detects coord type
 // -------------------------------------------------------
-$._editflow.setPosition = function(xStr, yStr) {
+$._onepanel.setPosition = function(xStr, yStr) {
     try {
         var x = parseFloat(xStr);
         var y = parseFloat(yStr);
@@ -1852,7 +2558,7 @@ $._editflow.setPosition = function(xStr, yStr) {
         var results = [];
 
         for (var i = 0; i < sel.length; i++) {
-            var posInfo = $._editflow._findPositionInfo(sel[i]);
+            var posInfo = $._onepanel._findPositionInfo(sel[i]);
             if (!posInfo) {
                 results.push("Clip " + i + ": no Position");
                 continue;
@@ -1871,7 +2577,7 @@ $._editflow.setPosition = function(xStr, yStr) {
 // -------------------------------------------------------
 // Scale
 // -------------------------------------------------------
-$._editflow.setScaleValue = function(scaleStr) {
+$._onepanel.setScaleValue = function(scaleStr) {
     try {
         var scale = parseFloat(scaleStr);
         if (isNaN(scale)) return '{"status":"error","message":"Invalid scale"}';
@@ -1885,7 +2591,7 @@ $._editflow.setScaleValue = function(scaleStr) {
         var results = [];
 
         for (var i = 0; i < sel.length; i++) {
-            var scaleInfo = $._editflow._findScaleProp(sel[i]);
+            var scaleInfo = $._onepanel._findScaleProp(sel[i]);
             if (!scaleInfo) {
                 results.push("Clip " + i + ": no Scale");
                 continue;
@@ -1905,7 +2611,7 @@ $._editflow.setScaleValue = function(scaleStr) {
 // -------------------------------------------------------
 // Reset clip transform: position → sequence center, scale → 100%
 // -------------------------------------------------------
-$._editflow.resetClipTransform = function() {
+$._onepanel.resetClipTransform = function() {
     try {
         var seq = app.project.activeSequence;
         if (!seq) return '{"status":"error","message":"No active sequence"}';
@@ -1918,7 +2624,7 @@ $._editflow.resetClipTransform = function() {
 
         var count = 0;
         for (var i = 0; i < sel.length; i++) {
-            var posInfo = $._editflow._findPositionInfo(sel[i]);
+            var posInfo = $._onepanel._findPositionInfo(sel[i]);
             if (posInfo) {
                 var compName = posInfo.compName;
                 var curVal = posInfo.prop.getValue();
@@ -1930,7 +2636,7 @@ $._editflow.resetClipTransform = function() {
                     posInfo.prop.setValue([seqW / 2, seqH / 2], true);
                 }
             }
-            var scaleInfo = $._editflow._findScaleProp(sel[i]);
+            var scaleInfo = $._onepanel._findScaleProp(sel[i]);
             if (scaleInfo) {
                 scaleInfo.prop.setValue(100, true);
                 count++;
@@ -1949,7 +2655,7 @@ $._editflow.resetClipTransform = function() {
 // -------------------------------------------------------
 // DEBUG — print all components and properties
 // -------------------------------------------------------
-$._editflow.debugClipComponents = function() {
+$._onepanel.debugClipComponents = function() {
     try {
         var sel = app.project.activeSequence.getSelection();
         if (!sel || sel.length === 0) return "ERROR: no clips selected";
@@ -1976,7 +2682,7 @@ $._editflow.debugClipComponents = function() {
     }
 };
 
-$._editflow.resetAudioGain = function() {
+$._onepanel.resetAudioGain = function() {
     try {
         var seq = app.project.activeSequence;
         if (!seq) return '{"status":"error","message":"No sequence"}';
@@ -2022,7 +2728,7 @@ $._editflow.resetAudioGain = function() {
 // -------------------------------------------------------
 // Read current audio level in dB
 // -------------------------------------------------------
-$._editflow.getAudioLevel = function() {
+$._onepanel.getAudioLevel = function() {
     try {
         var seq = app.project.activeSequence;
         if (!seq) return '{"db":0,"no_selection":true}';
@@ -2058,7 +2764,7 @@ $._editflow.getAudioLevel = function() {
 // Nudge audio level by deltaDd (e.g. +1 or -1)
 // Reads current level, adds delta, sets new level
 // -------------------------------------------------------
-$._editflow.nudgeAudioLevel = function(deltaDbStr) {
+$._onepanel.nudgeAudioLevel = function(deltaDbStr) {
     try {
         var deltaDd = parseFloat(deltaDbStr);
         if (isNaN(deltaDd)) return '{"status":"error","message":"Invalid delta"}';
@@ -2114,7 +2820,7 @@ $._editflow.nudgeAudioLevel = function(deltaDbStr) {
 // direction: "in" or "out"
 // durationStr: seconds as string (e.g. "0.5", "1.0", "2.0")
 // -------------------------------------------------------
-$._editflow.applyAudioFade = function(direction, durationStr) {
+$._onepanel.applyAudioFade = function(direction, durationStr) {
     try {
         var dur = parseFloat(durationStr);
         if (isNaN(dur) || dur <= 0) return '{"status":"error","message":"Bad duration"}';
@@ -2180,7 +2886,7 @@ $._editflow.applyAudioFade = function(direction, durationStr) {
 // selected audio clip(s). We match DOM selection ↔ QE clip
 // by start.ticks since both report identical values.
 // -------------------------------------------------------
-$._editflow.AUDIO_PRESETS = {
+$._onepanel.AUDIO_PRESETS = {
     "voice":     ["Highpass"],
     "telephone": ["Highpass", "Lowpass"],
     "bass":      ["Bass"],
@@ -2189,9 +2895,9 @@ $._editflow.AUDIO_PRESETS = {
     "denoise":   ["DeNoiser"]
 };
 
-$._editflow.applyAudioPreset = function(presetName) {
+$._onepanel.applyAudioPreset = function(presetName) {
     try {
-        var presetEffects = $._editflow.AUDIO_PRESETS[presetName];
+        var presetEffects = $._onepanel.AUDIO_PRESETS[presetName];
         if (!presetEffects) return '{"status":"error","message":"Unknown preset: ' + presetName + '"}';
 
         var seq = app.project.activeSequence;
@@ -2254,7 +2960,7 @@ $._editflow.applyAudioPreset = function(presetName) {
 // CLEAR AUDIO FX — strip non-default audio effects + flatten
 // volume keyframes on the selected audio clip(s).
 // -------------------------------------------------------
-$._editflow.clearAudioEffects = function() {
+$._onepanel.clearAudioEffects = function() {
     try {
         var seq = app.project.activeSequence;
         if (!seq) return '{"status":"error","message":"No sequence"}';
@@ -2320,7 +3026,7 @@ $._editflow.clearAudioEffects = function() {
     }
 };
 
-$._editflow.debugQEClip = function() {
+$._onepanel.debugQEClip = function() {
     try {
         var qeSeq = qe.project.getActiveSequence();
         var qeTrack = qeSeq.getAudioTrackAt(0);
@@ -2338,7 +3044,7 @@ $._editflow.debugQEClip = function() {
 
 // Custom video/audio export with user-defined filename and path.
 // outputFormat is optional for backward compatibility: video | mp3 | wav.
-$._editflow.exportCustom = function(presetPath, fileName, folderPath, outputFormat) {
+$._onepanel.exportCustom = function(presetPath, fileName, folderPath, outputFormat) {
     try {
         var seq = this.getSeq();
         if (!seq) return '{"status":"error","message":"Open a project."}';
@@ -2346,7 +3052,7 @@ $._editflow.exportCustom = function(presetPath, fileName, folderPath, outputForm
         if (folderPath && folderPath !== "") {
             folder = new Folder(folderPath);
         } else {
-            folder = new Folder(Folder.desktop.fsName + "/EditFlowPro_Exports");
+            folder = new Folder(Folder.desktop.fsName + "/OnePanel_Exports");
         }
         if (!folder.exists) folder.create();
         if (!folder.exists) {
@@ -2404,7 +3110,7 @@ $._editflow.exportCustom = function(presetPath, fileName, folderPath, outputForm
 // track on the active sequence.
 // =========================================================
 
-$._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
+$._onepanel.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
     var seq = this.getSeq();
     if (!seq) return '{"status":"error","message":"Open a sequence."}';
 
@@ -2980,7 +3686,7 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
                 } catch(e1) {
                     this.log("createCaptionTrack(item,0,0): " + e1.message);
                     try {
-                        seq.createCaptionTrack(imported, "EditFlowPro", 0);
+                        seq.createCaptionTrack(imported, "OnePanel", 0);
                         placed = true; placedHow = "createCaptionTrack(item,name,0)";
                     } catch(e2) {
                         this.log("createCaptionTrack(item,name,0): " + e2.message);
@@ -3155,7 +3861,7 @@ $._editflow.placeAnimatedCaptions = function(efpJsonPath, configJSON) {
 // them into a project bin, and places each on a video track.
 // =========================================================
 
-$._editflow.placeRenderedCaptions = function(manifestPath, configJSON) {
+$._onepanel.placeRenderedCaptions = function(manifestPath, configJSON) {
     var me = this;
     var seq = this.getSeq();
     if (!seq) return '{"status":"error","message":"Open a sequence."}';
@@ -3281,10 +3987,10 @@ $._editflow.placeRenderedCaptions = function(manifestPath, configJSON) {
     return '{"status":"success","message":"' + msg.replace(/"/g, '\\"') + '","placed":' + placedCount + ',"total":' + clips.length + '}';
 };
 
-// Remove only EditFlow's generated animation clips from the timeline. Source
+// Remove only One Panel's generated animation clips from the timeline. Source
 // media stays in EFP_Animated_Captions so Undo/regeneration never creates
 // offline files. This is the explicit rollback path exposed by the panel.
-$._editflow.removeRenderedCaptions = function() {
+$._onepanel.removeRenderedCaptions = function() {
     var seq = this.getSeq();
     if (!seq) return '{"status":"error","message":"Open a sequence."}';
     var removed = 0;
@@ -3312,7 +4018,7 @@ $._editflow.removeRenderedCaptions = function() {
 // segments (with ripple) on every track.
 // =========================================================
 
-$._editflow.applySilenceCuts = function(jsonPath, offsetSecs, rippleFlag) {
+$._onepanel.applySilenceCuts = function(jsonPath, offsetSecs, rippleFlag) {
     var seq = this.getSeq();
     if (!seq) return '{"status":"error","message":"Open a sequence."}';
 
@@ -3430,7 +4136,7 @@ $._editflow.applySilenceCuts = function(jsonPath, offsetSecs, rippleFlag) {
 // Scans for the correct command ID in the
 // user's Premiere version and executes it.
 // ============================================
-$._editflow.upgradeCaptionToGraphic = function() {
+$._onepanel.upgradeCaptionToGraphic = function() {
     try {
         var seq = app.project.activeSequence;
         if (!seq) return '{"status":"error","message":"No active sequence"}';
@@ -3506,7 +4212,7 @@ $._editflow.upgradeCaptionToGraphic = function() {
 // Returns info about the Premiere version and
 // available caption/graphic commands.
 // ============================================
-$._editflow.scanPremiereInfo = function() {
+$._onepanel.scanPremiereInfo = function() {
     try {
         var info = {};
         info.version = app.version || "unknown";
@@ -3558,7 +4264,7 @@ $._editflow.scanPremiereInfo = function() {
 // AUDIO QUICK LEVELS — set absolute dB on selected clips
 // Premiere Beta has a +15dB offset, so we compensate
 // =========================================================
-$._editflow.setAudioLevel = function(targetDbStr) {
+$._onepanel.setAudioLevel = function(targetDbStr) {
     try {
         var targetDb = parseFloat(targetDbStr);
         if (isNaN(targetDb)) return '{"status":"error","message":"Invalid dB value"}';
@@ -3606,7 +4312,7 @@ $._editflow.setAudioLevel = function(targetDbStr) {
 // CAPTURE FRAME — Get source clip info at playhead for ffmpeg
 // Returns media path + exact source timestamp for direct extraction
 // =========================================================
-$._editflow.getPlayheadFrameInfo = function() {
+$._onepanel.getPlayheadFrameInfo = function() {
     try {
         var seq = app.project.activeSequence;
         if (!seq) return '{"status":"error","message":"No active sequence"}';
@@ -3619,11 +4325,11 @@ $._editflow.getPlayheadFrameInfo = function() {
         var tempPng;
         if (isWin) {
             var publicDir = $.getenv("PUBLIC") || "C:\\Users\\Public";
-            var safeDir = new Folder(publicDir + "/EditFlowPro_Temp");
+            var safeDir = new Folder(publicDir + "/OnePanel_Temp");
             if (!safeDir.exists) safeDir.create();
-            tempPng = safeDir.fsName + "/editflow_frame_" + new Date().getTime() + ".png";
+            tempPng = safeDir.fsName + "/onepanel_frame_" + new Date().getTime() + ".png";
         } else {
-            tempPng = Folder.temp.fsName + "/editflow_frame_" + new Date().getTime() + ".png";
+            tempPng = Folder.temp.fsName + "/onepanel_frame_" + new Date().getTime() + ".png";
         }
         var safeTempPng = tempPng.replace(/\\/g, "/");
         try {
@@ -3663,7 +4369,7 @@ $._editflow.getPlayheadFrameInfo = function() {
                     try { endSec = clip.end.seconds; } catch(e) {}
                     try { playheadSec = time.seconds; } catch(e) {}
                     
-                    var me = $._editflow;
+                    var me = $._onepanel;
                     if (!clipInSec && clip.inPoint && clip.inPoint.ticks) clipInSec = me.ticksToSec(clip.inPoint.ticks);
                     if (!clipOutSec && clip.outPoint && clip.outPoint.ticks) clipOutSec = me.ticksToSec(clip.outPoint.ticks);
                     if (!startSec && clip.start && clip.start.ticks) startSec = me.ticksToSec(clip.start.ticks);
@@ -3696,7 +4402,7 @@ $._editflow.getPlayheadFrameInfo = function() {
 // CAPTURE FRAME — Native Export via Media Direct
 // Captures timeline effects perfectly without ffmpeg math
 // =========================================================
-$._editflow.exportNativeFrame = function(presetPath, tempDir) {
+$._onepanel.exportNativeFrame = function(presetPath, tempDir) {
     try {
         var seq = app.project.activeSequence;
         if (!seq) return '{"status":"error","message":"No active sequence"}';
@@ -3709,13 +4415,13 @@ $._editflow.exportNativeFrame = function(presetPath, tempDir) {
         seq.setInPoint(time.ticks);
         seq.setOutPoint(String(Number(time.ticks) + 254016000)); 
         
-        var baseName = "editflow_frame_" + new Date().getTime();
+        var baseName = "onepanel_frame_" + new Date().getTime();
         
         var isWin = (Folder.fs == "Windows");
         var finalTempDir = tempDir;
         if (isWin) {
             var publicDir = $.getenv("PUBLIC") || "C:\\Users\\Public";
-            var safeDir = new Folder(publicDir + "/EditFlowPro_Temp");
+            var safeDir = new Folder(publicDir + "/OnePanel_Temp");
             if (!safeDir.exists) safeDir.create();
             finalTempDir = safeDir.fsName;
         }
@@ -3733,7 +4439,7 @@ $._editflow.exportNativeFrame = function(presetPath, tempDir) {
     }
 };
 
-$._editflow.restoreInOut = function(inTicks, outTicks) {
+$._onepanel.restoreInOut = function(inTicks, outTicks) {
     try {
         var seq = app.project.activeSequence;
         if (seq) {
@@ -3747,7 +4453,7 @@ $._editflow.restoreInOut = function(inTicks, outTicks) {
 // CENTER ANCHOR POINT — Reset anchor to clip center
 // Detects coordinate system from Position property
 // =========================================================
-$._editflow.centerAnchorPoint = function() {
+$._onepanel.centerAnchorPoint = function() {
     try {
         var seq = app.project.activeSequence;
         if (!seq) return '{"status":"error","message":"No active sequence"}';
@@ -3819,7 +4525,7 @@ $._editflow.centerAnchorPoint = function() {
 // =========================================================
 // FIT TO FRAME — Scale clip to fill sequence dimensions
 // =========================================================
-$._editflow.fitToFrame = function(mode) {
+$._onepanel.fitToFrame = function(mode) {
     try {
         var seq = app.project.activeSequence;
         if (!seq) { return '{"status":"error","message":"No active sequence"}'; }
@@ -3921,7 +4627,7 @@ $._editflow.fitToFrame = function(mode) {
 // Applies the user's default audio transition (typically
 // Constant Power) to the selected edit points/clips.
 // =========================================================
-$._editflow.applyDefaultAudioTransition = function() {
+$._onepanel.applyDefaultAudioTransition = function() {
     try {
         var seq = app.project.activeSequence;
         if (!seq) return '{"status":"error","message":"No active sequence"}';
@@ -3949,7 +4655,7 @@ $._editflow.applyDefaultAudioTransition = function() {
 
 // Caption QA uses this only as a review convenience. It moves the playhead to
 // a reported time; it never changes tracks, clips, captions or sequence state.
-$._editflow.jumpToTimelineTime = function(seconds) {
+$._onepanel.jumpToTimelineTime = function(seconds) {
     try {
         var seq = app.project.activeSequence;
         if (!seq) return '{"status":"error","message":"No active sequence"}';
@@ -3964,4 +4670,4 @@ $._editflow.jumpToTimelineTime = function(seconds) {
     }
 };
 
-$._editflow_loaded = true;
+$._onepanel_loaded = true;

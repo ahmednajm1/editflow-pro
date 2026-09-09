@@ -1,5 +1,5 @@
 /**
- * EditFlow Pro - License Key Management Module
+ * One Panel - License Key Management Module
  * Exposes a global License object to manage activation, validation, and deactivation.
  * Integrates with Lemon Squeezy License API with offline grace periods.
  */
@@ -28,7 +28,7 @@
             btn_activate: "⚡ تفعيل الأداة",
             btn_deactivate: "إلغاء التفعيل 🔓",
             btn_activating: "جاري التحقق... ⏳",
-            buy_link: "لم تشترِ بعد؟ احصل على EditFlow Pro الآن ←",
+            buy_link: "لم تشترِ بعد؟ احصل على One Panel الآن ←",
             support_link: "تحتاج مساعدة؟ راسلني واتساب 💬",
             success: "✓ تم التفعيل بنجاح! جاري تنشيط الأداة...",
             status_pro: "⭐ Pro Activated ✓",
@@ -48,7 +48,7 @@
             btn_activate: "⚡ Activate Panel",
             btn_deactivate: "Deactivate 🔓",
             btn_activating: "Verifying... ⏳",
-            buy_link: "Haven't purchased yet? Get EditFlow Pro here ←",
+            buy_link: "Haven't purchased yet? Get One Panel here ←",
             support_link: "Need help? Contact support on WhatsApp 💬",
             success: "✓ Activated successfully! Loading panel...",
             status_pro: "⭐ Pro Activated ✓",
@@ -210,7 +210,7 @@
                         instance_id: data.instance.id,
                         customer_email: data.meta.customer_email || "customer@example.com",
                         customer_name: data.meta.customer_name || "Ahmed Najm",
-                        product_name: data.meta.product_name || "EditFlow Pro",
+                        product_name: data.meta.product_name || "One Panel",
                         activated_at: data.instance.created_at || new Date().toISOString(),
                         last_validated_at: new Date().toISOString(),
                         status: "active"
@@ -368,8 +368,8 @@
             // Populate HTML dynamically to guarantee bilingual rendering
             overlay.innerHTML = `
                 <div class="license-card">
-                    <img src="img/ef_logo.png" class="license-logo" alt="EditFlow Pro">
-                    <div class="license-badge-pro">✦ EditFlow Pro</div>
+                    <img src="img/ef_logo.png" class="license-logo" alt="One Panel">
+                    <div class="license-badge-pro">✦ One Panel</div>
                     <h2 class="license-title">${TRANSLATIONS[lang].title}</h2>
                     <p class="license-subtitle">${TRANSLATIONS[lang].desc}</p>
 
@@ -385,7 +385,7 @@
                     <div class="license-divider"></div>
 
                     <div class="license-footer-links">
-                        <a href="#" class="license-link" onclick="if(window.csInterface) { window.csInterface.openURLInDefaultBrowser('https://najmedia.com/editflow'); } return false;">${TRANSLATIONS[lang].buy_link}</a>
+                        <a href="#" class="license-link" onclick="if(window.csInterface) { window.csInterface.openURLInDefaultBrowser('https://najmedia.com/onepanel'); } return false;">${TRANSLATIONS[lang].buy_link}</a>
                         <a href="#" class="license-link" onclick="if(window.csInterface) { window.csInterface.openURLInDefaultBrowser('https://wa.me/96894939544'); } return false;">${TRANSLATIONS[lang].support_link}</a>
                     </div>
                 </div>

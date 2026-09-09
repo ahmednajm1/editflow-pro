@@ -1,5 +1,5 @@
 // dspWorker.js
-// EditFlow Pro v7 — Adaptive Silence Detection + Precision Beat Detection
+// One Panel v7 — Adaptive Silence Detection + Precision Beat Detection
 
 var MAX_PROCESS_MS = 4000;
 var TARGET_SR = 22050;

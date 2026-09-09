@@ -7,7 +7,7 @@ class Logger {
         // In a true Node.js environment via CEP:
         // this.fs = require('fs');
         // this.os = require('os');
-        // this.logPath = this.os.homedir() + '/Desktop/EditFlowPro_Debug.log';
+        // this.logPath = this.os.homedir() + '/Desktop/OnePanel_Debug.log';
     }
 
     log(message) {
@@ -28,7 +28,7 @@ class Logger {
         const blob = new Blob([this.history.join('\n')], {type: "text/plain;charset=utf-8"});
         const tempLink = document.createElement("a");
         tempLink.href = URL.createObjectURL(blob);
-        tempLink.setAttribute("download", "EditFlowPro_Session.log");
+        tempLink.setAttribute("download", "OnePanel_Session.log");
         tempLink.click();
     }
 }
