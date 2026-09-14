@@ -1074,6 +1074,77 @@ $._onepanel = {
     // already in the project (isAdjustmentLayer is reliable for that) and tells
     // the editor plainly when there is none to use.
     // =========================================================
+    // Where the adjustment layer should sit: a selected clip first, so a reframe
+    // can be scoped to one shot; otherwise the sequence In/Out when one is marked;
+    // otherwise the whole sequence. Read before anything else touches the
+    // timeline, because adding tracks or importing can clear the selection.
+    _adjustmentRange: function(seq) {
+        var seqEnd = 0;
+        try { seqEnd = Number(String(seq.end)); } catch (eEnd) {}
+        var sel = null;
+        try { sel = seq.getSelection(); } catch (eSel) {}
+        if (sel && sel.length > 0) {
+            var lo = -1, hi = -1;
+            for (var i = 0; i < sel.length; i++) {
+                var st = -1, en = -1;
+                try {
+                    st = Number(String(sel[i].start.ticks));
+                    en = Number(String(sel[i].end.ticks));
+                } catch (eT) {}
+                if (st < 0 || !(en > st)) continue;
+                if (lo < 0 || st < lo) lo = st;
+                if (hi < 0 || en > hi) hi = en;
+            }
+            if (lo >= 0 && hi > lo) return { start: lo, end: hi, source: "clip" };
+        }
+        try {
+            var inT = Number(String(seq.getInPointAsTime().ticks));
+            var outT = Number(String(seq.getOutPointAsTime().ticks));
+            if (inT < 0) inT = 0;
+            if (seqEnd > 0 && outT > seqEnd) outT = seqEnd;
+            // Unmarked, Premiere reports 0 to the sequence end, which is not a range.
+            if (outT > inT && (inT > 0 || (seqEnd > 0 && outT < seqEnd))) {
+                return { start: inT, end: outT, source: "inout" };
+            }
+        } catch (eIO) {}
+        return { start: 0, end: seqEnd, source: "sequence" };
+    },
+
+    // Premiere has no API that creates an adjustment layer. The panel ships a
+    // tiny project (client/templates) holding one inside a sequence; importing
+    // that sequence brings the layer into the open project with it. The id is the
+    // sequence's ObjectUID as written in the template file.
+    ADJ_TEMPLATE_SEQ_ID: "53746e12-a151-48bb-a973-54bd7f400dde",
+
+    _importAdjustmentTemplate: function(path) {
+        var added = [];
+        try {
+            var f = new File(path);
+            if (!f.exists) { this.log("Adjustment template missing: " + path); return added; }
+            var before = {};
+            var seqs = app.project.sequences;
+            for (var i = 0; i < seqs.numSequences; i++) {
+                try { before[seqs[i].sequenceID] = true; } catch (eB) {}
+            }
+            var res = app.project.importSequences(f.fsName, [this.ADJ_TEMPLATE_SEQ_ID]);
+            this.log("Adjustment template importSequences -> " + res);
+            seqs = app.project.sequences;
+            for (var j = 0; j < seqs.numSequences; j++) {
+                var sid = "";
+                try { sid = seqs[j].sequenceID; } catch (eS) {}
+                if (sid && !before[sid]) added.push(seqs[j]);
+            }
+        } catch (e) { this.log("Adjustment template import failed: " + e.message); }
+        return added;
+    },
+
+    _removeSequences: function(list) {
+        for (var i = 0; i < list.length; i++) {
+            try { app.project.deleteSequence(list[i]); }
+            catch (e) { this.log("Could not remove imported template sequence: " + e.message); }
+        }
+    },
+
     _findAdjustmentLayer: function() {
         var found = null;
         function walk(bin, depth) {
@@ -1094,12 +1165,91 @@ $._onepanel = {
         return found;
     },
 
-    addAdjustmentLayer: function(effectName) {
+    // Transform's own motion blur needs two properties: "Use Composition's
+    // Shutter Angle" switched off, then the angle. Display names are localised,
+    // so English names are tried first, then the shape of the effect: its last
+    // checkbox is that switch and the property right after it is the angle
+    // (Uniform Scale, the only other checkbox, comes earlier). Reads the value
+    // back so a silent no-op is reported as a failure, not a success.
+    _setTransformShutter: function(track, effectName, angle) {
+        try {
+            if (!track || !track.clips || !track.clips.numItems) return false;
+            var clip = track.clips[0];
+            var comp = null;
+            for (var i = clip.components.numItems - 1; i >= 0; i--) {
+                var cand = clip.components[i];
+                var mn = "", dn = "";
+                try { mn = String(cand.matchName || ""); } catch (eMn) {}
+                try { dn = String(cand.displayName || ""); } catch (eDn) {}
+                if (mn === "AE.ADBE Geometry2" || dn === effectName) { comp = cand; break; }
+            }
+            if (!comp) { this.log("Shutter: Transform component not found"); return false; }
+
+            var props = comp.properties;
+            var useIdx = -1, angleIdx = -1;
+            for (var p = 0; p < props.numItems; p++) {
+                var nm = "";
+                try { nm = String(props[p].displayName || ""); } catch (eNm) {}
+                if (/composition.*shutter/i.test(nm)) useIdx = p;
+                else if (/shutter/i.test(nm)) angleIdx = p;
+            }
+            // Premiere leaves that checkbox unnamed (checked against a saved
+            // project): it is the parameter directly before "Shutter Angle".
+            if (angleIdx >= 0 && useIdx < 0) useIdx = angleIdx - 1;
+            if (useIdx < 0 || angleIdx < 0) {
+                var lastBool = -1;
+                for (var q = 0; q < props.numItems; q++) {
+                    var v = null;
+                    try { v = props[q].getValue(); } catch (eVal) {}
+                    if (typeof v === "boolean") lastBool = q;
+                }
+                if (lastBool >= 0 && lastBool + 1 < props.numItems) { useIdx = lastBool; angleIdx = lastBool + 1; }
+            }
+            // Last resort for localised names: Transform has 12 parameters and
+            // the switch and angle are the 10th and 11th.
+            if ((useIdx < 0 || angleIdx < 0) && props.numItems === 12) { useIdx = 9; angleIdx = 10; }
+            if (useIdx < 0 || angleIdx < 0) { this.log("Shutter: properties not found"); return false; }
+
+            props[useIdx].setValue(false, true);
+            props[angleIdx].setValue(angle, true);
+            var check = null;
+            try { check = props[angleIdx].getValue(); } catch (eCheck) {}
+            this.log("Shutter: index " + angleIdx + " set to " + angle + ", reads back " + check);
+            return Number(check) === Number(angle);
+        } catch (e) {
+            this.log("Shutter: " + e.message);
+            return false;
+        }
+    },
+
+    addAdjustmentLayer: function(effectName, shutterAngle, templatePath) {
         var seq = this.getSeq();
         if (!seq) return '{"status":"error","message":"Open a sequence first."}';
         if (!app.project) return '{"status":"error","message":"Open a project first."}';
+        var range = this._adjustmentRange(seq);
 
         var layer = this._findAdjustmentLayer();
+        var importedSeqs = [];
+        if (!layer && templatePath) {
+            var originalId = "";
+            try { originalId = seq.sequenceID; } catch (eOid) {}
+            importedSeqs = this._importAdjustmentTemplate(String(templatePath));
+            layer = this._findAdjustmentLayer();
+            // Importing can make the template sequence the active one, and every
+            // step below works on the active sequence. Put the editor's back first.
+            if (importedSeqs.length) {
+                var activeId = "";
+                try { activeId = app.project.activeSequence.sequenceID; } catch (eAct) {}
+                if (activeId !== originalId) {
+                    try { app.project.openSequence(originalId); } catch (eOpen) { this.log("openSequence failed: " + eOpen.message); }
+                    try { activeId = app.project.activeSequence.sequenceID; } catch (eAct2) { activeId = ""; }
+                }
+                if (activeId !== originalId) {
+                    this._removeSequences(importedSeqs);
+                    return '{"status":"error","message":"Premiere switched to another sequence while adding the layer. Click your sequence and try again."}';
+                }
+            }
+        }
         if (!layer) {
             return '{"status":"nolayer","message":"No adjustment layer in this project yet. Create one once with File, New, Adjustment Layer - then this button will reuse it every time."}';
         }
@@ -1119,25 +1269,27 @@ $._onepanel = {
         var track = seq.videoTracks[originalTracks];
         if (!track) return '{"status":"error","message":"The new adjustment track could not be read back."}';
 
-        try { track.overwriteClip(layer, 0); }
+        try { track.overwriteClip(layer, String(range.start)); }
         catch (ePlace) {
             return '{"status":"error","message":"Premiere refused to place the adjustment layer: ' + this._syncPrepEscape(ePlace.message) + '"}';
         }
         if (!track.clips.numItems) {
             return '{"status":"error","message":"The adjustment track stayed empty. Click the timeline once and try again."}';
         }
+        // The layer is now in use on the editor's own timeline, so removing the
+        // imported template sequence cannot take the layer item with it.
+        if (importedSeqs.length) this._removeSequences(importedSeqs);
 
-        // Cover the whole sequence: a reframe that stops partway through is worse
-        // than none, because the cut silently changes framing mid-edit.
+        // Size the layer to the chosen range: the selected clip, the In/Out, or the
+        // whole sequence. A layer that stops short of what was asked for silently
+        // changes framing mid-edit.
         var placed = track.clips[0];
-        var seqEnd = 0;
-        try { seqEnd = Number(String(seq.end)); } catch (eEndRead) {}
-        if (seqEnd > 0) {
+        if (range.end > range.start) {
             try {
                 var en = placed.end;
-                en.ticks = String(seqEnd);
+                en.ticks = String(range.end);
                 placed.end = en;
-            } catch (eStretch) { this.log("Adjustment layer: could not stretch to sequence end: " + eStretch.message); }
+            } catch (eStretch) { this.log("Adjustment layer: could not size to range: " + eStretch.message); }
         }
 
         // The effect name is case sensitive in QE: "transform" returns a nameless
@@ -1167,10 +1319,19 @@ $._onepanel = {
                 ',"message":"Adjustment layer added on V' + (originalTracks + 1) +
                 ', but ' + this._syncPrepEscape(wanted) + ' could not be attached. Add it from the Effects panel."}';
         }
+        var rangeNote = range.source === "clip" ? " over the selected clip"
+            : (range.source === "inout" ? " between In and Out" : " over the whole sequence");
+        var tail = " Open Effect Controls to adjust.";
+        var angle = Number(shutterAngle) || 0;
+        if (angle > 0) {
+            tail = this._setTransformShutter(seq.videoTracks[originalTracks], wanted, angle)
+                ? " Shutter angle set to " + angle + "."
+                : " Could not set the shutter angle - set it in Effect Controls.";
+        }
         return '{"status":"success","track":' + (originalTracks + 1) +
             ',"effect":"' + this._syncPrepEscape(wanted) +
             '","message":"Adjustment layer added on V' + (originalTracks + 1) +
-            ' with ' + this._syncPrepEscape(wanted) + ' ready. Open Effect Controls to adjust."}';
+            rangeNote + ' with ' + this._syncPrepEscape(wanted) + ' ready.' + tail + '"}';
     },
 
     // =========================================================
@@ -1630,25 +1791,130 @@ $._onepanel = {
         return '{"status":"success","message":"Cleared ' + list.length + ' markers","count":' + list.length + '}';
     },
 
-    importClipboardImage: function(filePath) {
+    // Import one file into a named bin and hand back the new project item.
+    // Found by nodeId identity first, because name matching breaks on macOS:
+    // filenames come back decomposed (NFD) while Premiere reports them composed.
+    _importIntoBin: function(fsPath, binName) {
+        var project = app.project;
+        var root = project.rootItem;
+        var bin = null;
         try {
-            var project = app.project;
-            if (!project) { return '{"status":"error","message":"Open a project."}'; }
+            for (var i = 0; i < root.children.numItems; i++) {
+                var child = root.children[i];
+                if (child.name === binName && child.type === 2) { bin = child; break; }
+            }
+            if (!bin) bin = root.createBin(binName);
+        } catch (eBin) { bin = root; }
+        if (!bin) bin = root;
 
-            // Find or create an EFP_Clipboard bin to keep things tidy
-            var bin = null;
+        var beforeIds = {};
+        var countBefore = 0;
+        try {
+            countBefore = bin.children.numItems;
+            for (var s = 0; s < countBefore; s++) {
+                try {
+                    var pre = bin.children[s];
+                    if (pre && pre.nodeId) beforeIds[pre.nodeId] = true;
+                } catch (ePre) {}
+            }
+        } catch (eSnap) {}
+
+        project.importFiles([fsPath], true, bin, false);
+
+        var item = null;
+        try {
+            for (var j = bin.children.numItems - 1; j >= 0; j--) {
+                var cand = bin.children[j];
+                var nid = null;
+                try { nid = cand.nodeId; } catch (eId) {}
+                if (cand && nid && !beforeIds[nid]) { item = cand; break; }
+            }
+        } catch (eScan) {}
+        if (!item) {
             try {
-                var root = project.rootItem;
-                for (var i = 0; i < root.children.numItems; i++) {
-                    var child = root.children[i];
-                    if (child.name === "EFP_Clipboard" && child.type === 2) { bin = child; break; }
+                for (var k = bin.children.numItems - 1; k >= 0; k--) {
+                    var c2 = bin.children[k];
+                    var mp = "";
+                    try { mp = c2.getMediaPath(); } catch (eMp) {}
+                    if (mp && mp === fsPath) { item = c2; break; }
                 }
-                if (!bin) bin = root.createBin("EFP_Clipboard");
-            } catch(e) { bin = project.rootItem; }
+            } catch (eScan2) {}
+        }
+        if (!item) {
+            try {
+                if (bin.children.numItems > countBefore) item = bin.children[bin.children.numItems - 1];
+            } catch (eLast) {}
+        }
+        return { bin: bin, item: item };
+    },
 
-            project.importFiles([filePath], true, bin, false);
-            return '{"status":"success","message":"Added to Project → EFP_Clipboard bin. Drag to place."}';
-        } catch(e) { return '{"status":"error","message":"' + e.message + '"}'; }
+    // Put an item at the playhead on the top video track when that track is
+    // empty, otherwise on a fresh track added above everything. A pasted image is
+    // an overlay, so it belongs on top, and a track with nothing on it can never
+    // have part of an existing edit overwritten by a still's default duration.
+    _placeOnTopAtPlayhead: function(item) {
+        var seq = this.getSeq();
+        if (!seq) return { ok: false, reason: "noseq" };
+        var playheadTicks = seq.getPlayerPosition().ticks;
+
+        var n = seq.videoTracks.numTracks;
+        var targetIndex = -1;
+        if (n > 0) {
+            var top = seq.videoTracks[n - 1];
+            var locked = false;
+            try { locked = (typeof top.isLocked === "function") && top.isLocked(); } catch (eLock) {}
+            if (top.clips.numItems === 0 && !locked) targetIndex = n - 1;
+        }
+        if (targetIndex < 0) {
+            try {
+                app.enableQE();
+                var qeSeq = qe.project.getActiveSequence();
+                qeSeq.addTracks(1, n, 0, 0);
+            } catch (eq) { this.log("_placeOnTopAtPlayhead addTracks failed: " + eq.message); }
+            if (seq.videoTracks.numTracks > n) targetIndex = seq.videoTracks.numTracks - 1;
+        }
+        if (targetIndex < 0) return { ok: false, reason: "notrack" };
+
+        var target = seq.videoTracks[targetIndex];
+        try {
+            target.overwriteClip(item, playheadTicks);
+            return { ok: true, track: targetIndex + 1 };
+        } catch (e1) {
+            try {
+                target.insertClip(item, playheadTicks);
+                return { ok: true, track: targetIndex + 1 };
+            } catch (e2) {
+                return { ok: false, reason: String(e2.message) };
+            }
+        }
+    },
+
+    importClipboardImage: function(filePath, mode) {
+        try {
+            if (!app.project) { return '{"status":"error","message":"Open a project."}'; }
+            var imageFile = new File(encodeURI(filePath));
+            if (!imageFile.exists) {
+                return '{"status":"error","message":"The pasted image is no longer on disk. Paste it again."}';
+            }
+            var got = this._importIntoBin(imageFile.fsName, "EFP_Clipboard");
+            if (!got || !got.item) {
+                return '{"status":"warning","message":"Added to the EFP_Clipboard bin. Drag it to the timeline."}';
+            }
+            if (mode !== "timeline") {
+                return '{"status":"success","message":"Added to Project > EFP_Clipboard bin."}';
+            }
+            var placed = this._placeOnTopAtPlayhead(got.item);
+            if (placed.ok) {
+                return '{"status":"success","message":"Image placed on V' + placed.track + ' at the playhead."}';
+            }
+            if (placed.reason === "noseq") {
+                return '{"status":"warning","message":"Added to the EFP_Clipboard bin. Open a sequence to place it."}';
+            }
+            if (placed.reason === "notrack") {
+                return '{"status":"warning","message":"Added to the EFP_Clipboard bin, but Premiere would not add a track for it. Drag it in manually."}';
+            }
+            return '{"status":"warning","message":"Added to the EFP_Clipboard bin - drag it to the timeline. (' + this._syncPrepEscape(placed.reason) + ')"}';
+        } catch(e) { return '{"status":"error","message":"' + this._syncPrepEscape(e.message) + '"}'; }
     },
 
     openSpeedDialog: function() {

@@ -8,7 +8,7 @@ window.onerror = function(msg, url, line) {
     return true;
 };
 
-var CURRENT_VERSION = "1.3.33";
+var CURRENT_VERSION = "1.3.34";
 var csInterface = null, dsp = null;
 var fsModule = null, osModule = null, pathModule = null, execModule = null, execFileModule = null, spawnModule = null;
 var foundPresetPath = null, foundAudioPresetPaths = {mp3:null, wav:null}, extensionPath = "", configPath = "";
@@ -105,8 +105,9 @@ var i18n = {
         adj_title: "Adjustment Layer",
         adj_desc: "Drop one layer over the whole sequence with the effect already on it. Every shot underneath changes at once.",
         adj_transform: "Transform",
-        adj_safe: "Reuses an adjustment layer already in your project. Undo with Cmd/Ctrl+Z.",
+        adj_safe: "Covers the selected clip, or In to Out, or the whole sequence. Undo with Cmd/Ctrl+Z.",
         adj_working: "Adding the adjustment layer\u2026",
+        adj_shutter: "Motion blur",
         guide_title: "Framing Guide",
         guide_desc: "See what the app will cover, then reframe every shot at once from a single adjustment layer.",
         guide_add_reels: "Instagram Reels",
@@ -127,8 +128,16 @@ var i18n = {
         sync_prep_working: "Preparing separate sync lanes…",
         sync_prep_ready: "{video} video + {audio} audio lane(s) ready, and targeted. Right-click the clips in the timeline and choose Synchronize.",
         paste_title: "Paste from Web",
-        paste_desc: "Copy any image from a browser → click Paste. Added to your Project bin ready to drag in.",
+        paste_desc: "Copy any image in your browser, then press Paste. It shows up here: drag it onto the timeline, or add it at the playhead.",
         paste_btn: "Paste Image from Internet",
+        paste_to_timeline: "Add at playhead",
+        paste_to_bin: "Add to bin",
+        paste_drag_hint: "Or drag the image straight onto the timeline.",
+        paste_drag_tip: "Drag onto the timeline",
+        paste_dismiss: "Clear",
+        paste_ready: "Image ready.",
+        paste_no_image: "No image in the clipboard. Copy an image first.",
+        paste_placing: "Placing\u2026",
         export_title: "Export Engine",
         export_file: "File",
         export_file_ph: "sequence name",
@@ -393,8 +402,9 @@ var i18n = {
         adj_title: "طبقة الضبط",
         adj_desc: "ضع طبقة واحدة فوق التسلسل كله والإفكت عليها جاهز. كل اللقطات تحتها تتغير معاً.",
         adj_transform: "Transform",
-        adj_safe: "تستخدم طبقة ضبط موجودة في مشروعك. للتراجع Cmd/Ctrl+Z.",
+        adj_safe: "تغطي المقطع المحدد، أو من In إلى Out، أو التسلسل كامل. للتراجع Cmd/Ctrl+Z.",
         adj_working: "جارٍ إضافة طبقة الضبط\u2026",
+        adj_shutter: "ضبابية الحركة",
         guide_title: "دليل التأطير",
         guide_desc: "شاهد ما الذي ستغطيه المنصّة، ثم أعد تأطير كل اللقطات دفعة واحدة من طبقة ضبط واحدة.",
         guide_add_reels: "انستغرام ريلز",
@@ -415,8 +425,16 @@ var i18n = {
         sync_prep_working: "جارٍ تجهيز مسارات المزامنة…",
         sync_prep_ready: "جاهز: {video} فيديو و{audio} صوت، كل واحد في مساره ومستهدَف. انقر بزر الفأرة الأيمن على المقاطع واختر Synchronize.",
         paste_title: "لصق من الويب",
-        paste_desc: "انسخ أي صورة من المتصفح → اضغط لصق. تضاف إلى ملفات المشروع جاهزة للسحب.",
+        paste_desc: "انسخ أي صورة من المتصفح ثم اضغط لصق. تظهر هنا: اسحبها إلى التايم لاين، أو أضفها عند مؤشر التشغيل.",
         paste_btn: "لصق صورة من الإنترنت",
+        paste_to_timeline: "أضف عند المؤشر",
+        paste_to_bin: "أضف إلى المشروع",
+        paste_drag_hint: "أو اسحب الصورة مباشرة إلى التايم لاين.",
+        paste_drag_tip: "اسحبها إلى التايم لاين",
+        paste_dismiss: "مسح",
+        paste_ready: "الصورة جاهزة.",
+        paste_no_image: "لا توجد صورة في الحافظة. انسخ صورة أولاً.",
+        paste_placing: "جارٍ الإضافة\u2026",
         export_title: "محرك التصدير",
         export_file: "الملف",
         export_file_ph: "اسم التسلسل",
@@ -1237,6 +1255,28 @@ document.addEventListener("DOMContentLoaded", function() {
         if (!statusEl) return;
         var busy = false;
 
+        var shutterChips = document.querySelectorAll(".adj-shutter-chip");
+        for (var sc = 0; sc < shutterChips.length; sc++) {
+            (function(chip) {
+                chip.addEventListener("click", function() {
+                    for (var k = 0; k < shutterChips.length; k++) shutterChips[k].classList.remove("chip-active");
+                    chip.classList.add("chip-active");
+                });
+            })(shutterChips[sc]);
+        }
+        // The template ships in client/templates. Same base as the framing guide's
+        // images, plus the Windows fix: "file:///C:/x" must become "C:/x", not "/C:/x".
+        function adjTemplatePath() {
+            var base = decodeURI(window.location.href.replace(/[^\/]*$/, "")).replace(/^file:\/\//, "");
+            base = base.replace(/^\/([A-Za-z]:)/, "$1");
+            return (base + "templates/OnePanel_AdjustmentLayer.prproj").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+        }
+        function selectedShutter() {
+            var active = document.querySelector("#adj-shutter-chips .chip-active");
+            var val = active ? parseInt(active.getAttribute("data-val"), 10) : 180;
+            return (val === 180 || val === 360) ? val : 180;
+        }
+
         function setAdjStatus(text, isError) {
             statusEl.textContent = text || "";
             statusEl.className = "sync-prep-status" + (isError ? " is-error" : "");
@@ -1262,7 +1302,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 }
                 setBusy(true);
                 setAdjStatus(t_refine("adj_working"));
-                csInterface.evalScript('$._onepanel.addAdjustmentLayer("' + spec.effect + '")', function(raw) {
+                csInterface.evalScript('$._onepanel.addAdjustmentLayer("' + spec.effect + '", ' + selectedShutter() + ', "' + adjTemplatePath() + '")', function(raw) {
                     console.log("[AdjLayer]", spec.effect, "->", raw);
                     setBusy(false);
                     var result = null;
@@ -3754,6 +3794,23 @@ document.addEventListener("DOMContentLoaded", function() {
 
     safeBind("btn-paste-clipboard", function() { pasteFromClipboard(); });
     safeBind("btn-paste-cancel", function() { cancelPaste(); });
+    safeBind("btn-paste-timeline", function() { placePastedImage("timeline"); });
+    safeBind("btn-paste-bin", function() { placePastedImage("bin"); });
+    safeBind("btn-paste-dismiss", function() { hidePastePreview(); });
+    (function() {
+        var img = document.getElementById("paste-preview-img");
+        if (!img) return;
+        // CEP hands a file path under this type to the host on drop, and the
+        // host imports it where it lands. Windows expects backslashes.
+        img.addEventListener("dragstart", function(ev) {
+            if (!pastePreviewPath || !ev.dataTransfer) return;
+            var dragPath = pastePreviewPath;
+            if (osModule && osModule.platform() === "win32") dragPath = dragPath.replace(/\//g, "\\");
+            ev.dataTransfer.effectAllowed = "copy";
+            ev.dataTransfer.setData("com.adobe.cep.dnd.file.0", dragPath);
+            console.log("[paste] drag out:", dragPath);
+        });
+    })();
 
     // SETTINGS
     var helpBtn = document.getElementById("btn-help-toggle");
@@ -4835,14 +4892,12 @@ function pasteFromClipboard() {
     var isWin = (osModule && osModule.platform() === "win32");
     
     var safeTemp = getSafeTempDir();
-    var tmp;
-    if (isWin) {
-        tmp = pathModule.join(safeTemp, "efp_paste.png");
-    } else {
-        var clipboardDir = getClipboardDir();
-        var uniqueName = "efp_paste_" + Date.now() + ".png";
-        tmp = pathModule.join(clipboardDir, uniqueName);
-    }
+
+    // One file per paste, kept on disk: it is the preview now, and once placed it
+    // is linked project media. Windows used to reuse a single temp file and delete
+    // it right after import, which left every pasted image offline in the project
+    // and let each paste overwrite the one before.
+    var tmp = pathModule.join(getClipboardDir() || safeTemp, "onepanel_paste_" + Date.now() + ".png");
     
     if (isWin) {
         var winPath = tmp.replace(/\//g, "\\");
@@ -4893,16 +4948,11 @@ function pasteFromClipboard() {
                 try { fsModule.unlinkSync(tempPs1); } catch(err) {}
                 if (e || !fsModule.existsSync(tmp)) {
                     console.error("[pasteFromClipboard] PowerShell error or output file missing.", e);
-                    if (ps) ps.innerText = "No image.";
-                    showStatus("No image in clipboard. Copy an image first.", "red");
+                    if (ps) ps.innerText = "";
+                    showStatus(t_refine("paste_no_image"), "red");
                     return;
                 }
-                if (ps) ps.innerText = "Importing...";
-                csInterface.evalScript('$._onepanel.importClipboardImage("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '")', function(res) {
-                    if (ps) ps.innerText = "Done!";
-                    handleJSXResult(res);
-                    try { fsModule.unlinkSync(tmp); } catch(e2) {}
-                });
+                showPastePreview(tmp);
             });
         } catch(err) {
             activeClipboardProcess = null;
@@ -4932,8 +4982,8 @@ function pasteFromClipboard() {
             var out = o ? o.trim() : "";
             if (e || out === "no") {
                 console.error("[pasteFromClipboard] osascript error or returned 'no':", e, out);
-                if (ps) ps.innerText = "No image.";
-                showStatus("No image in clipboard. Copy an image first.", "red");
+                if (ps) ps.innerText = "";
+                showStatus(t_refine("paste_no_image"), "red");
                 return;
             }
             if (!fsModule.existsSync(tmp)) {
@@ -4941,12 +4991,7 @@ function pasteFromClipboard() {
                 showStatus("Failed to write clipboard image file.", "red");
                 return;
             }
-            if (ps) ps.innerText = "Importing...";
-            csInterface.evalScript('$._onepanel.importClipboardImage("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '")', function(res) {
-                if (ps) ps.innerText = "Done!";
-                handleJSXResult(res);
-                // On macOS, do not delete the file since it is linked project media
-            });
+            showPastePreview(tmp);
         });
     }
 }
@@ -4973,20 +5018,59 @@ function importBlob(blob) {
     reader.onload = function(e) {
         var bufClass = (typeof Buffer !== "undefined" ? Buffer : require("buffer").Buffer);
         var buf = bufClass.from(new Uint8Array(e.target.result));
-        var isWin = (osModule.platform() === "win32");
-        var tmp;
-        if (isWin) {
-            tmp = osModule.tmpdir() + "/efp_paste_" + Date.now() + ".png";
-        } else {
-            var clipboardDir = getClipboardDir();
-            tmp = pathModule.join(clipboardDir, "efp_paste_" + Date.now() + ".png");
+        var tmp = pathModule.join(getClipboardDir() || getSafeTempDir(), "onepanel_paste_" + Date.now() + ".png");
+        try {
+            fsModule.writeFileSync(tmp, buf);
+        } catch (writeErr) {
+            console.error("[importBlob] could not write pasted image:", writeErr);
+            showStatus("Failed to write clipboard image file.", "red");
+            return;
         }
-        fsModule.writeFileSync(tmp, buf);
-        csInterface.evalScript('$._onepanel.importClipboardImage("' + tmp.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '")', function(res) {
-            handleJSXResult(res);
-        });
+        showPastePreview(tmp);
     };
     reader.readAsArrayBuffer(blob);
+}
+
+// ── PASTE PREVIEW ────────────────────────────────────────────
+var pastePreviewPath = "";
+
+function fileUrlFromPath(p) {
+    var norm = String(p).replace(/\\/g, "/");
+    if (norm.charAt(0) !== "/") norm = "/" + norm;
+    return "file://" + encodeURI(norm).replace(/#/g, "%23").replace(/\?/g, "%3F");
+}
+
+function showPastePreview(filePath) {
+    var card = document.getElementById("paste-preview");
+    var img = document.getElementById("paste-preview-img");
+    var ps = document.getElementById("paste-status");
+    if (!card || !img) return;
+    pastePreviewPath = filePath;
+    img.src = fileUrlFromPath(filePath);
+    card.classList.remove("hidden");
+    if (ps) ps.innerText = t_refine("paste_ready");
+}
+
+function hidePastePreview() {
+    var card = document.getElementById("paste-preview");
+    var img = document.getElementById("paste-preview-img");
+    var ps = document.getElementById("paste-status");
+    if (card) card.classList.add("hidden");
+    if (img) img.removeAttribute("src");
+    if (ps) ps.innerText = "";
+    pastePreviewPath = "";
+}
+
+function placePastedImage(mode) {
+    if (!pastePreviewPath || !csInterface) return;
+    var ps = document.getElementById("paste-status");
+    if (ps) ps.innerText = t_refine("paste_placing");
+    var escaped = pastePreviewPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    csInterface.evalScript('$._onepanel.importClipboardImage("' + escaped + '", "' + mode + '")', function(res) {
+        console.log("[paste] importClipboardImage " + mode + ":", res);
+        if (ps) ps.innerText = "";
+        handleJSXResult(res);
+    });
 }
 
 

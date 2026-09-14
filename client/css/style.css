@@ -2228,3 +2228,59 @@ html, body {
   color: var(--text-mute);
   margin-top: 2px;
 }
+
+/* ---------- PASTE FROM WEB: preview card ---------- */
+/* A pasted image used to go straight into a bin, so the editor had to leave
+   the panel to find it. It now waits here, where it can be dragged onto the
+   timeline or placed at the playhead in one click. */
+.paste-preview {
+  position: relative;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.25);
+}
+.paste-thumb {
+  display: block;
+  width: 100%;
+  max-height: 160px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: repeating-conic-gradient(rgba(255,255,255,0.05) 0% 25%, transparent 0% 50%) 50% / 16px 16px;
+  cursor: grab;
+}
+.paste-thumb:active { cursor: grabbing; }
+.paste-actions { display: flex; gap: 6px; margin-top: 8px; }
+.paste-actions > button { flex: 1 1 0; width: auto; font-size: 11.5px; padding: 8px 6px; }
+.paste-dismiss {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid var(--glass-border);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+}
+html[dir="rtl"] .paste-dismiss { right: auto; left: 12px; }
+.paste-dismiss:hover { border-color: var(--accent); }
+.paste-preview .sync-prep-safe { margin: 6px 0 0; text-align: center; }
+
+/* ---------- ADJUSTMENT LAYER: shutter angle ---------- */
+.adj-shutter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+.adj-shutter-label { font-size: 11px; color: var(--text-mute); }
+.adj-shutter .seg-group { flex: 0 0 auto; }
+/* width:auto undoes the global `button { width: 100% }` again. */
+.adj-shutter .seg-group .btn-preset { flex: 0 0 auto; width: auto; min-width: 54px; padding: 0 10px; }

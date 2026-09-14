@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>One Panel</title>
-    <link rel="stylesheet" href="css/style.css?v=85">
+    <link rel="stylesheet" href="css/style.css?v=87">
     <script src="js/CSInterface.js"></script>
 </head>
 <body>
@@ -532,10 +532,17 @@
                 <span data-i18n="adj_title">Adjustment Layer</span>
             </h3>
             <p class="description" data-i18n="adj_desc">Drop one layer over the whole sequence with the effect already on it. Every shot underneath changes at once.</p>
+            <div class="adj-shutter" role="group" aria-label="Shutter angle">
+                <span class="adj-shutter-label" data-i18n="adj_shutter">Motion blur</span>
+                <div class="btn-group seg-group" id="adj-shutter-chips">
+                    <button type="button" class="btn-preset adj-shutter-chip chip-active" data-val="180">180&deg;</button>
+                    <button type="button" class="btn-preset adj-shutter-chip" data-val="360">360&deg;</button>
+                </div>
+            </div>
             <div class="guide-picker" role="group" aria-label="Effect">
                 <button id="btn-adj-transform" class="guide-primary" data-i18n="adj_transform">Transform</button>
             </div>
-            <p class="sync-prep-safe" data-i18n="adj_safe">Reuses an adjustment layer already in your project. Undo with Cmd/Ctrl+Z.</p>
+            <p class="sync-prep-safe" data-i18n="adj_safe">Covers the selected clip, or In to Out, or the whole sequence. Undo with Cmd/Ctrl+Z.</p>
             <p id="adj-status" class="sync-prep-status" aria-live="polite"></p>
         </div>
 
@@ -579,11 +586,22 @@
                 <span class="icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span>
                 <span data-i18n="paste_title">Paste from Web</span>
             </h3>
-            <p class="description" data-i18n="paste_desc">Copy any image from a browser → click Paste. Added to your Project bin ready to drag in.</p>
+            <p class="description" data-i18n="paste_desc">Copy any image in your browser, then press Paste. It shows up here: drag it onto the timeline, or add it at the playhead.</p>
             <button id="btn-paste-clipboard" class="paste-btn">
                 <svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:middle; margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 <span data-i18n="paste_btn">Paste Image from Internet</span>
             </button>
+
+            <!-- The pasted image waits here instead of vanishing into a bin. -->
+            <div id="paste-preview" class="paste-preview hidden">
+                <button id="btn-paste-dismiss" class="paste-dismiss" type="button" data-i18n-title="paste_dismiss" title="Clear">&times;</button>
+                <img id="paste-preview-img" class="paste-thumb" alt="" draggable="true" data-i18n-title="paste_drag_tip" title="Drag onto the timeline">
+                <div class="paste-actions">
+                    <button id="btn-paste-timeline" class="guide-primary" type="button" data-i18n="paste_to_timeline">Add at playhead</button>
+                    <button id="btn-paste-bin" class="secondary" type="button" data-i18n="paste_to_bin">Add to bin</button>
+                </div>
+                <p class="sync-prep-safe" data-i18n="paste_drag_hint">Or drag the image straight onto the timeline.</p>
+            </div>
             <button id="btn-capture-frame" class="secondary" data-tooltip="Capture the current frame at the playhead and copy it to your clipboard. Paste anywhere instantly." style="margin-top:8px;" data-i18n="export_capture">
                 📷 Capture Frame
             </button>
@@ -987,7 +1005,7 @@
     <div id="licenseOverlay" class="license-overlay hidden"></div>
 
     <script src="js/dspTools.js"></script>
-    <script src="js/main.js?v=84"></script>
+    <script src="js/main.js?v=85"></script>
     <script src="js/license.js?v=62"></script>
 </body>
 </html>
